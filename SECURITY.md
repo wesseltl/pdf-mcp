@@ -19,8 +19,14 @@ does not do.
 ## What you should still be aware of
 
 - **File access scope.** By default the server can read any `.pdf` path the process has OS permission
-  to read. Run it as a user with access to only the data it should see, or restrict it with normal
-  filesystem permissions / a container.
+  to read. To lock it down, set the environment variable **`PDF_MCP_ALLOWED_DIR`** to a directory: the
+  server will then refuse to read anything outside that directory (symlink and `..` traversal are
+  blocked too). Example:
+
+  ```json
+  { "mcpServers": { "pdf": { "command": "pdf-agent-mcp",
+      "env": { "PDF_MCP_ALLOWED_DIR": "/data/documents" } } } }
+  ```
 - **Prompt injection.** Text inside a spreadsheet is *data*, not instructions. This server returns cell
   values as structured data; it does not execute anything found inside a file. As always, treat the
   content an agent reads from any document as untrusted input in your own workflow.

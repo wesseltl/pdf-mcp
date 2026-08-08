@@ -6,18 +6,38 @@ instead of guessing. Deterministic extraction; the model never invents a cell.
 """
 from __future__ import annotations
 
+import os
+
 import pdfplumber
+
+# Optional sandbox: if PDF_MCP_ALLOWED_DIR is set, only files inside it may be read. This lets you hand
+# the server to an agent without it being able to read arbitrary files on the machine.
+_ALLOWED_DIR = os.environ.get("PDF_MCP_ALLOWED_DIR")
+
+
+def _check_path(path: str) -> str:
+    """Resolve `path` and, if a sandbox dir is configured, reject anything outside it.
+
+    Uses realpath so symlinks and `..` traversal can't escape the allowed directory.
+    """
+    resolved = os.path.realpath(path)
+    if _ALLOWED_DIR:
+        base = os.path.realpath(_ALLOWED_DIR)
+        if os.path.commonpath([resolved, base]) != base:
+            raise PermissionError(
+                f"access denied: {path!r} is outside the allowed directory ({_ALLOWED_DIR})")
+    return resolved
 
 
 def page_count(path: str) -> int:
     """How many pages the PDF has."""
-    with pdfplumber.open(path) as pdf:
+    with pdfplumber.open(_check_path(path)) as pdf:
         return len(pdf.pages)
 
 
 def extract_text(path: str, page: int | None = None) -> dict:
     """Text from one page (1-based) or the whole document if page is None."""
-    with pdfplumber.open(path) as pdf:
+    with pdfplumber.open(_check_path(path)) as pdf:
         if page is not None:
             pages = [pdf.pages[page - 1]]
         else:
@@ -33,7 +53,7 @@ def extract_tables(path: str, page: int | None = None) -> dict:
     Empty cells come back as "".
     """
     out = []
-    with pdfplumber.open(path) as pdf:
+    with pdfplumber.open(_check_path(path)) as pdf:
         pages = [pdf.pages[page - 1]] if page is not None else pdf.pages
         for p in pages:
             for tbl in p.extract_tables():
