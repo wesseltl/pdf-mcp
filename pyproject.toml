@@ -1,0 +1,26 @@
+[build-system]
+requires = ["setuptools>=61"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "pdf-agent-mcp"
+version = "0.1.0"
+description = "An MCP server that lets AI agents extract text and tables from PDFs (invoices, reports, statements)."
+readme = "README.md"
+requires-python = ">=3.10"
+license = { text = "MIT" }
+authors = [{ name = "Wessel ter Laak" }]
+keywords = ["mcp", "ai-agents", "pdf", "table-extraction", "data-extraction", "llm", "model-context-protocol"]
+dependencies = ["pdfplumber>=0.11"]
+
+[project.optional-dependencies]
+mcp = ["mcp>=1.0"]
+
+[project.urls]
+Homepage = "https://github.com/wesseltl/pdf-mcp"
+
+[project.scripts]
+pdf-agent-mcp = "pdf_mcp.server:main"
+
+[tool.setuptools]
+packages = ["pdf_mcp"]
