@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "pdf-agent-mcp"
-version = "0.1.0"
+version = "0.1.1"
 description = "An MCP server that lets AI agents extract text and tables from PDFs (invoices, reports, statements)."
 readme = "README.md"
 requires-python = ">=3.10"
@@ -14,7 +14,7 @@ keywords = ["mcp", "ai-agents", "pdf", "table-extraction", "data-extraction", "l
 dependencies = ["pdfplumber>=0.11"]
 
 [project.optional-dependencies]
-mcp = ["mcp>=1.0"]
+mcp = ["fastmcp>=2.0"]
 
 [project.urls]
 Homepage = "https://github.com/wesseltl/pdf-mcp"
