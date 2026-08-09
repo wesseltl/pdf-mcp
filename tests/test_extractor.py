@@ -54,5 +54,13 @@ class TestExtractor(unittest.TestCase):
         self.assertEqual(r["n_pages"], 1)
 
 
+    def test_assessment_flags_ragged_and_empty(self):
+        from pdf_mcp.extractor import _assess
+        self.assertTrue(_assess([["A","B"],["1","2"]])["looks_clean"])          # clean
+        self.assertFalse(_assess([["A","B","C"],["x","y"]])["looks_clean"])     # ragged
+        self.assertFalse(_assess([["A","B"],["",""]])["looks_clean"])          # mostly empty
+
+
+
 if __name__ == "__main__":
     unittest.main()

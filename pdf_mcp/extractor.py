@@ -46,11 +46,36 @@ def extract_text(path: str, page: int | None = None) -> dict:
     return {"pages": parts, "n_pages": len(parts)}
 
 
+def _assess(rows: list[list]) -> dict:
+    """Judge how trustworthy an extracted table looks, so a clean parse is distinguishable from a
+    confident guess.
+
+    Two honest signals PDF table extraction gets wrong:
+      - ragged: rows with differing column counts usually mean the grid was detected wrong.
+      - empty_ratio: a table that's mostly blank cells is often a bad extraction.
+    """
+    if not rows:
+        return {"looks_clean": False, "warnings": ["empty table"]}
+    widths = {len(r) for r in rows}
+    ragged = len(widths) > 1
+    total = sum(len(r) for r in rows)
+    empty = sum(1 for r in rows for c in r if c == "")
+    empty_ratio = round(empty / total, 3) if total else 1.0
+    warnings = []
+    if ragged:
+        warnings.append(f"ragged: rows have {sorted(widths)} columns (grid may be misdetected)")
+    if empty_ratio > 0.4:
+        warnings.append(f"{int(empty_ratio * 100)}% of cells are empty (extraction may be off)")
+    return {"looks_clean": not warnings, "column_count": None if ragged else widths.pop(),
+            "empty_ratio": empty_ratio, "warnings": warnings}
+
+
 def extract_tables(path: str, page: int | None = None) -> dict:
     """Tables from one page (1-based) or the whole document.
 
-    Each table is a list of rows (each row a list of cell strings), exactly as laid out in the PDF.
-    Empty cells come back as "".
+    Each table is a list of rows (each row a list of cell strings), plus an honest assessment of how
+    clean the extraction looks (ragged column counts and mostly-empty tables are flagged), so the
+    caller can tell a reliable table from a shaky one instead of trusting tidy-looking output.
     """
     out = []
     with pdfplumber.open(_check_path(path)) as pdf:
@@ -58,7 +83,7 @@ def extract_tables(path: str, page: int | None = None) -> dict:
         for p in pages:
             for tbl in p.extract_tables():
                 clean = [[("" if c is None else str(c).strip()) for c in row] for row in tbl]
-                out.append({"page": p.page_number, "rows": clean, "n_rows": len(clean)})
+                out.append({"page": p.page_number, "rows": clean, "n_rows": len(clean), **_assess(clean)})
     return {"tables": out, "n_tables": len(out)}
 
 

@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "pdf-agent-mcp"
-version = "0.1.1"
+version = "0.1.2"
 description = "An MCP server that lets AI agents extract text and tables from PDFs (invoices, reports, statements)."
 readme = "README.md"
 requires-python = ">=3.10"

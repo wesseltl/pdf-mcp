@@ -37,7 +37,7 @@ comes back as structured rows (or CSV), not a flattened line of text:
 |---|---|
 | `page_count(path)` | How many pages the PDF has |
 | `extract_text(path, page)` | Text per page (one page, or the whole doc) |
-| `extract_tables(path, page)` | Tables as rows of cells |
+| `extract_tables(path, page)` | Tables as rows of cells, each with an honest assessment (`looks_clean`, `warnings`) flagging ragged or mostly-empty extractions |
 | `table_to_csv(path, page, index)` | One table as clean CSV text |
 
 ## Quickstart
