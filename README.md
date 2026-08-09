@@ -40,13 +40,23 @@ comes back as structured rows (or CSV), not a flattened line of text:
 | `extract_tables(path, page)` | Tables as rows of cells, each with an honest assessment (`looks_clean`, `warnings`) flagging ragged or mostly-empty extractions |
 | `table_to_csv(path, page, index)` | One table as clean CSV text |
 
-## Quickstart
+## Getting started (Claude Desktop)
+
+The fastest way to use this is with an MCP client like Claude Desktop. Three steps:
+
+**1. Install it**
 
 ```bash
 pip install "pdf-agent-mcp[mcp]"
 ```
 
-Add it to your MCP client (e.g. Claude Desktop):
+**2. Add it to your client's config**
+
+Claude Desktop's config lives here:
+- macOS: `~/Library/Application Support/Claude/claude_desktop_config.json`
+- Windows: `%APPDATA%\Claude\claude_desktop_config.json`
+
+Add the server:
 
 ```json
 {
@@ -56,14 +66,56 @@ Add it to your MCP client (e.g. Claude Desktop):
 }
 ```
 
-Now your agent can answer "pull the line items out of this invoice" by reading the PDF, not guessing.
+**3. Restart Claude Desktop.** You'll see a tools icon appear, meaning the server is connected.
+
+That's it. Now ask about any `.pdf` on your machine:
+
+```
+You:  Pull the line items out of /Users/me/invoices/2024-001.pdf
+
+Agent (calls extract_tables):
+  Item     Qty   Price
+  Widget    3    12.50
+  Gadget    1    40.00
+  Bolt     10     0.25
+  (the table extracted cleanly)
+```
+
+The agent reads the real table structure instead of a flattened blob, so nothing is misaligned.
+
+> **Restricting file access:** to stop the agent reading anything outside one folder, set
+> `PDF_MCP_ALLOWED_DIR`. See [SECURITY.md](SECURITY.md).
+
+## Understanding the output
+
+`extract_tables` returns the rows, plus an honest assessment of how reliable each table looks, so you
+can trust a clean table and double-check a shaky one:
+
+```json
+{
+  "page": 1,
+  "rows": [ ... ],
+  "n_rows": 4,
+  "looks_clean": true,
+  "column_count": 3,
+  "empty_ratio": 0.0,
+  "warnings": []
+}
+```
+
+- **`looks_clean`** — `true` if the table extracted without red flags.
+- **`column_count`** — the number of columns, if every row agrees on it (`null` if rows disagree).
+- **`empty_ratio`** — fraction of blank cells. A high value often means a bad extraction.
+- **`warnings`** — plain-language flags, e.g. *"ragged: rows have [2, 3, 4] columns (grid may be
+  misdetected)"* or *"66% of cells are empty"*. PDF tables are genuinely hard (nested/merged cells,
+  multi-page), so instead of pretending, the tool tells you when a result is suspect.
 
 ## Also usable from plain Python
 
 ```python
 from pdf_mcp import extractor
 
-extractor.extract_tables("invoice.pdf")      # {'tables': [{'rows': [...]}], ...}
+extractor.extract_tables("invoice.pdf")      # {'tables': [{'rows': [...], 'looks_clean': True, ...}]}
 extractor.table_to_csv("invoice.pdf")        # clean CSV of the first table
 extractor.extract_text("report.pdf", page=1)
 ```
