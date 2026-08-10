@@ -86,6 +86,33 @@ The agent reads the real table structure instead of a flattened blob, so nothing
 > **Restricting file access:** to stop the agent reading anything outside one folder, set
 > `PDF_MCP_ALLOWED_DIR`. See [SECURITY.md](SECURITY.md).
 
+## Use it with other MCP clients
+
+The same server works in any MCP client, only the config differs. Use `pdf-agent-mcp` as the command.
+
+**Cursor** — `~/.cursor/mcp.json` (global) or `.cursor/mcp.json` (per project). Same shape as Claude
+Desktop, and it hot-reloads (no restart):
+
+```json
+{ "mcpServers": { "pdf": { "command": "pdf-agent-mcp" } } }
+```
+
+**VS Code / GitHub Copilot** — `.vscode/mcp.json`. Note the different key (`servers`, not `mcpServers`)
+and the required `type`. Tools only run in Copilot **Agent mode**:
+
+```json
+{ "servers": { "pdf": { "type": "stdio", "command": "pdf-agent-mcp" } } }
+```
+
+**Windsurf** — `~/.codeium/windsurf/mcp_config.json` (create it if missing). Same shape as Claude
+Desktop:
+
+```json
+{ "mcpServers": { "pdf": { "command": "pdf-agent-mcp" } } }
+```
+
+**Cline** — add it from the extension's MCP settings panel in VS Code (command: `pdf-agent-mcp`).
+
 ## Understanding the output
 
 `extract_tables` returns the rows, plus an honest assessment of how reliable each table looks, so you
