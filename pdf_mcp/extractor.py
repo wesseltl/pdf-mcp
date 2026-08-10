@@ -85,6 +85,7 @@ def _stitch_multipage(tables: list[dict]) -> list[dict]:
             prev is not None
             and prev.get("column_count") is not None
             and prev["column_count"] == t.get("column_count")
+            and t["page"] == prev["merged_from_pages"][-1] + 1
         )
         if not can_join:
             merged.append({**t, "merged_from_pages": [t["page"]]})

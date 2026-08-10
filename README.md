@@ -151,7 +151,8 @@ extractor.extract_text("report.pdf", page=1)
 ## Tests
 
 ```bash
-python -m unittest discover -s tests     # builds its own test PDF, runs anywhere
+python -m pip install -e ".[test]"
+python -m unittest discover -s tests     # builds synthetic PDFs, runs anywhere
 ```
 
 ## License
