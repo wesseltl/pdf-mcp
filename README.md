@@ -2,6 +2,7 @@
 
 # pdf-mcp
 
+![CI](https://github.com/wesseltl/pdf-mcp/actions/workflows/ci.yml/badge.svg)
 ![Python](https://img.shields.io/badge/python-3.10%2B-blue)
 ![MCP](https://img.shields.io/badge/MCP-server-6E56CF)
 ![License](https://img.shields.io/badge/license-MIT-green)
