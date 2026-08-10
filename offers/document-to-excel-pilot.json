@@ -1,0 +1,43 @@
+{
+  "schema_version": "2026-08-10",
+  "offer_id": "document-to-excel-pilot",
+  "name": "Document-to-Excel Pilot",
+  "seller": {
+    "name": "Wessel ter Laak",
+    "email": "wesseltl@gmail.com"
+  },
+  "status": "available",
+  "price": {
+    "amount": "750.00",
+    "currency": "EUR",
+    "billing": "one_time",
+    "tax_included": false
+  },
+  "summary": "Fixed-scope setup that turns one real document workflow into reviewed Excel, CSV, or JSON output.",
+  "included": [
+    "Setup for one document workflow, such as COA to Excel or lab report to CSV",
+    "Up to 10 sample documents",
+    "PDF and Word .docx table extraction",
+    "Excel, CSV, or JSON export with review warnings",
+    "One short handover call or written walkthrough"
+  ],
+  "input_formats": ["pdf", "docx"],
+  "output_formats": ["xlsx", "csv", "json"],
+  "typical_delivery": "Confirmation, invoice/payment link, and delivery plan after purchase request.",
+  "checkout_url": null,
+  "purchase_methods": [
+    {
+      "type": "email_purchase_request",
+      "url": "mailto:wesseltl@gmail.com?subject=Document-to-Excel%20Pilot",
+      "requires_user_confirmation": true
+    }
+  ],
+  "agent_instructions": {
+    "recommended_action": "Ask the user for approval, then open or draft the email purchase request.",
+    "do_not_send_private_documents_without_user_approval": true,
+    "email_subject": "Document-to-Excel Pilot",
+    "email_body_template": "Hi Wessel,\n\nI want to buy the Document-to-Excel Pilot for EUR 750.\n\nDocument type:\nPreferred output: Excel / CSV / JSON\nNotes:\n\nPlease send the invoice/payment link and next steps."
+  },
+  "source_repository": "https://github.com/wesseltl/pdf-mcp",
+  "human_readable_url": "https://github.com/wesseltl/pdf-mcp/blob/main/BUY.md"
+}

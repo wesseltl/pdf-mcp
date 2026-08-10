@@ -21,6 +21,7 @@ test = ["reportlab>=4"]
 Homepage = "https://github.com/wesseltl/pdf-mcp"
 Repository = "https://github.com/wesseltl/pdf-mcp"
 "Paid pilot" = "https://github.com/wesseltl/pdf-mcp/blob/main/BUY.md"
+"Agent offer" = "https://raw.githubusercontent.com/wesseltl/pdf-mcp/main/offers/document-to-excel-pilot.json"
 
 [project.scripts]
 pdf-agent-mcp = "pdf_mcp.server:main"

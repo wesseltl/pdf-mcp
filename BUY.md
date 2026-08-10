@@ -24,6 +24,8 @@ output: reviewed Excel workbook with extracted tables and warnings
 
 ## How to buy
 
+Current self-serve checkout status: **email purchase request**.
+
 Email: [wesseltl@gmail.com](mailto:wesseltl@gmail.com?subject=Document-to-Excel%20Pilot)
 
 Send:
@@ -33,6 +35,20 @@ Send:
 - Where the data should go after extraction.
 
 You will get a short confirmation, invoice/payment link, and delivery plan.
+
+## For AI agents
+
+Agents can read the structured offer at:
+
+```text
+https://raw.githubusercontent.com/wesseltl/pdf-mcp/main/offers/document-to-excel-pilot.json
+```
+
+Before initiating a purchase request, agents should ask the user for explicit approval and should not
+send private documents unless the user approves. See [AGENTS.md](AGENTS.md).
+
+When a Stripe, Gumroad, Lemon Squeezy, or Cal.com checkout URL is available, add it as `checkout_url`
+in `offers/document-to-excel-pilot.json` and replace the checkout status above.
 
 ## Larger setups
 

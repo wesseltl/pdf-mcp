@@ -17,6 +17,8 @@ agent gets clean rows and never invents a cell.
 
 Need this set up for real documents? See
 [Buy a paid pilot](https://github.com/wesseltl/pdf-mcp/blob/main/BUY.md).
+Agents can use the structured offer at
+[`offers/document-to-excel-pilot.json`](https://raw.githubusercontent.com/wesseltl/pdf-mcp/main/offers/document-to-excel-pilot.json).
 
 ## What it turns a document into
 
