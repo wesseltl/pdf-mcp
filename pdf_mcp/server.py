@@ -8,7 +8,7 @@ Run:  python -m pdf_mcp.server        (needs:  pip install "pdf-agent-mcp[mcp]")
 """
 from __future__ import annotations
 
-from pdf_mcp import docx_extractor, extractor
+from pdf_mcp import docx_extractor, exporter, extractor
 
 try:
     from fastmcp import FastMCP            # standalone FastMCP (mcp SDK 2.x+)
@@ -99,6 +99,19 @@ def docx_table_to_csv(path: str, index: int = 0) -> str:
         index: which table to return if there are several (default the first).
     """
     return docx_extractor.docx_table_to_csv(path, index)
+
+
+@mcp.tool()
+def export_document_tables(input_path: str, output_path: str, merge_multipage: bool = True) -> dict:
+    """Export tables from a PDF or Word document to .xlsx, .csv, or .json.
+
+    Args:
+        input_path: path to the .pdf or .docx file.
+        output_path: path to write. Supported extensions: .xlsx, .csv, .json.
+        merge_multipage: join PDF tables that continue across page breaks. Merged tables are flagged
+            with warnings because continuation is a guess.
+    """
+    return exporter.export_document_tables(input_path, output_path, merge_multipage)
 
 
 def main() -> None:

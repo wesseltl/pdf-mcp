@@ -15,6 +15,9 @@ When you paste a document into a prompt, the columns collapse and the table turn
 model guesses at the numbers. This extracts the actual table structure with deterministic code, so the
 agent gets clean rows and never invents a cell.
 
+Need this set up for real documents? See
+[Buy a paid pilot](https://github.com/wesseltl/pdf-mcp/blob/main/BUY.md).
+
 ## What it turns a document into
 
 A PDF or Word table like this:
@@ -43,6 +46,7 @@ comes back as structured rows (or CSV), not a flattened line of text:
 | `extract_docx_text(path)` | Paragraph text from a `.docx` file |
 | `extract_docx_tables(path)` | Word tables as rows of cells, with the same assessment fields and merged-cell warnings |
 | `docx_table_to_csv(path, index)` | One Word table as clean CSV text |
+| `export_document_tables(input_path, output_path, merge_multipage)` | Export PDF/DOCX tables to `.xlsx`, `.csv`, or `.json` |
 
 ## Getting started (Claude Desktop)
 
@@ -117,6 +121,19 @@ Desktop:
 
 **Cline** — add it from the extension's MCP settings panel in VS Code (command: `pdf-agent-mcp`).
 
+## Export to Excel, CSV, or JSON
+
+For a direct document-to-file workflow, use the CLI:
+
+```bash
+export-document-tables report.pdf report.xlsx
+export-document-tables coa.docx coa.xlsx
+export-document-tables coa.docx coa.json
+```
+
+Excel exports include a `Review` sheet with table locations, row counts, warnings, and whether each
+table needs review. Each extracted table gets its own sheet.
+
 ## Understanding the output
 
 `extract_tables` returns the rows, plus an honest assessment of how reliable each table looks, so you
@@ -147,6 +164,7 @@ can trust a clean table and double-check a shaky one:
 
 ```python
 from pdf_mcp import docx_extractor, extractor
+from pdf_mcp import exporter
 
 extractor.extract_tables("invoice.pdf")      # {'tables': [{'rows': [...], 'looks_clean': True, ...}]}
 extractor.table_to_csv("invoice.pdf")        # clean CSV of the first table
@@ -154,6 +172,8 @@ extractor.extract_text("report.pdf", page=1)
 
 docx_extractor.extract_docx_tables("coa.docx")
 docx_extractor.docx_table_to_csv("coa.docx")
+
+exporter.export_document_tables("coa.docx", "coa.xlsx")
 ```
 
 ## Tests
