@@ -41,7 +41,7 @@ comes back as structured rows (or CSV), not a flattened line of text:
 | `extract_tables(path, page, merge_multipage)` | Tables as rows of cells, each with an honest assessment (`looks_clean`, `warnings`) flagging ragged or mostly-empty extractions |
 | `table_to_csv(path, page, index)` | One table as clean CSV text |
 | `extract_docx_text(path)` | Paragraph text from a `.docx` file |
-| `extract_docx_tables(path)` | Word tables as rows of cells, with the same assessment fields |
+| `extract_docx_tables(path)` | Word tables as rows of cells, with the same assessment fields and merged-cell warnings |
 | `docx_table_to_csv(path, index)` | One Word table as clean CSV text |
 
 ## Getting started (Claude Desktop)
@@ -137,6 +137,8 @@ can trust a clean table and double-check a shaky one:
 - **`looks_clean`** — `true` if the table extracted without red flags.
 - **`column_count`** — the number of columns, if every row agrees on it (`null` if rows disagree).
 - **`empty_ratio`** — fraction of blank cells. A high value often means a bad extraction.
+- **`has_merged_cells`** — Word-only flag for tables with merged cells. Word exposes those cells as
+  repeated values, so the table is flagged for review.
 - **`warnings`** — plain-language flags, e.g. *"ragged: rows have [2, 3, 4] columns (grid may be
   misdetected)"* or *"66% of cells are empty"*. PDF tables are genuinely hard (nested/merged cells,
   multi-page), so instead of pretending, the tool tells you when a result is suspect.

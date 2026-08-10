@@ -31,6 +31,17 @@ def make_docx(path):
     doc.save(path)
 
 
+def make_docx_with_merged_cells(path):
+    from docx import Document
+    doc = Document()
+    table = doc.add_table(rows=2, cols=3)
+    table.rows[0].cells[0].merge(table.rows[0].cells[2]).text = "Results"
+    table.rows[1].cells[0].text = "pH"
+    table.rows[1].cells[1].text = "7.2"
+    table.rows[1].cells[2].text = ""
+    doc.save(path)
+
+
 class TestDocxExtractor(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
@@ -51,6 +62,17 @@ class TestDocxExtractor(unittest.TestCase):
         self.assertEqual(table["rows"][0], ["Analyte", "Result", "Unit"])
         self.assertEqual(table["rows"][2], ["Glucose", "5.1", "mmol/L"])
         self.assertEqual(table["column_count"], 3)
+        self.assertFalse(table["has_merged_cells"])
+
+    def test_extract_docx_tables_flags_merged_cells(self):
+        path = os.path.join(tempfile.mkdtemp(), "merged.docx")
+        make_docx_with_merged_cells(path)
+        r = docx_extractor.extract_docx_tables(path)
+        table = r["tables"][0]
+        self.assertEqual(table["rows"][0], ["Results", "Results", "Results"])
+        self.assertTrue(table["has_merged_cells"])
+        self.assertFalse(table["looks_clean"])
+        self.assertTrue(any("merged cells detected" in w for w in table["warnings"]))
 
     def test_docx_table_to_csv(self):
         csv = docx_extractor.docx_table_to_csv(self.path)

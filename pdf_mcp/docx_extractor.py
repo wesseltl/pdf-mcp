@@ -34,8 +34,26 @@ def extract_docx_tables(path: str) -> dict:
     doc = Document(_check_path(path))
     tables = []
     for i, table in enumerate(doc.tables):
-        rows = [[cell.text.strip() for cell in row.cells] for row in table.rows]
-        tables.append({"index": i, "rows": rows, "n_rows": len(rows), **_assess(rows)})
+        rows = []
+        has_merged_cells = False
+        for row in table.rows:
+            cells = list(row.cells)
+            if len({id(cell._tc) for cell in cells}) < len(cells):
+                has_merged_cells = True
+            rows.append([cell.text.strip() for cell in cells])
+        assessment = _assess(rows)
+        if has_merged_cells:
+            assessment["warnings"] = list(assessment.get("warnings", [])) + [
+                "merged cells detected (Word exposes merged cells as repeated values)"
+            ]
+            assessment["looks_clean"] = False
+        tables.append({
+            "index": i,
+            "rows": rows,
+            "n_rows": len(rows),
+            "has_merged_cells": has_merged_cells,
+            **assessment,
+        })
     return {"tables": tables, "n_tables": len(tables)}
 
 
