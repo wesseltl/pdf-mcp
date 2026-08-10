@@ -7,21 +7,22 @@ does not do.
 
 - **Runs locally.** It executes on your own machine as a normal Python process. Your files are read
   where they sit; nothing is uploaded anywhere.
-- **Read-only.** It only *reads* the PDF files you point it at. It never writes, modifies, moves, or
-  deletes any file.
+- **Read-only.** It only *reads* the PDF or Word files you point it at. It never writes, modifies,
+  moves, or deletes any file.
 - **No network calls.** The server makes no outbound network requests. Your data cannot be sent
   anywhere because nothing is sent anywhere.
 - **No telemetry.** It collects no usage data, no analytics, nothing.
-- **Deterministic reading.** The cell values are read by plain tested Python (`pdfplumber`). A
-  language model never reads a value and writes back a "cleaned" one, so nothing is invented or altered.
+- **Deterministic reading.** The cell values are read by plain tested Python (`pdfplumber` and
+  `python-docx`). A language model never reads a value and writes back a "cleaned" one, so nothing is
+  invented or altered.
 - **Open source (MIT).** Every line is auditable in this repository.
 
 ## What you should still be aware of
 
-- **File access scope.** By default the server can read any `.pdf` path the process has OS permission
-  to read. To lock it down, set the environment variable **`PDF_MCP_ALLOWED_DIR`** to a directory: the
-  server will then refuse to read anything outside that directory (symlink and `..` traversal are
-  blocked too). Example:
+- **File access scope.** By default the server can read any supported document path the process has OS
+  permission to read. To lock it down, set the environment variable **`PDF_MCP_ALLOWED_DIR`** to a
+  directory: the server will then refuse to read anything outside that directory (symlink and `..`
+  traversal are blocked too). Example:
 
   ```json
   { "mcpServers": { "pdf": { "command": "pdf-agent-mcp",

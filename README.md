@@ -7,17 +7,17 @@
 ![MCP](https://img.shields.io/badge/MCP-server-6E56CF)
 ![License](https://img.shields.io/badge/license-MIT-green)
 
-**Let your AI agent pull text and tables out of PDFs.** An [MCP](https://modelcontextprotocol.io)
-server for invoices, reports, and statements, where the data lives in tables the model can't read from
-a pasted blob.
+**Let your AI agent pull text and tables out of PDFs and Word documents.** An
+[MCP](https://modelcontextprotocol.io) server for invoices, reports, statements, and lab documents,
+where the data lives in tables the model can't read from a pasted blob.
 
-When you paste a PDF into a prompt, the columns collapse and the table turns to mush, so the model
-guesses at the numbers. This extracts the actual table structure with deterministic code, so the agent
-gets clean rows and never invents a cell.
+When you paste a document into a prompt, the columns collapse and the table turns to mush, so the
+model guesses at the numbers. This extracts the actual table structure with deterministic code, so the
+agent gets clean rows and never invents a cell.
 
-## What it turns a PDF into
+## What it turns a document into
 
-A PDF invoice table like this:
+A PDF or Word table like this:
 
 ```
 Item     Qty   Price
@@ -40,6 +40,9 @@ comes back as structured rows (or CSV), not a flattened line of text:
 | `extract_text(path, page)` | Text per page (one page, or the whole doc) |
 | `extract_tables(path, page, merge_multipage)` | Tables as rows of cells, each with an honest assessment (`looks_clean`, `warnings`) flagging ragged or mostly-empty extractions |
 | `table_to_csv(path, page, index)` | One table as clean CSV text |
+| `extract_docx_text(path)` | Paragraph text from a `.docx` file |
+| `extract_docx_tables(path)` | Word tables as rows of cells, with the same assessment fields |
+| `docx_table_to_csv(path, index)` | One Word table as clean CSV text |
 
 ## Getting started (Claude Desktop)
 
@@ -69,7 +72,7 @@ Add the server:
 
 **3. Restart Claude Desktop.** You'll see a tools icon appear, meaning the server is connected.
 
-That's it. Now ask about any `.pdf` on your machine:
+That's it. Now ask about any `.pdf` or `.docx` on your machine:
 
 ```
 You:  Pull the line items out of /Users/me/invoices/2024-001.pdf
@@ -141,11 +144,14 @@ can trust a clean table and double-check a shaky one:
 ## Also usable from plain Python
 
 ```python
-from pdf_mcp import extractor
+from pdf_mcp import docx_extractor, extractor
 
 extractor.extract_tables("invoice.pdf")      # {'tables': [{'rows': [...], 'looks_clean': True, ...}]}
 extractor.table_to_csv("invoice.pdf")        # clean CSV of the first table
 extractor.extract_text("report.pdf", page=1)
+
+docx_extractor.extract_docx_tables("coa.docx")
+docx_extractor.docx_table_to_csv("coa.docx")
 ```
 
 ## Tests

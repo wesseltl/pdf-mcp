@@ -1,14 +1,14 @@
-"""server.py — let an AI agent extract text and tables from PDFs as an MCP tool.
+"""server.py — let an AI agent extract text and tables from documents as an MCP tool.
 
-Agents can't read a PDF: they get a flattened blob where columns collapse and tables turn to mush.
-This gives an agent tools to pull the text and the actual table structure out, so it works with clean
-rows instead of guessing. Deterministic extraction; the model never invents a cell.
+Agents often get a flattened blob where columns collapse and tables turn to mush. This gives an
+agent tools to pull the text and the actual table structure out of PDFs and Word documents, so it
+works with clean rows instead of guessing. Deterministic extraction; the model never invents a cell.
 
 Run:  python -m pdf_mcp.server        (needs:  pip install "pdf-agent-mcp[mcp]")
 """
 from __future__ import annotations
 
-from pdf_mcp import extractor
+from pdf_mcp import docx_extractor, extractor
 
 try:
     from fastmcp import FastMCP            # standalone FastMCP (mcp SDK 2.x+)
@@ -68,6 +68,37 @@ def table_to_csv(path: str, page: int | None = None, index: int = 0) -> str:
         index: which table to return if there are several (default the first).
     """
     return extractor.table_to_csv(path, page, index)
+
+
+@mcp.tool()
+def extract_docx_text(path: str) -> dict:
+    """Extract text from a Word .docx file.
+
+    Args:
+        path: path to the .docx file.
+    """
+    return docx_extractor.extract_docx_text(path)
+
+
+@mcp.tool()
+def extract_docx_tables(path: str) -> dict:
+    """Extract tables from a Word .docx file as rows of cells.
+
+    Args:
+        path: path to the .docx file.
+    """
+    return docx_extractor.extract_docx_tables(path)
+
+
+@mcp.tool()
+def docx_table_to_csv(path: str, index: int = 0) -> str:
+    """Extract one Word table and return it as clean CSV text.
+
+    Args:
+        path: path to the .docx file.
+        index: which table to return if there are several (default the first).
+    """
+    return docx_extractor.docx_table_to_csv(path, index)
 
 
 def main() -> None:
