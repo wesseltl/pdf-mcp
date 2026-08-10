@@ -46,14 +46,16 @@ def extract_text(path: str, page: int | None = None) -> dict:
 
 
 @mcp.tool()
-def extract_tables(path: str, page: int | None = None) -> dict:
+def extract_tables(path: str, page: int | None = None, merge_multipage: bool = False) -> dict:
     """Extract tables from a PDF as rows of cells (invoices, reports, statements).
 
     Args:
         path: path to the .pdf file.
         page: 1-based page number, or omit for the whole document.
+        merge_multipage: join tables that continue across page breaks (same column count). Merged
+            tables are flagged with merged_from_pages and a warning, since continuation is a guess.
     """
-    return extractor.extract_tables(path, page)
+    return extractor.extract_tables(path, page, merge_multipage)
 
 
 @mcp.tool()

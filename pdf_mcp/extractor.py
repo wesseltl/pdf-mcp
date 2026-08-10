@@ -70,12 +70,47 @@ def _assess(rows: list[list]) -> dict:
             "empty_ratio": empty_ratio, "warnings": warnings}
 
 
-def extract_tables(path: str, page: int | None = None) -> dict:
+def _stitch_multipage(tables: list[dict]) -> list[dict]:
+    """Join tables that continue across page breaks.
+
+    A table on the next page is treated as a continuation of the previous one when they have the same
+    (non-ragged) column count. If the continuation repeats the header row, it's dropped. This is a
+    heuristic, not a fact, so a merged table reports `merged_from_pages` and a warning, and the caller
+    can turn merging off if it guesses wrong.
+    """
+    merged: list[dict] = []
+    for t in tables:
+        prev = merged[-1] if merged else None
+        can_join = (
+            prev is not None
+            and prev.get("column_count") is not None
+            and prev["column_count"] == t.get("column_count")
+        )
+        if not can_join:
+            merged.append({**t, "merged_from_pages": [t["page"]]})
+            continue
+        rows = t["rows"]
+        # drop a repeated header on the continuation page
+        if rows and rows[0] == prev["rows"][0]:
+            rows = rows[1:]
+        new_rows = prev["rows"] + rows
+        prev.update(rows=new_rows, n_rows=len(new_rows),
+                    merged_from_pages=prev["merged_from_pages"] + [t["page"]], **_assess(new_rows))
+        prev["warnings"] = list(prev.get("warnings", [])) + [
+            f"merged across pages {prev['merged_from_pages']} (continuation guessed from matching columns)"]
+        prev["looks_clean"] = False   # a stitched table is a heuristic; flag it for review
+    return merged
+
+
+def extract_tables(path: str, page: int | None = None, merge_multipage: bool = False) -> dict:
     """Tables from one page (1-based) or the whole document.
 
     Each table is a list of rows (each row a list of cell strings), plus an honest assessment of how
     clean the extraction looks (ragged column counts and mostly-empty tables are flagged), so the
     caller can tell a reliable table from a shaky one instead of trusting tidy-looking output.
+
+    Set `merge_multipage=True` to join tables that continue across page breaks (same column count).
+    Merged tables are flagged with `merged_from_pages` and a warning, since continuation is a guess.
     """
     out = []
     with pdfplumber.open(_check_path(path)) as pdf:
@@ -84,6 +119,8 @@ def extract_tables(path: str, page: int | None = None) -> dict:
             for tbl in p.extract_tables():
                 clean = [[("" if c is None else str(c).strip()) for c in row] for row in tbl]
                 out.append({"page": p.page_number, "rows": clean, "n_rows": len(clean), **_assess(clean)})
+    if merge_multipage:
+        out = _stitch_multipage(out)
     return {"tables": out, "n_tables": len(out)}
 
 

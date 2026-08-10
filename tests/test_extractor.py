@@ -60,6 +60,26 @@ class TestExtractor(unittest.TestCase):
         self.assertFalse(_assess([["A","B","C"],["x","y"]])["looks_clean"])     # ragged
         self.assertFalse(_assess([["A","B"],["",""]])["looks_clean"])          # mostly empty
 
+    def test_stitch_multipage_merges_and_drops_repeated_header(self):
+        from pdf_mcp.extractor import _stitch_multipage
+        page1 = {"page": 1, "rows": [["Item", "Qty"], ["Widget", "3"]], "column_count": 2,
+                 "warnings": [], "looks_clean": True}
+        page2 = {"page": 2, "rows": [["Item", "Qty"], ["Bolt", "10"]], "column_count": 2,
+                 "warnings": [], "looks_clean": True}
+        merged = _stitch_multipage([page1, page2])
+        self.assertEqual(len(merged), 1)                          # joined into one
+        self.assertEqual(merged[0]["merged_from_pages"], [1, 2])
+        # header appears once, both data rows present
+        self.assertEqual(merged[0]["rows"],
+                         [["Item", "Qty"], ["Widget", "3"], ["Bolt", "10"]])
+        self.assertFalse(merged[0]["looks_clean"])                # flagged as a heuristic
+
+    def test_stitch_leaves_mismatched_column_tables_separate(self):
+        from pdf_mcp.extractor import _stitch_multipage
+        a = {"page": 1, "rows": [["A", "B"]], "column_count": 2, "warnings": [], "looks_clean": True}
+        b = {"page": 2, "rows": [["A", "B", "C"]], "column_count": 3, "warnings": [], "looks_clean": True}
+        self.assertEqual(len(_stitch_multipage([a, b])), 2)       # different widths, not merged
+
 
 
 if __name__ == "__main__":
