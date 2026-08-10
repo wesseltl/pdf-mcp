@@ -1,25 +1,24 @@
 {
   "schema_version": "2026-08-10",
-  "offer_id": "document-to-excel-pilot",
-  "name": "Document-to-Excel Starter",
+  "offer_id": "sample-conversion",
+  "name": "Sample Conversion",
   "seller": {
     "name": "Wessel ter Laak",
     "email": "wesseltl@gmail.com"
   },
   "status": "available",
   "price": {
-    "amount": "99.00",
+    "amount": "19.00",
     "currency": "EUR",
     "billing": "one_time",
     "tax_included": false
   },
-  "summary": "Starter setup for one small document workflow into reviewed Excel, CSV, or JSON output.",
+  "summary": "Low-risk sample conversion for one document into Excel, CSV, or JSON.",
   "included": [
-    "Setup for one small document workflow, such as COA to Excel or lab report to CSV",
-    "Up to 5 sample documents",
-    "PDF and Word .docx table extraction",
-    "Excel, CSV, or JSON export with review warnings",
-    "Written walkthrough"
+    "Conversion of 1 sample document",
+    "PDF or Word .docx table extraction",
+    "Excel, CSV, or JSON output",
+    "Short feasibility notes and review warnings"
   ],
   "input_formats": ["pdf", "docx"],
   "output_formats": ["xlsx", "csv", "json"],
@@ -28,15 +27,15 @@
   "purchase_methods": [
     {
       "type": "email_purchase_request",
-      "url": "mailto:wesseltl@gmail.com?subject=Document-to-Excel%20Starter",
+      "url": "mailto:wesseltl@gmail.com?subject=Sample%20Conversion",
       "requires_user_confirmation": true
     }
   ],
   "agent_instructions": {
     "recommended_action": "Ask the user for approval, then open or draft the email purchase request.",
     "do_not_send_private_documents_without_user_approval": true,
-    "email_subject": "Document-to-Excel Starter",
-    "email_body_template": "Hi Wessel,\n\nI want to buy the Document-to-Excel Starter for EUR 99.\n\nDocument type:\nPreferred output: Excel / CSV / JSON\nNotes:\n\nPlease send the invoice/payment link and next steps."
+    "email_subject": "Sample Conversion",
+    "email_body_template": "Hi Wessel,\n\nI want to buy the Sample Conversion for EUR 19.\n\nDocument type:\nPreferred output: Excel / CSV / JSON\nNotes:\n\nPlease send the invoice/payment link and next steps."
   },
   "source_repository": "https://github.com/wesseltl/pdf-mcp",
   "human_readable_url": "https://github.com/wesseltl/pdf-mcp/blob/main/BUY.md"

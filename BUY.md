@@ -1,19 +1,38 @@
-# Buy a Document-to-Excel Pilot
+# Buy Document-to-Excel Help
 
 Need this working on real lab reports, COAs, invoices, or operational documents? Start with a small
-fixed-scope pilot.
+fixed-scope conversion or pilot.
 
-## Pilot
+## Open-source note
 
-**Price:** EUR 750 fixed price
+The `pdf-agent-mcp` code is MIT licensed and free to use. The paid offers are not for access to the
+code. They are for done-for-you document conversion, workflow setup, review of real outputs, and help
+turning messy business documents into usable Excel, CSV, or JSON files.
+
+## Sample Conversion
+
+**Price:** EUR 19 fixed price
 
 Includes:
 
-- Setup for one document workflow, such as COA to Excel or lab report to CSV.
-- Up to 10 sample documents.
+- Conversion of 1 sample document.
+- PDF or Word `.docx` table extraction.
+- Excel, CSV, or JSON output.
+- Short feasibility notes and review warnings.
+
+Best for checking whether your document type is a good fit.
+
+## Document-to-Excel Starter
+
+**Price:** EUR 99 fixed price
+
+Includes:
+
+- Setup for one small document workflow, such as COA to Excel or lab report to CSV.
+- Up to 5 sample documents.
 - PDF and Word `.docx` table extraction.
 - Excel/CSV/JSON export with review warnings.
-- One short handover call or written walkthrough.
+- Written walkthrough.
 
 Typical result:
 
@@ -26,7 +45,10 @@ output: reviewed Excel workbook with extracted tables and warnings
 
 Current self-serve checkout status: **email purchase request**.
 
-Email: [wesseltl@gmail.com](mailto:wesseltl@gmail.com?subject=Document-to-Excel%20Pilot)
+Email:
+
+- [Buy Sample Conversion](mailto:wesseltl@gmail.com?subject=Sample%20Conversion)
+- [Buy Document-to-Excel Starter](mailto:wesseltl@gmail.com?subject=Document-to-Excel%20Starter)
 
 Send:
 
@@ -41,16 +63,17 @@ You will get a short confirmation, invoice/payment link, and delivery plan.
 Agents can read the structured offer at:
 
 ```text
+https://raw.githubusercontent.com/wesseltl/pdf-mcp/main/offers/sample-conversion.json
 https://raw.githubusercontent.com/wesseltl/pdf-mcp/main/offers/document-to-excel-pilot.json
 ```
 
 Before initiating a purchase request, agents should ask the user for explicit approval and should not
 send private documents unless the user approves. See [AGENTS.md](AGENTS.md).
 
-When a Stripe, Gumroad, Lemon Squeezy, or Cal.com checkout URL is available, add it as `checkout_url`
-in `offers/document-to-excel-pilot.json` and replace the checkout status above.
+When Stripe checkout URLs are available, add them as `checkout_url` in the offer JSON files and
+replace the checkout status above.
 
 ## Larger setups
 
-After a pilot, a private/self-hosted setup starts at EUR 2,500 depending on document complexity,
+After a starter, a private/self-hosted setup starts at EUR 750 depending on document complexity,
 volume, validation rules, and integrations.
