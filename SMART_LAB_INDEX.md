@@ -15,12 +15,22 @@ From the repository root:
 ```bash
 python -m venv .venv
 .venv/bin/python -m pip install -e .
+.venv/bin/smart-lab-index-app
+```
+
+Choose a folder in the system dialog. The browser opens locally, enables no-egress mode, and starts
+indexing. **Change folder** returns to the system chooser without requiring a terminal. Picker-created
+workspaces use separate local databases so unrelated laboratory folders are not silently combined.
+
+To open the included demonstration without a picker:
+
+```bash
 .venv/bin/smart-lab-index-app examples/smart_lab_index/sample_lab \
   --database .smart-lab-index-demo.db --source-id lab-alpha --no-egress
 ```
 
-The browser opens locally. Select **Index now**, then open the Review queue to inspect the deliberate
-location conflict and its exact spreadsheet/Word evidence.
+Open the Review queue to inspect the deliberate location conflict and its exact spreadsheet/Word
+evidence.
 
 For the equivalent CLI flow:
 
@@ -44,14 +54,15 @@ Installed packages expose the shorter equivalent command:
 smart-lab-index index /path/to/read-only/lab-folder --no-egress
 ```
 
-By default, durable state is stored at `~/.smart-lab-index/index.db`. Core rejects a database path
-inside the indexed source root.
+Picker-created workspaces store durable state under `~/.smart-lab-index/workspaces/`. Explicit CLI
+runs default to `~/.smart-lab-index/index.db`. Core rejects a database path inside the indexed source
+root.
 
 ## Commands
 
 | Command | Purpose |
 |---|---|
-| `smart-lab-index-app ROOT` | Open the local graphical operator workspace |
+| `smart-lab-index-app [ROOT]` | Choose a folder graphically or open an explicit source root |
 | `index ROOT` | Recursively discover and incrementally index supported files |
 | `status` | Show source, document, entity, assertion, issue, and latest-run counts |
 | `inspect` | Return entities, assertions, provenance, and issues as JSON |
@@ -186,14 +197,21 @@ Documents, Review queue, Issues, Sources, and Modules. Navigation is generated f
 categories and stored data. Evidence rows open a detail dialog showing source path, structural
 locator, confidence, module, and issue evidence.
 
-The app accepts one configured source root at startup, performs indexing in a background thread, and
-uses thread-local SQLite connections for responsive reads. All API routes containing index data
-require a random browser-session token. Mutating routes additionally require a same-origin request.
-Assets are bundled and the Content Security Policy permits only same-origin resources.
+The app accepts an explicit source root or invokes a platform folder dialog. A source change performs
+a controlled same-port restart, rotates the browser-session token, and reloads only after the new
+session is available. Indexing runs in a background thread and SQLite connections remain thread
+local. All API routes containing index data require a random browser-session token. Mutating routes
+additionally require a same-origin request. Assets are bundled and the Content Security Policy
+permits only same-origin resources.
+
+Folder selection uses fixed local system commands without a shell: PowerShell on Windows,
+`osascript` on macOS, and `zenity`, `kdialog`, or `yad` on Linux. Only necessary desktop environment
+variables are forwarded. No source contents are read or copied by the chooser.
 
 ## Current limitations
 
-- The GUI source root is selected at startup; a packaged native folder picker is not implemented.
+- Standalone desktop archives are unsigned ZIP applications rather than signed OS installers. Linux
+  folder selection requires `zenity`, `kdialog`, or `yad` from the desktop environment.
 - Only a filesystem connector and one general laboratory domain pack are implemented.
 - Deterministic rules cover the synthetic MVP columns and a narrow `located_in` text form; they are
   not a general natural-language understanding system.

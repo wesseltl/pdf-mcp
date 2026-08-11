@@ -28,6 +28,7 @@ const DETAIL_KEY_ORDER = [
 
 const elements = {
   announcement: document.getElementById("announcement"),
+  changeSourceButton: document.getElementById("change-source-button"),
   desktopNav: document.getElementById("desktop-nav"),
   detailBody: document.getElementById("detail-body"),
   detailClose: document.getElementById("detail-close"),
@@ -43,6 +44,7 @@ const elements = {
   refreshButton: document.getElementById("refresh-button"),
   shutdownButton: document.getElementById("shutdown-button"),
   sourceRoot: document.getElementById("source-root"),
+  topbarActions: document.getElementById("topbar-actions"),
   viewCount: document.getElementById("view-count"),
   viewRoot: document.getElementById("view-root"),
   viewTitle: document.getElementById("view-title"),
@@ -51,6 +53,7 @@ const elements = {
 const ui = {
   actionError: "",
   activeViewId: null,
+  changingSource: false,
   fetching: false,
   filterByView: new Map(),
   lastOperationState: null,
@@ -285,7 +288,7 @@ function selectInitialView() {
 }
 
 async function refreshState(options = {}) {
-  if (ui.fetching || ui.stopped) {
+  if (ui.fetching || ui.stopped || ui.changingSource) {
     return;
   }
   ui.fetching = true;
@@ -363,6 +366,48 @@ async function startIndex() {
   }
 }
 
+async function changeSource() {
+  if (ui.requestBusy || ui.stopped || ui.changingSource) {
+    return;
+  }
+  ui.requestBusy = true;
+  ui.actionError = "";
+  updateCommandState();
+  try {
+    await apiRequest("/api/change-source", { method: "POST" });
+    ui.changingSource = true;
+    clearPoll();
+    announce("Folder selection opened");
+    renderApplication();
+    window.setTimeout(waitForSourceRestart, 750);
+  } catch (error) {
+    ui.actionError = error instanceof Error ? error.message : "Unable to change the source folder.";
+    renderApplication();
+  } finally {
+    ui.requestBusy = false;
+    updateCommandState();
+  }
+}
+
+async function waitForSourceRestart() {
+  while (ui.changingSource) {
+    try {
+      const response = await fetch("/", {
+        cache: "no-store",
+        credentials: "same-origin",
+      });
+      const html = response.ok ? await response.text() : "";
+      if (response.ok && html && !html.includes(SESSION_TOKEN)) {
+        window.location.reload();
+        return;
+      }
+    } catch (_error) {
+      // The loopback server is intentionally offline while the chooser is open.
+    }
+    await new Promise((resolve) => window.setTimeout(resolve, 500));
+  }
+}
+
 async function stopApplication() {
   if (ui.requestBusy || ui.stopped) {
     return;
@@ -392,8 +437,9 @@ async function stopApplication() {
 
 function updateCommandState() {
   const indexing = operationState() === "INDEXING";
-  const disabled = ui.requestBusy || ui.stopped;
+  const disabled = ui.requestBusy || ui.stopped || ui.changingSource;
   elements.indexButton.disabled = disabled || indexing || !ui.state;
+  elements.changeSourceButton.disabled = disabled || indexing || !ui.state;
   elements.refreshButton.disabled = disabled || ui.fetching;
   elements.shutdownButton.disabled = disabled;
   elements.mobileViewSelect.disabled = ui.stopped || !currentViews().length;
@@ -516,6 +562,11 @@ function renderChrome() {
   elements.sourceRoot.textContent = root;
   elements.sourceRoot.title = root;
   elements.productVersion.textContent = `Version ${scalarText(ui.state?.product_version)}`;
+  elements.changeSourceButton.hidden = source.can_change_source !== true;
+  elements.topbarActions.classList.toggle(
+    "has-source-picker",
+    source.can_change_source === true,
+  );
 
   const noEgress = source.no_egress === true;
   elements.egressStatus.className = `status-badge ${noEgress ? "status-success" : "status-warning"}`;
@@ -635,11 +686,29 @@ function renderApplication() {
     return;
   }
 
+  if (ui.changingSource) {
+    renderChangingSource();
+    return;
+  }
+
   renderChrome();
   renderNavigation();
   renderViewHeader();
   renderOperationStatus();
   renderActiveView();
+  updateCommandState();
+}
+
+function renderChangingSource() {
+  elements.operationStatus.replaceChildren();
+  const panel = emptyState(
+    "Choose a source folder",
+    "The local folder chooser is open.",
+    "⌖",
+  );
+  panel.classList.add("stopped-panel");
+  elements.viewRoot.replaceChildren(panel);
+  elements.viewRoot.setAttribute("aria-busy", "true");
   updateCommandState();
 }
 
@@ -1362,6 +1431,7 @@ function closeDetails() {
 }
 
 elements.refreshButton.addEventListener("click", () => refreshState({ announceRefresh: true }));
+elements.changeSourceButton.addEventListener("click", changeSource);
 elements.indexButton.addEventListener("click", startIndex);
 elements.shutdownButton.addEventListener("click", stopApplication);
 elements.mobileViewSelect.addEventListener("change", (event) => chooseView(event.target.value));

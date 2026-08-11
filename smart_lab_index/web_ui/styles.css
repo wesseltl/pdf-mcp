@@ -29,6 +29,10 @@
   letter-spacing: 0;
 }
 
+[hidden] {
+  display: none !important;
+}
+
 html {
   min-width: 320px;
   min-height: 100%;
@@ -300,6 +304,10 @@ select:focus-visible,
 .button {
   padding: 7px 12px;
   white-space: nowrap;
+}
+
+.label-compact {
+  display: none;
 }
 
 .icon-button {
@@ -1156,13 +1164,26 @@ select:focus-visible,
 @media (max-width: 420px) {
   .topbar-actions {
     display: grid;
-    grid-template-columns: 36px minmax(0, 1fr) minmax(0, 1fr);
+    grid-template-columns: 36px repeat(2, minmax(0, 1fr));
+  }
+
+  .topbar-actions.has-source-picker {
+    grid-template-columns: 36px repeat(3, minmax(0, 1fr));
   }
 
   .topbar-actions .button {
     min-width: 0;
-    padding-right: 8px;
-    padding-left: 8px;
+    padding-right: 5px;
+    padding-left: 5px;
+    font-size: 13px;
+  }
+
+  .label-wide {
+    display: none;
+  }
+
+  .label-compact {
+    display: inline;
   }
 
   .view-heading h1 {

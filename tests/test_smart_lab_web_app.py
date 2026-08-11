@@ -8,10 +8,11 @@ import tempfile
 import threading
 import unittest
 from pathlib import Path
+from unittest.mock import Mock, call, patch
 
 from scripts.generate_smart_lab_example import generate
 from smart_lab_index.core.config import RuntimePolicy
-from smart_lab_index.web_app import create_server
+from smart_lab_index.web_app import create_server, main
 
 
 class SmartLabWebAppTests(unittest.TestCase):
@@ -25,6 +26,7 @@ class SmartLabWebAppTests(unittest.TestCase):
             database=self.database,
             source_id="lab-alpha-web",
             policy=RuntimePolicy(no_egress=True),
+            allow_source_change=True,
             port=0,
         )
         self.port = self.server.server_address[1]
@@ -32,7 +34,8 @@ class SmartLabWebAppTests(unittest.TestCase):
         self.thread.start()
 
     def tearDown(self) -> None:
-        self.server.shutdown()
+        if self.thread.is_alive():
+            self.server.shutdown()
         self.server.server_close()
         self.state.wait_for_index(timeout=10)
         self.thread.join(timeout=2)
@@ -95,6 +98,7 @@ class SmartLabWebAppTests(unittest.TestCase):
         payload = self.state_payload()
         self.assertEqual(payload["source"]["source_id"], "lab-alpha-web")
         self.assertTrue(payload["source"]["no_egress"])
+        self.assertTrue(payload["source"]["can_change_source"])
         self.assertEqual(payload["summary"]["entities"], 0)
         view_ids = [view["view_id"] for view in payload["views"]]
         self.assertEqual(view_ids[0], "overview")
@@ -143,6 +147,26 @@ class SmartLabWebAppTests(unittest.TestCase):
                 policy=RuntimePolicy(no_egress=True),
                 port=0,
             )
+
+    def test_change_source_action_is_authenticated_and_stops_for_picker(self) -> None:
+        status, _headers, _content = self.request(
+            "POST",
+            "/api/change-source",
+            body=b"",
+        )
+        self.assertEqual(status, 403)
+
+        status, _headers, content = self.request(
+            "POST",
+            "/api/change-source",
+            body=b"",
+            headers=self.api_headers(),
+        )
+        self.assertEqual(status, 202)
+        self.assertTrue(json.loads(content)["changing"])
+        self.thread.join(timeout=2)
+        self.assertFalse(self.thread.is_alive())
+        self.assertTrue(self.state.source_change_requested)
 
     def test_gui_index_flow_preserves_evidence_and_is_incremental(self) -> None:
         status, _headers, content = self.request(
@@ -199,6 +223,173 @@ class SmartLabWebAppTests(unittest.TestCase):
         self.assertEqual(rerun["unchanged"], 4)
         self.assertEqual(rerun["parsed"], 0)
         self.assertEqual(rerun["assertions"], 0)
+
+
+class SmartLabWebAppMainTests(unittest.TestCase):
+    def test_no_root_uses_picker_enables_no_egress_and_indexes(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary) / "lab"
+            root.mkdir()
+            server = Mock()
+            server.server_address = ("127.0.0.1", 9020)
+            state = Mock()
+            state.root = str(root)
+            state.database = str(Path(temporary) / "index.db")
+            state.policy = RuntimePolicy(no_egress=True)
+            state.source_change_requested = False
+            with (
+                patch(
+                    "smart_lab_index.web_app.folder_picker_available",
+                    return_value=True,
+                ),
+                patch(
+                    "smart_lab_index.web_app.choose_source_folder",
+                    return_value=root,
+                ),
+                patch(
+                    "smart_lab_index.web_app.create_server",
+                    return_value=(server, state),
+                ) as create,
+            ):
+                result = main(["--no-browser", "--port", "0"])
+
+        self.assertEqual(result, 0)
+        self.assertTrue(create.call_args.kwargs["policy"].no_egress)
+        self.assertTrue(create.call_args.kwargs["allow_source_change"])
+        managed_database = Path(create.call_args.kwargs["database"])
+        self.assertEqual(managed_database.parent.name, "workspaces")
+        self.assertNotIn(root.name, managed_database.name)
+        state.start_index.assert_called_once_with()
+        server.serve_forever.assert_called_once_with(poll_interval=0.25)
+
+    def test_source_change_restarts_same_port_and_clears_explicit_source_id(
+        self,
+    ) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            first_root = Path(temporary) / "first"
+            second_root = Path(temporary) / "second"
+            first_root.mkdir()
+            second_root.mkdir()
+            servers = [Mock(), Mock()]
+            states = [Mock(), Mock()]
+            for server in servers:
+                server.server_address = ("127.0.0.1", 9030)
+            for state, root, changing in zip(
+                states,
+                (first_root, second_root),
+                (True, False),
+                strict=True,
+            ):
+                state.root = str(root)
+                state.database = str(Path(temporary) / "index.db")
+                state.policy = RuntimePolicy(no_egress=True)
+                state.source_change_requested = changing
+            with (
+                patch(
+                    "smart_lab_index.web_app.folder_picker_available",
+                    return_value=True,
+                ),
+                patch(
+                    "smart_lab_index.web_app.choose_source_folder",
+                    return_value=second_root,
+                ),
+                patch(
+                    "smart_lab_index.web_app.create_server",
+                    side_effect=list(zip(servers, states, strict=True)),
+                ) as create,
+            ):
+                result = main(
+                    [
+                        str(first_root),
+                        "--source-id",
+                        "explicit-source",
+                        "--no-browser",
+                        "--port",
+                        "9030",
+                    ]
+                )
+
+        self.assertEqual(result, 0)
+        self.assertEqual(create.call_count, 2)
+        self.assertEqual(
+            create.call_args_list,
+            [
+                call(
+                    str(first_root),
+                    database="~/.smart-lab-index/index.db",
+                    source_id="explicit-source",
+                    policy=RuntimePolicy(no_egress=False),
+                    disabled_module_ids=[],
+                    allow_source_change=True,
+                    port=9030,
+                ),
+                call(
+                    second_root,
+                    database="~/.smart-lab-index/index.db",
+                    source_id=None,
+                    policy=RuntimePolicy(no_egress=False),
+                    disabled_module_ids=[],
+                    allow_source_change=True,
+                    port=9030,
+                ),
+            ],
+        )
+        states[0].start_index.assert_not_called()
+        states[1].start_index.assert_called_once_with()
+
+    def test_failed_source_change_restores_previous_workspace(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            first_root = Path(temporary) / "first"
+            rejected_root = Path(temporary) / "rejected"
+            first_root.mkdir()
+            rejected_root.mkdir()
+            first_server = Mock()
+            restored_server = Mock()
+            first_server.server_address = ("127.0.0.1", 9040)
+            restored_server.server_address = ("127.0.0.1", 9040)
+            first_state = Mock()
+            first_state.root = str(first_root)
+            first_state.database = str(Path(temporary) / "index.db")
+            first_state.policy = RuntimePolicy(no_egress=True)
+            first_state.source_change_requested = True
+            restored_state = Mock()
+            restored_state.root = str(first_root)
+            restored_state.database = first_state.database
+            restored_state.policy = RuntimePolicy(no_egress=True)
+            restored_state.source_change_requested = False
+            with (
+                patch(
+                    "smart_lab_index.web_app.folder_picker_available",
+                    return_value=True,
+                ),
+                patch(
+                    "smart_lab_index.web_app.choose_source_folder",
+                    return_value=rejected_root,
+                ),
+                patch(
+                    "smart_lab_index.web_app.create_server",
+                    side_effect=[
+                        (first_server, first_state),
+                        ValueError("invalid selected source"),
+                        (restored_server, restored_state),
+                    ],
+                ) as create,
+            ):
+                result = main(
+                    [
+                        str(first_root),
+                        "--database",
+                        first_state.database,
+                        "--no-browser",
+                        "--port",
+                        "9040",
+                    ]
+                )
+
+        self.assertEqual(result, 0)
+        self.assertEqual(create.call_count, 3)
+        self.assertEqual(create.call_args_list[-1].args[0], str(first_root))
+        restored_state.start_index.assert_not_called()
 
 
 if __name__ == "__main__":

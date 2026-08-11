@@ -43,6 +43,7 @@ will still publish successfully.
    ```bash
    python -m pip install -e ".[desktop-build]"
    python scripts/build_desktop_app.py
+   python scripts/build_smart_lab_desktop_app.py
    ```
 
 4. Run the paid-beta metadata and launch checks:
@@ -60,8 +61,10 @@ will still publish successfully.
    git push origin "v$VERSION"
    ```
 
-The `Publish` workflow builds and smoke-tests standalone browser apps on Windows, macOS, and Linux,
-then creates a GitHub release with those archives and the Python distributions. When
+The `Publish` workflow builds and smoke-tests the PDF converter and Smart Lab Index standalone apps
+on Windows, macOS, and Linux, then creates a GitHub release with those archives and the Python
+distributions. The Smart Lab smoke test runs the compiled executable through the complete synthetic
+no-egress index. When
 `PYPI_PUBLISH_ENABLED=true`, it also uploads the package to PyPI and, after that succeeds, publishes
 matching metadata to the MCP Registry. The `Pages` workflow deploys the public site from `docs/` on
 every push to `main`.

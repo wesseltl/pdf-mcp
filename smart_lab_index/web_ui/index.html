@@ -32,17 +32,23 @@
           <strong id="source-root" class="source-root">Loading…</strong>
           <span id="egress-status" class="status-badge status-neutral">Checking policy</span>
         </div>
-        <div class="topbar-actions">
+        <div id="topbar-actions" class="topbar-actions">
           <button id="refresh-button" class="icon-button" type="button" title="Refresh data" aria-label="Refresh data">
             <span aria-hidden="true">↻</span>
           </button>
+          <button id="change-source-button" class="button button-secondary" type="button" title="Choose another source folder" hidden>
+            <span class="label-wide">Change folder</span>
+            <span class="label-compact">Folder</span>
+          </button>
           <button id="index-button" class="button button-primary" type="button">
             <span aria-hidden="true">▶</span>
-            <span>Index now</span>
+            <span class="label-wide">Index now</span>
+            <span class="label-compact">Index</span>
           </button>
           <button id="shutdown-button" class="button button-danger-quiet" type="button">
             <span aria-hidden="true">■</span>
-            <span>Stop app</span>
+            <span class="label-wide">Stop app</span>
+            <span class="label-compact">Stop</span>
           </button>
         </div>
       </header>

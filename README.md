@@ -18,13 +18,16 @@ services, telemetry, or network access. Start with the four-file synthetic examp
 ```bash
 python -m venv .venv
 .venv/bin/python -m pip install -e .
-.venv/bin/smart-lab-index-app examples/smart_lab_index/sample_lab \
-  --database .smart-lab-index-demo.db --no-egress
+.venv/bin/smart-lab-index-app
 ```
 
-The browser opens the Overview workspace. Select **Index now** to populate Equipment, Locations,
-People, Responsibilities, Documents, Review queue, Sources, and Modules. The app binds only to
-loopback and serves bundled assets.
+Choose a laboratory folder in the system dialog. The browser opens the Overview workspace and starts
+the first index automatically. Equipment, Locations, People, Responsibilities, Documents, Review
+queue, Sources, and Modules remain local. **Change folder** switches workspaces without a terminal.
+The app binds only to loopback and serves bundled assets.
+
+The release workflow also creates standalone `smart-lab-index` ZIP applications for Windows, macOS,
+and Linux. After extraction, open the application directly; Python is not required.
 
 ## Document ingestion compatibility
 
