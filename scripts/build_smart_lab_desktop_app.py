@@ -242,6 +242,12 @@ def _wait_for_expected_index(
                 if not match:
                     raise RuntimeError("desktop app did not provide a browser session")
                 token = match.group(1)
+                with urllib.request.urlopen(
+                    f"http://127.0.0.1:{port}/icons.svg", timeout=1
+                ) as response:
+                    icons = response.read().decode("utf-8")
+                if 'id="shield-check"' not in icons:
+                    raise RuntimeError("desktop app did not bundle the interface icons")
             request = urllib.request.Request(
                 f"http://127.0.0.1:{port}/api/state",
                 headers={"X-Smart-Lab-Session": token},
@@ -318,9 +324,9 @@ def archive_app(signing_status: str) -> Path:
         "==================================\n\n"
         f"{launch_instruction}\n"
         "The first time, connect a laboratory folder in the system dialog. The local browser "
-        "workspace opens and starts a read-only file scan. Smart Lab Index remembers that folder "
-        "and repeats incremental scans automatically. Use Change to switch folders and Close app "
-        "when finished.\n\n"
+        "workspace opens and starts a read-only file sync. Smart Lab Index remembers that folder "
+        "and repeats incremental syncs automatically. Use Manage source to switch folders and "
+        "Close application when finished.\n\n"
         "The desktop flow starts in no-egress mode and serves only bundled assets on loopback. "
         "If a system folder dialog is unavailable, the app opens its own local folder navigator.\n\n"
         f"{trust_note}\n",
