@@ -7,27 +7,55 @@
 ![MCP](https://img.shields.io/badge/MCP-server-6E56CF)
 ![License](https://img.shields.io/badge/license-MIT-green)
 
-**Turn recurring PDF and Word tables into profile-checked records with source evidence.** An
-[MCP](https://modelcontextprotocol.io) server for lab reports, certificates of analysis, invoices,
-statements, and other born-digital business documents.
+**Turn tables in PDF and Word documents into Excel, CSV, or JSON.** Use the simple browser app with
+no agent setup, or connect the same deterministic extraction tools to an AI agent through
+[MCP](https://modelcontextprotocol.io).
 
-Raw extraction is useful but easy to mistrust. pdf-mcp can instead run a versioned document profile:
-it maps declared headers, validates required fields and types, keeps every value tied to its source
-cell, and returns `accepted`, `needs_review`, or `rejected`. Cell values come from deterministic
-parsers, not model-generated output.
+The browser app is for direct table conversion. It previews the extracted rows, highlights basic
+structure warnings, and keeps files on your computer. Advanced profile checking can additionally
+validate named fields, preserve source evidence, and return `accepted`, `needs_review`, or
+`rejected` for a recurring document workflow. Cell values come from document parsers, not generated
+model output.
 
 Need a profile and measured baseline for real documents? See the
 [Document Reliability Pilot](https://github.com/wesseltl/pdf-mcp/blob/main/BUY.md).
 Agents can use the structured offer at
 [`offers/document-to-excel-pilot.json`](https://raw.githubusercontent.com/wesseltl/pdf-mcp/main/offers/document-to-excel-pilot.json).
 
-Landing page: [local extraction and free hosted agent beta](https://wesseltl.github.io/pdf-mcp/).
+Website: [simple conversion, local tools, and the free hosted agent beta](https://wesseltl.github.io/pdf-mcp/).
 
 > **Current limitation:** PDF extraction supports born-digital documents. Scanned or image-only PDFs
 > require OCR, which is not included. An `accepted` decision means the configured checks passed; it
 > does not prove that the source document itself is correct.
 
-## Local or free hosted beta
+## Simple browser app
+
+This is the easiest way to use pdf-mcp. It requires no Python, terminal, MCP client, or agent
+configuration after downloading the app.
+
+1. Open the [latest release](https://github.com/wesseltl/pdf-mcp/releases/latest).
+2. Download the `pdf-mcp-app` ZIP for Windows, macOS, or Linux.
+3. Unzip it and open `pdf-mcp-app`.
+4. Your browser opens. Drop in a PDF or Word document, choose Excel, CSV, or JSON, and select
+   **Convert document**.
+
+Use **Stop app** in the browser when finished. The app listens only on your computer. Temporary
+document copies are deleted immediately after conversion, and prepared downloads expire after 30
+minutes or when the app stops. The community beta downloads are currently unsigned, so the operating
+system may ask you to confirm that you want to open them.
+
+If Python is already installed, the same interface can be started with:
+
+```bash
+python -m pip install "pdf-agent-mcp @ https://github.com/wesseltl/pdf-mcp/releases/download/v0.4.0/pdf_agent_mcp-0.4.0-py3-none-any.whl"
+pdf-mcp-app
+```
+
+The simple app performs raw table extraction. “No basic structure problems detected” is not an
+accuracy guarantee. Check important values before using them, or use a profile-checked pilot for a
+recurring business workflow.
+
+## For agents: local or free hosted beta
 
 The normal `pdf-agent-mcp` command remains local, MIT licensed, network-free, and telemetry-free.
 For people who explicitly want a measured agent beta, `pdf-agent-cloud-mcp` uploads only the selected
@@ -51,7 +79,7 @@ a document; invitations begin only after the endpoint is verified:
 After acceptance, install and configure the separate bridge with the endpoint and key you receive:
 
 ```bash
-python -m pip install "pdf-agent-mcp[cloud] @ https://github.com/wesseltl/pdf-mcp/releases/download/v0.3.0/pdf_agent_mcp-0.3.0-py3-none-any.whl"
+python -m pip install "pdf-agent-mcp[cloud] @ https://github.com/wesseltl/pdf-mcp/releases/download/v0.4.0/pdf_agent_mcp-0.4.0-py3-none-any.whl"
 ```
 
 ```json
@@ -116,14 +144,14 @@ can be checked against `invoice-lines-v1` and returned as canonical records with
 | `docx_table_to_csv(path, index)` | One Word table as clean CSV text |
 | `export_document_tables(input_path, output_path, merge_multipage)` | Export PDF/DOCX tables to `.xlsx`, `.csv`, or `.json` |
 
-## Getting started (Claude Desktop)
+## MCP setup for Claude Desktop
 
 The fastest way to use this is with an MCP client like Claude Desktop. Three steps:
 
 **1. Install it**
 
 ```bash
-python -m pip install "pdf-agent-mcp[mcp] @ https://github.com/wesseltl/pdf-mcp/releases/download/v0.3.0/pdf_agent_mcp-0.3.0-py3-none-any.whl"
+python -m pip install "pdf-agent-mcp[mcp] @ https://github.com/wesseltl/pdf-mcp/releases/download/v0.4.0/pdf_agent_mcp-0.4.0-py3-none-any.whl"
 ```
 
 **2. Add it to your client's config**

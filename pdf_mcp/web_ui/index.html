@@ -1,0 +1,144 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="pdf-mcp-session" content="__PDF_MCP_SESSION__">
+    <title>Convert Document Tables | pdf-mcp</title>
+    <meta name="description" content="Convert tables in PDF and Word documents to Excel, CSV, or JSON on your own computer.">
+    <link rel="stylesheet" href="/styles.css">
+    <script src="/app.js" defer></script>
+  </head>
+  <body>
+    <header class="app-header">
+      <a class="brand" href="/" aria-label="pdf-mcp converter home">pdf-mcp</a>
+      <p class="local-state"><span aria-hidden="true"></span>Runs on this computer</p>
+      <div class="header-actions">
+        <a class="help-link" href="https://github.com/wesseltl/pdf-mcp#simple-browser-app" target="_blank" rel="noopener">Help</a>
+        <button class="stop-button" id="stop-app" type="button">Stop app</button>
+      </div>
+    </header>
+
+    <main>
+      <section class="intro" aria-labelledby="page-title">
+        <p class="eyebrow">Document table converter</p>
+        <h1 id="page-title">Turn a PDF or Word table into a spreadsheet.</h1>
+        <p>Choose a document, select an output, and download the extracted rows. No agent or technical setup is needed after the app opens.</p>
+        <p class="format-line"><strong>Input:</strong> PDF or DOCX <span aria-hidden="true">|</span> <strong>Output:</strong> Excel, CSV, or JSON</p>
+      </section>
+
+      <section class="tool-shell" id="converter" aria-labelledby="converter-title">
+        <h2 class="visually-hidden" id="converter-title">Convert a document</h2>
+        <div class="tool-body">
+          <section class="tool-step file-step" aria-labelledby="file-step-title">
+            <div class="step-heading">
+              <span class="step-number">1</span>
+              <div><h3 id="file-step-title">Choose a document</h3><p>PDF or Word .docx, up to 25 MB and 100 PDF pages</p></div>
+            </div>
+
+            <label class="drop-zone" id="drop-zone" for="file-input">
+              <input id="file-input" type="file" accept=".pdf,.docx,application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document">
+              <span class="file-mark" aria-hidden="true"></span>
+              <strong>Drop a document here</strong>
+              <span>or click to choose one</span>
+            </label>
+
+            <div class="selected-file" id="selected-file" hidden>
+              <div class="file-type" id="file-type" aria-hidden="true">PDF</div>
+              <div class="file-details"><strong id="file-name"></strong><span id="file-size"></span></div>
+              <button class="text-command" id="remove-file" type="button">Remove</button>
+            </div>
+          </section>
+
+          <section class="tool-step output-step" aria-labelledby="output-step-title">
+            <div class="step-heading">
+              <span class="step-number">2</span>
+              <div><h3 id="output-step-title">Choose the output</h3><p>Excel is easiest for most people</p></div>
+            </div>
+
+            <fieldset class="format-options">
+              <legend class="visually-hidden">Output format</legend>
+              <label>
+                <input type="radio" name="output-format" value="xlsx" checked>
+                <span><strong>Excel</strong><small>Recommended</small></span>
+              </label>
+              <label>
+                <input type="radio" name="output-format" value="csv">
+                <span><strong>CSV</strong><small>Plain rows</small></span>
+              </label>
+              <label>
+                <input type="radio" name="output-format" value="json">
+                <span><strong>JSON</strong><small>For software</small></span>
+              </label>
+            </fieldset>
+
+            <label class="checkbox-row">
+              <input id="merge-pages" type="checkbox" checked>
+              <span><strong>Join tables continued on the next page</strong><small>Continued tables are marked for review.</small></span>
+            </label>
+
+            <div class="privacy-note">
+              <strong>Your file stays on this computer.</strong>
+              <span>The temporary copy is deleted as soon as conversion finishes.</span>
+            </div>
+          </section>
+        </div>
+
+        <div class="error-message" id="error-message" role="alert" hidden>
+          <strong id="error-title"></strong>
+          <span id="error-detail"></span>
+          <span id="error-hint"></span>
+        </div>
+
+        <div class="action-bar">
+          <p>Scanned or photographed pages are not supported yet.</p>
+          <button class="primary-button" id="convert-button" type="button" disabled>Convert document</button>
+        </div>
+      </section>
+
+      <section class="results" id="results" aria-labelledby="result-title" hidden>
+        <div class="result-heading">
+          <div>
+            <p class="eyebrow" id="result-eyebrow">Conversion complete</p>
+            <h2 id="result-title"></h2>
+            <p id="result-message"></p>
+          </div>
+          <button class="primary-button" id="download-button" type="button">Download output</button>
+        </div>
+
+        <dl class="result-summary">
+          <div><dt id="summary-tables">0</dt><dd>tables found</dd></div>
+          <div><dt id="summary-review">0</dt><dd>need review</dd></div>
+          <div><dt id="summary-format">Excel</dt><dd>output format</dd></div>
+        </dl>
+
+        <div class="warning-panel" id="warning-panel" hidden>
+          <h3>What to check</h3>
+          <ul id="warning-list"></ul>
+        </div>
+
+        <section class="preview" aria-labelledby="preview-title">
+          <div class="preview-heading">
+            <div><h3 id="preview-title">Extracted table preview</h3><p id="preview-location"></p></div>
+            <div class="table-tabs" id="table-tabs" role="tablist" aria-label="Extracted tables"></div>
+          </div>
+          <div class="preview-scroll">
+            <table id="preview-table"></table>
+          </div>
+          <p class="preview-note" id="preview-note"></p>
+        </section>
+
+        <div class="result-footer">
+          <p>Raw extraction does not prove every value is correct. Check important values before using them.</p>
+          <button class="secondary-button" id="convert-another" type="button">Convert another document</button>
+        </div>
+      </section>
+    </main>
+
+    <footer>
+      <span>pdf-mcp local app</span>
+      <span>No uploads. No telemetry.</span>
+      <a href="https://github.com/wesseltl/pdf-mcp" target="_blank" rel="noopener">Advanced tools and source code</a>
+    </footer>
+  </body>
+</html>

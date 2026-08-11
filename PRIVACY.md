@@ -7,8 +7,11 @@ reliability beta.
 
 ## Local open-source tool
 
-`pdf-agent-mcp` runs on the user's own computer. It does not upload documents, make network calls,
-collect telemetry, or send usage analytics. See `SECURITY.md` for the local threat model.
+`pdf-agent-mcp` and the optional `pdf-mcp-app` browser interface run on the user's own computer. They
+do not upload documents, make conversion-related network calls, collect telemetry, or send usage
+analytics. The browser app deletes its temporary local document copy after each conversion and
+removes in-memory prepared downloads within 30 minutes or when the app stops. See `SECURITY.md` for
+the local threat model.
 
 ## Free hosted beta
 
