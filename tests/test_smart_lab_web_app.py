@@ -99,11 +99,15 @@ class SmartLabWebAppTests(unittest.TestCase):
         self.assertEqual(favicon_status, 200)
         self.assertEqual(favicon_headers["Content-Type"], "image/svg+xml")
         self.assertIn(b"<svg", favicon)
+        icons_status, icons_headers, icons = self.request("GET", "/icons.svg")
+        self.assertEqual(icons_status, 200)
+        self.assertEqual(icons_headers["Content-Type"], "image/svg+xml")
+        self.assertIn(b'id="shield-check"', icons)
         combined = b"\n".join(assets).lower()
         self.assertNotIn(b"https://", combined)
         self.assertNotIn(b"http://", combined)
-        self.assertIn(b"your lab, connected", combined)
-        self.assertIn(b"every connection traces back to a source", combined)
+        self.assertIn(b"knowledge map", combined)
+        self.assertIn(b"technical details", combined)
 
     def test_state_requires_session_and_is_capability_driven(self) -> None:
         status, _headers, content = self.request("GET", "/api/state")

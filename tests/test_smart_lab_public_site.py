@@ -82,7 +82,7 @@ class SmartLabPublicSiteTests(unittest.TestCase):
     def test_workspace_images_have_stable_desktop_and_mobile_dimensions(self) -> None:
         expected = {
             "smart-lab-index-workspace.png": (1600, 1000),
-            "smart-lab-index-workspace-mobile.png": (390, 1259),
+            "smart-lab-index-workspace-mobile.png": (390, 1200),
         }
         for name, dimensions in expected.items():
             with self.subTest(image=name):

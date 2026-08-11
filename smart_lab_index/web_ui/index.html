@@ -14,64 +14,89 @@
   <a class="skip-link" href="#main-content">Skip to content</a>
 
   <div class="app-shell">
-    <aside class="sidebar" aria-label="Application navigation">
+    <button id="sidebar-backdrop" class="sidebar-backdrop" type="button" aria-label="Close navigation" tabindex="-1"></button>
+    <aside id="sidebar" class="sidebar" aria-label="Application navigation">
       <div class="brand">
         <span class="brand-mark" aria-hidden="true">SL</span>
         <span class="brand-name">Smart Lab Index</span>
+        <button id="mobile-menu-close" class="icon-button mobile-menu-close" type="button" title="Close navigation" aria-label="Close navigation">
+          <svg class="ui-icon" aria-hidden="true"><use href="/icons.svg#x"></use></svg>
+        </button>
+      </div>
+      <div class="sidebar-workspace">
+        <span class="sidebar-workspace-label">Workspace</span>
+        <strong id="sidebar-source-name">Opening workspace</strong>
+        <span id="sidebar-source-state">Checking index status</span>
       </div>
       <nav id="desktop-nav" class="desktop-nav" aria-label="Index views"></nav>
       <div class="sidebar-footer">
-        <span class="sidebar-footer-label">Runs on this computer</span>
-        <span id="product-version" class="product-version">Version —</span>
+        <div class="sidebar-trust">
+          <span class="sidebar-trust-marker" aria-hidden="true"></span>
+          <span>
+            <strong id="sidebar-trust-label">Private workspace</strong>
+            <small id="sidebar-trust-detail">Local and read-only</small>
+          </span>
+        </div>
+        <div class="sidebar-meta">
+          <span id="product-version" class="product-version">Version —</span>
+          <button id="shutdown-button" class="sidebar-close-action" type="button">
+            <svg class="ui-icon" aria-hidden="true"><use href="/icons.svg#power"></use></svg>
+            <span>Close application</span>
+          </button>
+        </div>
       </div>
     </aside>
 
     <div class="workspace">
       <header class="topbar">
+        <button id="mobile-menu-button" class="icon-button mobile-menu-button" type="button" title="Open navigation" aria-label="Open navigation" aria-controls="sidebar" aria-expanded="false">
+          <svg class="ui-icon" aria-hidden="true"><use href="/icons.svg#menu"></use></svg>
+        </button>
         <div class="source-context">
-          <span class="context-label">Connected folder</span>
+          <span class="context-label">Workspace</span>
           <strong id="source-root" class="source-root">Loading…</strong>
-          <span id="egress-status" class="status-badge status-neutral">Checking policy</span>
         </div>
+        <button id="global-search-button" class="global-search-button" type="button">
+          <svg class="ui-icon global-search-icon" aria-hidden="true"><use href="/icons.svg#search"></use></svg>
+          <span class="global-search-label">Search equipment, locations, people and documents</span>
+          <kbd>/</kbd>
+        </button>
         <div id="topbar-actions" class="topbar-actions">
+          <button id="trust-button" class="trust-button" type="button">
+            <span class="trust-indicator" aria-hidden="true"></span>
+            <span id="egress-status">Checking trust status</span>
+          </button>
           <button id="refresh-button" class="icon-button" type="button" title="Refresh data" aria-label="Refresh data">
-            <span aria-hidden="true">↻</span>
+            <svg class="ui-icon" aria-hidden="true"><use href="/icons.svg#refresh-cw"></use></svg>
           </button>
           <button id="change-source-button" class="button button-secondary" type="button" title="Choose another source folder" hidden>
-            <span class="label-wide">Change</span>
-            <span class="label-compact">Folder</span>
+            <span class="label-wide">Manage source</span>
+            <span class="label-compact">Source</span>
           </button>
-          <button id="index-button" class="button button-primary" type="button">
-            <span aria-hidden="true">▶</span>
-            <span class="label-wide">Scan files</span>
-            <span class="label-compact">Scan</span>
+          <button id="index-button" class="button button-primary" type="button" title="Sync workspace" aria-label="Sync workspace now">
+            <svg class="ui-icon" aria-hidden="true"><use href="/icons.svg#refresh-cw"></use></svg>
+            <span class="label-wide">Sync now</span>
+            <span class="label-compact">Sync</span>
           </button>
           <button id="cancel-index-button" class="button button-secondary" type="button" hidden>
-            <span aria-hidden="true">■</span>
-            <span class="label-wide">Cancel index</span>
+            <svg class="ui-icon" aria-hidden="true"><use href="/icons.svg#x"></use></svg>
+            <span class="label-wide">Cancel sync</span>
             <span class="label-compact">Cancel</span>
-          </button>
-          <button id="shutdown-button" class="button button-danger-quiet" type="button">
-            <span aria-hidden="true">■</span>
-            <span class="label-wide">Close app</span>
-            <span class="label-compact">Close</span>
           </button>
         </div>
       </header>
 
-      <div class="mobile-navigation">
-        <label for="mobile-view-select">View</label>
-        <select id="mobile-view-select" aria-label="Current index view"></select>
-      </div>
-
       <main id="main-content" class="main-content" tabindex="-1">
         <div class="view-toolbar">
           <div class="view-heading">
-            <h1 id="view-title">Home</h1>
-            <span id="view-count" class="view-count" aria-live="polite"></span>
+            <span id="view-context" class="view-context">Workspace overview</span>
+            <div class="view-title-row">
+              <h1 id="view-title">Overview</h1>
+              <span id="view-count" class="view-count" aria-live="polite"></span>
+            </div>
           </div>
           <div id="filter-control" class="filter-control">
-            <label class="visually-hidden" for="view-filter">Filter current view</label>
+            <label id="view-filter-label" class="visually-hidden" for="view-filter">Filter current view</label>
             <span class="filter-symbol" aria-hidden="true">⌕</span>
             <input id="view-filter" type="search" autocomplete="off" placeholder="Filter current view">
           </div>
@@ -96,7 +121,7 @@
         <p id="detail-subtitle" class="detail-subtitle"></p>
       </div>
       <button id="detail-close" class="icon-button" type="button" title="Close details" aria-label="Close details">
-        <span aria-hidden="true">×</span>
+        <svg class="ui-icon" aria-hidden="true"><use href="/icons.svg#x"></use></svg>
       </button>
     </div>
     <div id="detail-body" class="detail-body"></div>

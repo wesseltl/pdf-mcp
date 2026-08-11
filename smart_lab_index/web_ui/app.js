@@ -40,15 +40,25 @@ const elements = {
   egressStatus: document.getElementById("egress-status"),
   filter: document.getElementById("view-filter"),
   filterControl: document.getElementById("filter-control"),
+  filterLabel: document.getElementById("view-filter-label"),
+  globalSearchButton: document.getElementById("global-search-button"),
   indexButton: document.getElementById("index-button"),
-  mobileViewSelect: document.getElementById("mobile-view-select"),
+  mobileMenuButton: document.getElementById("mobile-menu-button"),
+  mobileMenuClose: document.getElementById("mobile-menu-close"),
   operationStatus: document.getElementById("operation-status"),
   productVersion: document.getElementById("product-version"),
   refreshButton: document.getElementById("refresh-button"),
+  sidebarBackdrop: document.getElementById("sidebar-backdrop"),
+  sidebarSourceName: document.getElementById("sidebar-source-name"),
+  sidebarSourceState: document.getElementById("sidebar-source-state"),
+  sidebarTrustDetail: document.getElementById("sidebar-trust-detail"),
+  sidebarTrustLabel: document.getElementById("sidebar-trust-label"),
   shutdownButton: document.getElementById("shutdown-button"),
   sourceRoot: document.getElementById("source-root"),
   topbarActions: document.getElementById("topbar-actions"),
+  trustButton: document.getElementById("trust-button"),
   viewCount: document.getElementById("view-count"),
+  viewContext: document.getElementById("view-context"),
   viewRoot: document.getElementById("view-root"),
   viewTitle: document.getElementById("view-title"),
 };
@@ -59,6 +69,7 @@ const ui = {
   changingSource: false,
   fetching: false,
   filterByView: new Map(),
+  health: null,
   lastOperationState: null,
   loading: true,
   pollTimer: null,
@@ -224,6 +235,14 @@ function svgNode(tagName, className = "", attributes = {}) {
   return element;
 }
 
+function iconNode(name, className = "ui-icon") {
+  const icon = svgNode("svg", className, { "aria-hidden": "true", focusable: "false" });
+  const use = svgNode("use");
+  use.setAttribute("href", `/icons.svg#${name}`);
+  icon.append(use);
+  return icon;
+}
+
 function announce(message) {
   elements.announcement.textContent = "";
   window.setTimeout(() => {
@@ -339,11 +358,15 @@ async function refreshState(options = {}) {
 
   const previousOperation = ui.lastOperationState;
   try {
-    const state = await apiRequest("/api/state");
+    const [state, health] = await Promise.all([
+      apiRequest("/api/state"),
+      apiRequest("/api/health").catch(() => null),
+    ]);
     if (!state || typeof state !== "object") {
       throw new Error("The application returned an invalid state response.");
     }
     ui.state = state;
+    ui.health = health && typeof health === "object" ? health : null;
     ui.loading = false;
     selectInitialView();
     ui.lastOperationState = operationState();
@@ -509,7 +532,8 @@ function updateCommandState() {
   elements.changeSourceButton.disabled = disabled || indexing || !ui.state;
   elements.refreshButton.disabled = disabled || ui.fetching;
   elements.shutdownButton.disabled = disabled;
-  elements.mobileViewSelect.disabled = ui.stopped || !currentViews().length;
+  elements.globalSearchButton.disabled = ui.stopped || !currentViews().length;
+  elements.trustButton.disabled = ui.stopped || !ui.state;
   elements.filter.disabled = ui.stopped || !activeView();
 }
 
@@ -564,35 +588,71 @@ function viewCategory(view) {
 function navigationIcon(view) {
   const category = viewCategory(view);
   const icons = {
-    documents: "▧",
-    entities: "⌖",
-    issues: "!",
-    modules: "◇",
-    overview: "▦",
-    search: "⌕",
-    responsibilities: "✓",
-    sources: "↗",
-    unknown: "·",
+    documents: "file-text",
+    entities: "package",
+    issues: "circle-alert",
+    modules: "activity",
+    overview: "layout-dashboard",
+    search: "search",
+    responsibilities: "link",
+    sources: "folder",
+    unknown: "activity",
   };
   if (category === "entities") {
     const type = String(view.entity_type || asArray(view.entity_types).join(" ") || view.view_id || "").toUpperCase();
     if (type.includes("ASSET") || type.includes("EQUIPMENT")) {
-      return "⚙";
+      return "package";
     }
     if (type.includes("PERSON") || type.includes("PEOPLE")) {
-      return "○";
+      return "user";
     }
     if (type.includes("ORGANIZATION")) {
-      return "▤";
+      return type.includes("UNIT") ? "users" : "building";
+    }
+    if (type.includes("LOCATION")) {
+      return "map-pin";
     }
   }
   return icons[category];
 }
 
+function displayViewLabel(view) {
+  const category = viewCategory(view);
+  if (category === "overview") {
+    return "Overview";
+  }
+  if (category === "sources") {
+    return "Sources";
+  }
+  if (category === "modules") {
+    return "System health";
+  }
+  if (category === "issues" && String(view.status || "").toUpperCase() === "OPEN") {
+    return "Review queue";
+  }
+  return scalarText(view.label, view.view_id);
+}
+
+function navigationGroup(view) {
+  const category = viewCategory(view);
+  if (["overview", "search"].includes(category)) {
+    return "Workspace";
+  }
+  if (category === "issues") {
+    return "Review";
+  }
+  if (category === "sources") {
+    return "Data";
+  }
+  if (category === "modules") {
+    return "Administration";
+  }
+  return "Knowledge";
+}
+
 function renderNavigation() {
   const views = currentViews();
   const navFragment = document.createDocumentFragment();
-  const selectFragment = document.createDocumentFragment();
   let previousGroup = "";
 
   if (!views.length) {
@@ -601,48 +661,47 @@ function renderNavigation() {
 
   views.forEach((view) => {
     const viewId = String(view.view_id);
-    const group = scalarText(view.group, "Workspace");
+    const group = navigationGroup(view);
     if (group !== previousGroup) {
       const heading = node("div", "nav-group-label", group);
-      heading.setAttribute("aria-hidden", "true");
+      heading.setAttribute("role", "heading");
+      heading.setAttribute("aria-level", "2");
       navFragment.append(heading);
       previousGroup = group;
     }
     const button = node("button", "nav-button");
     button.type = "button";
     button.dataset.viewId = viewId;
-    button.title = scalarText(view.label, viewId);
+    button.title = displayViewLabel(view);
     if (viewId === ui.activeViewId) {
       button.setAttribute("aria-current", "page");
     }
 
-    const icon = node("span", "nav-icon", navigationIcon(view));
+    const icon = node("span", "nav-icon");
     icon.setAttribute("aria-hidden", "true");
-    button.append(icon, node("span", "nav-label", scalarText(view.label, viewId)));
+    icon.append(iconNode(navigationIcon(view)));
+    button.append(icon, node("span", "nav-label", displayViewLabel(view)));
     if (view.count !== null && view.count !== undefined) {
       button.append(node("span", "nav-count", formatNumber(view.count)));
     }
-    button.addEventListener("click", () => chooseView(viewId));
+    button.addEventListener("click", () => {
+      chooseView(viewId);
+      closeNavigation();
+    });
     navFragment.append(button);
-
-    const option = document.createElement("option");
-    option.value = viewId;
-    option.textContent = view.count === null || view.count === undefined
-      ? scalarText(view.label, viewId)
-      : `${scalarText(view.label, viewId)} (${formatNumber(view.count)})`;
-    option.selected = viewId === ui.activeViewId;
-    selectFragment.append(option);
   });
 
   elements.desktopNav.replaceChildren(navFragment);
-  elements.mobileViewSelect.replaceChildren(selectFragment);
 }
 
 function renderChrome() {
   const source = asObject(ui.state?.source);
   const root = scalarText(source.root, "No source configured");
-  elements.sourceRoot.textContent = scalarText(source.display_name, root);
+  const sourceName = scalarText(source.display_name, root);
+  elements.sourceRoot.textContent = sourceName;
   elements.sourceRoot.title = root;
+  elements.sidebarSourceName.textContent = sourceName;
+  elements.sidebarSourceName.title = root;
   elements.productVersion.textContent = `Version ${scalarText(ui.state?.product_version)}`;
   elements.changeSourceButton.hidden = source.can_change_source !== true;
   elements.topbarActions.classList.toggle(
@@ -651,23 +710,61 @@ function renderChrome() {
   );
 
   const noEgress = source.no_egress === true;
-  elements.egressStatus.className = `status-badge ${noEgress ? "status-success" : "status-warning"}`;
-  elements.egressStatus.textContent = noEgress ? "Files stay local" : "Cloud connections on";
-  elements.egressStatus.title = noEgress
-    ? "Document content is processed on this computer"
-    : "This workspace permits configured outbound connections";
+  const health = asObject(ui.health);
+  const healthReady = health.ready !== false;
+  const trustTone = !healthReady ? "danger" : noEgress ? "success" : "warning";
+  elements.trustButton.dataset.tone = trustTone;
+  elements.egressStatus.textContent = !healthReady
+    ? "System needs attention"
+    : noEgress
+      ? "Local mode"
+      : "External access allowed";
+  elements.trustButton.title = noEgress
+    ? "External connections are blocked. Open trust status."
+    : "This workspace allows configured external connections. Open trust status.";
+  elements.sidebarTrustLabel.textContent = healthReady ? "Private workspace" : "Check system health";
+  elements.sidebarTrustDetail.textContent = noEgress
+    ? "Local and read-only"
+    : "Read-only · External access allowed";
+
+  const latestRun = asObject(ui.state?.summary?.latest_run);
+  const state = operationState();
+  if (state === "INDEXING") {
+    elements.sidebarSourceState.textContent = "Sync in progress";
+  } else if (state === "FAILED") {
+    elements.sidebarSourceState.textContent = "Last sync failed";
+  } else if (latestRun.completed_at) {
+    elements.sidebarSourceState.textContent = `Updated ${formatDate(latestRun.completed_at)}`;
+  } else {
+    elements.sidebarSourceState.textContent = "Ready for first sync";
+  }
 }
 
 function renderViewHeader() {
   const view = activeView();
-  const label = scalarText(view?.label, "Index");
+  const label = view ? displayViewLabel(view) : "Workspace";
   const category = viewCategory(view);
   elements.viewTitle.textContent = label;
+  const contexts = {
+    documents: "Indexed knowledge",
+    entities: "Indexed knowledge",
+    issues: "Evidence review",
+    modules: "Administration",
+    overview: "Workspace overview",
+    responsibilities: "Indexed knowledge",
+    search: "Workspace search",
+    sources: "Connected data",
+    unknown: "Workspace",
+  };
+  elements.viewContext.textContent = contexts[category] || "Workspace";
   elements.viewTitle.tabIndex = -1;
   elements.filterControl.hidden = category === "overview";
   elements.filter.placeholder = category === "search"
     ? "Search all indexed knowledge"
     : `Filter ${label.toLocaleLowerCase()}`;
+  elements.filterLabel.textContent = category === "search"
+    ? "Search all indexed knowledge"
+    : `Filter ${label}`;
   elements.filter.value = ui.filterByView.get(ui.activeViewId) || "";
   setViewCount(view?.count ?? null);
 }
@@ -912,7 +1009,14 @@ function emptyState(title, message, symbol = "○") {
 function commandButton(label, symbol, action, className = "button button-primary") {
   const button = node("button", className);
   button.type = "button";
-  const icon = node("span", "", symbol);
+  const iconName = {
+    "→": "arrow-right",
+    "↻": "refresh-cw",
+    "⌕": "search",
+    "✓": "check",
+    "×": "x",
+  }[symbol];
+  const icon = iconName ? iconNode(iconName) : node("span", "", symbol);
   icon.setAttribute("aria-hidden", "true");
   button.append(icon, node("span", "", label));
   button.addEventListener("click", action);
@@ -934,6 +1038,7 @@ function scheduleSearch() {
   }
   ui.searching = true;
   ui.searchError = "";
+  announce("Searching indexed knowledge");
   renderSearch(activeView());
   ui.searchTimer = window.setTimeout(() => performSearch(query), 250);
 }
@@ -948,9 +1053,11 @@ async function performSearch(query) {
     ui.searchQuery = query;
     ui.searchResults = asArray(payload?.results);
     ui.searchError = "";
+    announce(`${formatNumber(ui.searchResults.length)} search result${ui.searchResults.length === 1 ? "" : "s"}`);
   } catch (error) {
     ui.searchError = error instanceof Error ? error.message : "Search could not be completed.";
     ui.searchResults = [];
+    announce("Search failed");
   } finally {
     if (viewCategory(activeView()) === "search" && elements.filter.value.trim() === query) {
       ui.searching = false;
@@ -1033,39 +1140,43 @@ function renderOverview(view) {
     const scanning = operationState() === "INDEXING";
     const scanned = Boolean(summary.latest_run);
     const panel = emptyState(
-      scanning ? "Scanning your folder" : scanned ? "No supported files found" : "Your folder is connected",
+      scanning ? "Building your workspace" : scanned ? "No supported files found" : "Your source is connected",
       scanning
         ? "The first results will appear here automatically."
         : scanned
           ? "Choose another folder or scan again after files are added."
-          : "Start the first file scan to create this workspace.",
+          : "Start the first sync to create this workspace.",
       scanning ? "↻" : scanned ? "⌕" : "✓",
     );
     panel.append(renderSetupProgress(scanning, scanned));
     if (!scanning) {
-      panel.append(commandButton(scanned ? "Scan again" : "Scan files", "▶", startIndex));
+      panel.append(commandButton(scanned ? "Sync again" : "Sync now", "↻", startIndex));
     }
     elements.viewRoot.replaceChildren(panel);
     setViewCount(null);
     return;
   }
 
-  const openIssues = asArray(ui.state.issues).filter(
-    (issue) => String(issue.status || "OPEN").toUpperCase() === "OPEN",
-  );
+  const priority = { CRITICAL: 5, HIGH: 4, MEDIUM: 3, LOW: 2, INFO: 1 };
+  const openIssues = asArray(ui.state.issues)
+    .filter((issue) => String(issue.status || "OPEN").toUpperCase() === "OPEN")
+    .sort((left, right) => (
+      (priority[String(right.severity || "").toUpperCase()] || 0)
+      - (priority[String(left.severity || "").toUpperCase()] || 0)
+    ));
   const entities = asArray(ui.state.entities);
   const assertions = asArray(ui.state.assertions);
   const latestRun = asObject(summary.latest_run);
 
   const container = node("div", "home-command-center");
-  container.append(renderLabInsight(summary, openIssues));
+  container.append(renderWorkspaceSummary(summary, openIssues, latestRun));
 
   const commandGrid = node("div", "home-command-grid");
   commandGrid.append(
     renderKnowledgeMap(entities, assertions, openIssues),
     renderDecisionPanel(openIssues, latestRun),
   );
-  container.append(commandGrid, renderKnowledgePipeline(summary));
+  container.append(commandGrid);
 
   if (Object.keys(latestRun).length) {
     container.append(renderLatestScanFooter(latestRun));
@@ -1075,49 +1186,48 @@ function renderOverview(view) {
   setViewCount(null);
 }
 
-function renderLabInsight(summary, openIssues) {
-  const insight = node("section", "lab-insight");
-  const copy = node("div", "lab-insight-copy");
-  const eyebrow = node("div", "lab-insight-eyebrow");
-  const liveMarker = node("span", "lab-insight-marker");
-  liveMarker.setAttribute("aria-hidden", "true");
-  eyebrow.append(liveMarker, node("span", "", "Lab knowledge, live"));
-
-  const issue = openIssues[0];
-  const observations = asArray(asObject(issue?.evidence).observed_locations);
-  const subject = scalarText(issue?.entity_name || asObject(issue?.evidence).subject_name, "A record");
-  let title = "Your lab knowledge is connected";
-  let detail = `Smart Lab Index connected ${formatNumber(summary.entities)} items through ${formatNumber(summary.active_assertions)} evidence-backed relationships.`;
-  if (issue && observations.length > 1) {
-    title = `${subject} appears in ${formatNumber(observations.length)} locations`;
-    detail = `Both claims were kept. The exact source evidence is ready for your decision.`;
-  } else if (issue) {
-    title = `${formatNumber(openIssues.length)} finding${openIssues.length === 1 ? "" : "s"} need your decision`;
-    detail = "Smart Lab Index kept the underlying evidence so every finding can be verified.";
-  }
-
-  copy.append(eyebrow, node("h2", "", title), node("p", "", detail));
-  const actions = node("div", "lab-insight-actions");
-  if (issue) {
-    actions.append(commandButton("Review evidence", "→", () => openIssueDetails(issue)));
+function renderWorkspaceSummary(summary, openIssues, latestRun) {
+  const section = node("section", "overview-summary");
+  const status = node("div", `overview-status${openIssues.length ? " needs-review" : " is-current"}`);
+  const marker = node("span", "overview-status-marker", openIssues.length ? "!" : "✓");
+  marker.setAttribute("aria-hidden", "true");
+  const copy = node("div", "overview-status-copy");
+  copy.append(
+    node(
+      "strong",
+      "",
+      openIssues.length
+        ? "Workspace needs attention"
+        : "Workspace is up to date",
+    ),
+    node(
+      "span",
+      "",
+      latestRun.completed_at
+        ? `${openIssues.length ? `${formatNumber(openIssues.length)} review item${openIssues.length === 1 ? "" : "s"} · ` : ""}Latest sync ${formatDate(latestRun.completed_at)}`
+        : "No completed sync recorded",
+    ),
+  );
+  status.append(marker, copy);
+  if (openIssues.length) {
+    status.append(commandButton("Open review queue", "→", openReviewQueue, "button button-secondary"));
   } else {
-    actions.append(commandButton("Search lab knowledge", "⌕", focusSearch));
+    status.append(commandButton("Search workspace", "⌕", focusSearch, "button button-secondary"));
   }
-  actions.append(node("span", "lab-insight-proof", "Every connection traces back to a source"));
-  copy.append(actions);
 
-  const totals = node("dl", "lab-insight-totals");
+  const metrics = node("dl", "overview-metrics");
   [
+    ["Source files", summary.sources],
+    ["Documents read", summary.documents],
     ["Lab items", summary.entities],
     ["Connections", summary.active_assertions],
-    ["Needs review", summary.open_issues],
   ].forEach(([label, value]) => {
-    const total = node("div", "lab-insight-total");
-    total.append(node("dt", "", label), node("dd", "", formatNumber(value)));
-    totals.append(total);
+    const metric = node("div", "overview-metric");
+    metric.append(node("dt", "", label), node("dd", "", formatNumber(value)));
+    metrics.append(metric);
   });
-  insight.append(copy, totals);
-  return insight;
+  section.append(status, metrics);
+  return section;
 }
 
 function focusSearch() {
@@ -1129,15 +1239,72 @@ function focusSearch() {
   elements.filter.focus();
 }
 
+function openReviewQueue() {
+  const review = currentViews().find(
+    (view) => viewCategory(view) === "issues" && String(view.status || "").toUpperCase() === "OPEN",
+  );
+  if (review) {
+    chooseView(String(review.view_id));
+  }
+}
+
+function openNavigation() {
+  document.body.classList.add("navigation-open");
+  elements.mobileMenuButton.setAttribute("aria-expanded", "true");
+  elements.sidebarBackdrop.tabIndex = 0;
+  elements.mobileMenuClose.focus();
+}
+
+function closeNavigation({ restoreFocus = false } = {}) {
+  const wasOpen = document.body.classList.contains("navigation-open");
+  document.body.classList.remove("navigation-open");
+  elements.mobileMenuButton.setAttribute("aria-expanded", "false");
+  elements.sidebarBackdrop.tabIndex = -1;
+  if (wasOpen && restoreFocus) {
+    elements.mobileMenuButton.focus();
+  }
+}
+
+function openTrustCenter() {
+  const source = asObject(ui.state?.source);
+  const health = asObject(ui.health);
+  const automation = asObject(source.automation);
+  const noEgress = source.no_egress === true;
+  const parserIsolation = asObject(health.parser_isolation || source.parser_isolation);
+  const healthLabel = health.ready === false ? "Needs attention" : "Healthy";
+  const parserLabel = parserIsolation.enabled === false ? "Unavailable" : "Enabled";
+  const schedule = automation.enabled
+    ? `Automatic sync every ${formatNumber(automation.interval_minutes)} minutes`
+    : "Automatic sync is off";
+  openDetails(
+    "Trust status",
+    `${healthLabel} · Checked locally`,
+    {
+      "Data location": noEgress
+        ? "Index data and extracted content stay on this computer."
+        : "This workspace permits configured external connections.",
+      Network: noEgress
+        ? "External connections are blocked."
+        : "External connections are allowed; review enabled modules before using sensitive data.",
+      "Source safety": "Source files are read only and are never modified by Smart Lab Index.",
+      Permissions: "Basic file permissions are observed. Access is not enforced by Smart Lab Index.",
+      "System health": healthLabel,
+      "Parser isolation": parserLabel,
+      Automation: schedule,
+    },
+    ["Data location", "Network", "Source safety", "Permissions", "System health", "Parser isolation", "Automation"],
+  );
+}
+
 function renderKnowledgeMap(entities, assertions, openIssues) {
   const panel = node("section", "knowledge-panel");
   const header = node("div", "knowledge-panel-header");
   const heading = node("div", "");
   heading.append(
-    node("span", "panel-eyebrow", "Connected knowledge"),
-    node("h2", "", "Your lab, connected"),
+    node("span", "panel-eyebrow", "Explore"),
+    node("h2", "", "Knowledge map"),
   );
-  header.append(heading, node("span", "map-live-badge", "Live map"));
+  header.append(heading, node("span", "map-live-badge", "Connected view"));
 
   const graph = knowledgeGraphData(entities, assertions, openIssues);
   const surface = node("div", "knowledge-map-surface");
@@ -1146,7 +1313,7 @@ function renderKnowledgeMap(entities, assertions, openIssues) {
   } else {
     surface.append(renderKnowledgeSvg(graph, openIssues));
   }
-  panel.append(header, surface, renderKnowledgeLinks(graph.assertions));
+  panel.append(header, surface, renderKnowledgeLinks(graph.assertions, openIssues));
 
   const shown = graph.entities.length;
   const note = shown < entities.length
@@ -1239,8 +1406,8 @@ function graphPositions(entities) {
 
 function renderKnowledgeSvg(graph, openIssues) {
   const svg = svgNode("svg", "knowledge-map", {
-    "aria-label": "Interactive map of indexed lab items and their relationships",
-    role: "group",
+    "aria-hidden": "true",
+    focusable: "false",
     viewBox: "0 0 760 300",
   });
   const title = svgNode("title");
@@ -1284,6 +1451,7 @@ function renderKnowledgeSvg(graph, openIssues) {
     const labelWidth = Math.min(126, Math.max(64, label.length * 5.8 + 16));
     const midpointX = (start.x + end.x) / 2;
     const midpointY = (start.y + end.y) / 2;
+    const labelY = Math.abs(start.y - end.y) < 8 ? midpointY - 18 : midpointY;
     const labelGroup = svgNode("g", "knowledge-edge-label");
     labelGroup.append(
       svgNode("rect", "knowledge-edge-label-bg", {
@@ -1291,13 +1459,13 @@ function renderKnowledgeSvg(graph, openIssues) {
         rx: 4,
         width: labelWidth,
         x: midpointX - labelWidth / 2,
-        y: midpointY - 10,
+        y: labelY - 10,
       }),
     );
     const text = svgNode("text", "knowledge-edge-label-text", {
       "text-anchor": "middle",
       x: midpointX,
-      y: midpointY + 4,
+      y: labelY + 4,
     });
     text.textContent = label;
     labelGroup.append(text);
@@ -1310,9 +1478,6 @@ function renderKnowledgeSvg(graph, openIssues) {
     const type = String(entity.entity_type || "unknown").toLocaleLowerCase();
     const conflicted = issueIds.has(String(entity.entity_id));
     const group = svgNode("g", `knowledge-node node-${type}${conflicted ? " is-conflicted" : ""}`, {
-      "aria-label": `Open ${scalarText(entity.canonical_name, "item")} details`,
-      role: "button",
-      tabindex: 0,
       transform: `translate(${position.x - 82} ${position.y - 29})`,
     });
     group.append(svgNode("rect", "knowledge-node-shape", { height: 58, rx: 7, width: 164 }));
@@ -1338,21 +1503,27 @@ function renderKnowledgeSvg(graph, openIssues) {
       entity,
     );
     group.addEventListener("click", open);
-    group.addEventListener("keydown", (event) => activateOnKeyboard(event, open));
     svg.append(group);
   });
   return svg;
 }
 
-function renderKnowledgeLinks(assertions) {
+function renderKnowledgeLinks(assertions, openIssues = []) {
   const list = node("div", "knowledge-links");
   if (!assertions.length) {
     list.append(node("p", "knowledge-link-empty", "No relationships have been found yet."));
     return list;
   }
-  assertions.slice(0, 3).forEach((assertion) => {
+  const conflictedAssertions = new Set(
+    openIssues.flatMap((issue) => asArray(issue.assertion_ids).map(String)),
+  );
+  assertions.forEach((assertion) => {
     const button = node("button", "knowledge-link");
     button.type = "button";
+    const conflicted = conflictedAssertions.has(String(assertion.assertion_id));
+    if (conflicted) {
+      button.classList.add("is-conflicted");
+    }
     const relation = node("span", "knowledge-link-relation");
     relation.append(
       node("strong", "", scalarText(assertion.subject_name, "Item")),
@@ -1362,6 +1533,10 @@ function renderKnowledgeLinks(assertions) {
     button.append(
       relation,
       node("span", "knowledge-link-source", scalarText(assertion.source_path, "Source evidence")),
+    );
+    button.setAttribute(
+      "aria-label",
+      `${scalarText(assertion.subject_name, "Item")} ${formatPredicate(assertion.predicate)} ${scalarText(assertion.object_name || assertion.literal, "Item")}. Source: ${scalarText(assertion.source_path, "unknown")}${conflicted ? ". Conflicting evidence" : ""}`,
     );
     button.addEventListener("click", () => openDetails(
       `${scalarText(assertion.subject_name, "Item")} ${formatPredicate(assertion.predicate)}`,
@@ -1378,10 +1553,10 @@ function renderDecisionPanel(openIssues, latestRun) {
   const issue = openIssues[0];
   if (!issue) {
     panel.append(
-      node("span", "panel-eyebrow", "Review status"),
+      node("span", "panel-eyebrow", "Review queue"),
       node("div", "decision-clear-mark", "✓"),
-      node("h2", "", "No contradictions need review"),
-      node("p", "decision-copy", "Every current finding is clear. New conflicts will appear here automatically."),
+      node("h2", "", "Review queue is clear"),
+      node("p", "decision-copy", "No open review items were reported by the latest completed sync."),
     );
     if (latestRun.completed_at) {
       panel.append(node("p", "decision-meta", `Checked ${formatDate(latestRun.completed_at)}`));
@@ -1392,15 +1567,15 @@ function renderDecisionPanel(openIssues, latestRun) {
   const evidence = asObject(issue.evidence);
   const observations = asArray(evidence.observed_locations);
   panel.append(
-    node("span", "panel-eyebrow", "Decision needed"),
+    node("span", "panel-eyebrow", "Review queue"),
     statusBadge(issue.severity),
-    node("h2", "", issueLabel(issue.code)),
+    node("h2", "", observations.length > 1 ? "Which location should Smart Lab Index use?" : issueLabel(issue.code)),
     node("p", "decision-subject", scalarText(issue.entity_name || evidence.subject_name, "Indexed item")),
     node(
       "p",
       "decision-copy",
       observations.length > 1
-        ? `${formatNumber(observations.length)} sources disagree. Choose the record your lab trusts.`
+        ? `${formatNumber(observations.length)} sources disagree. Both original claims will remain preserved.`
         : "Review the source evidence and record your decision.",
     ),
   );
@@ -1419,7 +1594,7 @@ function renderDecisionPanel(openIssues, latestRun) {
     panel.append(choices);
   }
 
-  const action = commandButton("Review evidence", "→", () => openIssueDetails(issue));
+  const action = commandButton("Review and decide", "→", () => openIssueDetails(issue));
   action.classList.add("decision-action");
   panel.append(action);
   if (openIssues.length > 1) {
@@ -1444,45 +1619,27 @@ function sourceEvidenceLabel(value) {
   return source;
 }
 
-function renderKnowledgePipeline(summary) {
-  const pipeline = node("section", "knowledge-pipeline");
-  const header = node("div", "knowledge-pipeline-header");
-  header.append(
-    node("h2", "", "From scattered files to usable knowledge"),
-    node("span", "", "Read-only · Evidence preserved"),
-  );
-  const steps = node("div", "knowledge-pipeline-steps");
-  [
-    ["01", "Files found", summary.sources],
-    ["02", "Documents read", summary.documents],
-    ["03", "Lab items", summary.entities],
-    ["04", "Connections", summary.active_assertions],
-  ].forEach(([number, label, value]) => {
-    const step = node("div", "knowledge-pipeline-step");
-    step.append(
-      node("span", "knowledge-pipeline-number", number),
-      node("strong", "knowledge-pipeline-value", formatNumber(value)),
-      node("span", "knowledge-pipeline-label", label),
-    );
-    steps.append(step);
-  });
-  pipeline.append(header, steps);
-  return pipeline;
-}
-
 function renderLatestScanFooter(run) {
-  const footer = node("section", "latest-scan-footer");
+  const status = String(run.status || "COMPLETED").toUpperCase();
+  const tone = ["FAILED", "ERROR"].includes(status)
+    ? "danger"
+    : status === "CANCELLED"
+      ? "warning"
+      : status === "COMPLETED"
+        ? "success"
+        : "neutral";
+  const footer = node("section", `latest-scan-footer is-${tone}`);
   const marker = node("span", "latest-scan-marker");
   marker.setAttribute("aria-hidden", "true");
   const copy = node("div", "latest-scan-copy");
   copy.append(
-    node("strong", "", `Latest scan ${humanize(run.status || "completed").toLocaleLowerCase()}`),
-    node("span", "", run.completed_at ? formatDate(run.completed_at) : "Scan details available"),
+    node("strong", "", `Latest sync ${humanize(run.status || "completed").toLocaleLowerCase()}`),
+    node("span", "", run.completed_at ? formatDate(run.completed_at) : "Sync details available"),
   );
   const details = commandButton(
-    "View scan details",
+    "View sync details",
     "→",
-    () => openDetails("Latest scan", scalarText(run.index_run_id ?? run.run_id, "Run details"), run),
+    () => openDetails("Latest sync", "Processing summary", run),
     "button button-secondary",
   );
   footer.append(marker, copy, details);
@@ -1493,7 +1650,7 @@ function renderSetupProgress(scanning, scanned) {
   const progress = node("div", "setup-progress");
   [
     ["Folder connected", "done"],
-    ["Files scanned", scanned ? "done" : scanning ? "active" : "waiting"],
+    ["Files synced", scanned ? "done" : scanning ? "active" : "waiting"],
     ["Ready to search", "waiting"],
   ].forEach(([label, state]) => {
     const row = node("div", `setup-step is-${state}`);
@@ -1558,14 +1715,29 @@ function renderEntities(view) {
     return;
   }
 
+  const columns = [
+    { key: "canonical_name", label: "Name", className: "primary-cell" },
+    { label: "Type", value: (row) => typePair(row.entity_type, row.subtype) },
+    { key: "identifier", label: "Identifier", className: "cell-mono" },
+  ];
+  if (entityTypes.includes("ASSET")) {
+    columns.push(
+      { label: "Current location", value: entityLocation },
+      { label: "Responsible", value: entityResponsibility },
+    );
+  } else if (entityTypes.includes("LOCATION")) {
+    columns.push({ label: "Equipment", value: locationEquipmentCount });
+  } else if (entityTypes.includes("PERSON")) {
+    columns.push({ label: "Responsibilities", value: personResponsibilityCount });
+  }
+  columns.push(
+    { label: "Review", value: entityReviewStatus },
+    { label: "First observed", value: entityFirstObserved, className: "cell-muted" },
+  );
+
   const table = createTable({
     caption: scalarText(view.label, "Entities"),
-    columns: [
-      { key: "canonical_name", label: "Name", className: "primary-cell" },
-      { label: "Type", value: (row) => typePair(row.entity_type, row.subtype) },
-      { key: "identifier", label: "Identifier", className: "cell-mono" },
-      { label: "Details", value: (row) => summarizeMetadata(row.metadata), className: "cell-muted" },
-    ],
+    columns,
     rows,
     rowLabel: (row) => `Open ${scalarText(row.canonical_name, "entity")} details`,
     onOpen: (row) => openDetails(
@@ -1575,6 +1747,60 @@ function renderEntities(view) {
     ),
   });
   elements.viewRoot.replaceChildren(table);
+}
+
+function assertionsForEntity(entityId, predicate, direction = "subject") {
+  const idKey = direction === "object" ? "object_entity_id" : "subject_entity_id";
+  return asArray(ui.state?.assertions).filter(
+    (assertion) => String(assertion[idKey] || "") === String(entityId || "")
+      && String(assertion.predicate || "").toLocaleLowerCase() === predicate,
+  );
+}
+
+function entityLocation(entity) {
+  const locations = assertionsForEntity(entity.entity_id, "located_in")
+    .map((assertion) => scalarText(assertion.object_name || assertion.literal, ""))
+    .filter(Boolean);
+  const unique = [...new Set(locations)];
+  if (!unique.length) {
+    return node("span", "cell-muted", "Not found");
+  }
+  if (unique.length > 1) {
+    return node("span", "status-badge status-warning", `${formatNumber(unique.length)} locations`);
+  }
+  return unique[0];
+}
+
+function entityResponsibility(entity) {
+  const people = assertionsForEntity(entity.entity_id, "responsible_for", "object")
+    .map((assertion) => scalarText(assertion.subject_name, ""))
+    .filter(Boolean);
+  return [...new Set(people)].join(", ") || node("span", "cell-muted", "Not assigned");
+}
+
+function locationEquipmentCount(entity) {
+  const count = assertionsForEntity(entity.entity_id, "located_in", "object").length;
+  return `${formatNumber(count)} item${count === 1 ? "" : "s"}`;
+}
+
+function personResponsibilityCount(entity) {
+  const count = assertionsForEntity(entity.entity_id, "responsible_for").length;
+  return `${formatNumber(count)} item${count === 1 ? "" : "s"}`;
+}
+
+function entityReviewStatus(entity) {
+  const open = asArray(ui.state?.issues).some(
+    (issue) => String(issue.entity_id || "") === String(entity.entity_id || "")
+      && String(issue.status || "OPEN").toUpperCase() === "OPEN",
+  );
+  return statusBadge(open ? "OPEN" : "CLEAR");
+}
+
+function entityFirstObserved(entity) {
+  const metadata = asObject(entity.metadata);
+  const firstObserved = asObject(metadata.first_observed);
+  const provenance = asObject(firstObserved.provenance || metadata.provenance);
+  return Object.keys(provenance).length ? sourceEvidenceLabel(provenance) : "—";
 }
 
 function typePair(primary, secondary) {
@@ -1725,19 +1951,19 @@ function issueTable(rows, caption) {
 }
 
 function openIssueDetails(issue) {
+  const observations = asArray(asObject(issue.evidence).observed_locations);
   openDetails(
-    issueLabel(issue.code),
-    scalarText(issue.entity_name, scalarText(issue.issue_id, "Issue evidence")),
+    observations.length > 1 ? "Which location should Smart Lab Index use?" : issueLabel(issue.code),
+    scalarText(issue.entity_name, "Review source evidence"),
     issue,
-    ["severity", "status", "entity_name", "evidence", "reviews", "assertion_ids", "issue_id", "rule_module_id", "rule_version"],
+    ["severity", "status", "entity_name", "evidence", "reviews"],
   );
   if (String(issue.status || "").toUpperCase() !== "OPEN") {
     return;
   }
-  const observations = asArray(asObject(issue.evidence).observed_locations);
 
   const section = node("section", "detail-group review-form");
-  section.append(node("span", "detail-label", "Resolve issue"));
+  section.append(node("span", "detail-label", "Record a decision"));
   const form = document.createElement("form");
   if (observations.length) {
     const fieldset = document.createElement("fieldset");
@@ -1752,7 +1978,7 @@ function openIssueDetails(issue) {
       radio.required = true;
       const copy = node("span", "inline-pair");
       copy.append(
-        node("strong", "", scalarText(item.location_name, `Location ${index + 1}`)),
+        node("strong", "", `Use ${scalarText(item.location_name, `location ${index + 1}`)}`),
         node("span", "inline-secondary", locationEvidenceSummary(item)),
       );
       option.append(radio, copy);
@@ -1761,7 +1987,13 @@ function openIssueDetails(issue) {
     form.append(fieldset);
   }
 
-  const reasonLabel = node("label", "review-reason-label", "Review note");
+  form.append(node(
+    "p",
+    "review-impact",
+    "The selected value becomes current in the index. Source files and original claims will not change.",
+  ));
+
+  const reasonLabel = node("label", "review-reason-label", "Decision rationale");
   const reason = document.createElement("textarea");
   reason.name = "reason";
   reason.required = true;
@@ -1773,7 +2005,7 @@ function openIssueDetails(issue) {
   error.setAttribute("role", "alert");
   const actions = node("div", "review-actions");
   if (observations.length) {
-    const confirm = commandButton("Confirm location", "✓", () => {
+    const confirm = commandButton("Confirm decision", "✓", () => {
       const selected = form.querySelector('input[name="assertion_id"]:checked');
       if (!form.reportValidity() || !selected) {
         return;
@@ -1783,7 +2015,7 @@ function openIssueDetails(issue) {
     confirm.type = "button";
     actions.append(confirm);
   }
-  const dismiss = commandButton("Dismiss issue", "×", () => {
+  const dismiss = commandButton("Dismiss finding", "×", () => {
     if (!reason.reportValidity()) {
       return;
     }
@@ -1801,6 +2033,7 @@ async function submitIssueReview(issue, decision, assertionId, reason, form, err
     control.disabled = true;
   });
   errorElement.textContent = "";
+  announce("Saving decision");
   try {
     await apiRequest("/api/review-issue", {
       method: "POST",
@@ -2024,7 +2257,7 @@ function renderUnknownView(view) {
 
 function statusTone(value) {
   const status = String(value || "").toUpperCase();
-  if (["HEALTHY", "ACTIVE", "ENABLED", "COMPLETED", "CONFIRMED", "DIRECT", "RESOLVED", "CLOSED"].includes(status)) {
+  if (["HEALTHY", "ACTIVE", "ENABLED", "COMPLETED", "CONFIRMED", "DIRECT", "RESOLVED", "CLOSED", "CLEAR"].includes(status)) {
     return "status-success";
   }
   if (["ERROR", "FAILED", "CRITICAL", "HIGH", "CONFLICTED", "REJECTED", "UNAVAILABLE"].includes(status)) {
@@ -2067,6 +2300,12 @@ function createTable({ caption, columns, rows, onOpen, rowLabel }) {
     heading.scope = "col";
     headRow.append(heading);
   });
+  if (onOpen) {
+    const actionHeading = node("th", "row-action-heading");
+    actionHeading.scope = "col";
+    actionHeading.append(node("span", "visually-hidden", "Open record"));
+    headRow.append(actionHeading);
+  }
   head.append(headRow);
   table.append(head);
 
@@ -2087,13 +2326,21 @@ function createTable({ caption, columns, rows, onOpen, rowLabel }) {
 
     if (onOpen) {
       tableRow.classList.add("is-clickable");
-      tableRow.tabIndex = 0;
-      tableRow.setAttribute("role", "button");
-      tableRow.setAttribute("aria-haspopup", "dialog");
-      tableRow.setAttribute("aria-label", rowLabel ? rowLabel(row) : "Open record details");
       const open = () => onOpen(row);
       tableRow.addEventListener("click", open);
-      tableRow.addEventListener("keydown", (event) => activateOnKeyboard(event, open));
+      const actionCell = node("td", "row-action-cell");
+      actionCell.dataset.label = "Open";
+      const action = node("button", "row-open-button");
+      action.type = "button";
+      action.append(iconNode("arrow-right"));
+      action.setAttribute("aria-haspopup", "dialog");
+      action.setAttribute("aria-label", rowLabel ? rowLabel(row) : "Open record details");
+      action.addEventListener("click", (event) => {
+        event.stopPropagation();
+        open();
+      });
+      actionCell.append(action);
+      tableRow.append(actionCell);
     }
     body.append(tableRow);
   });
@@ -2121,18 +2368,88 @@ function orderedEntries(record, preferredKeys = []) {
   return [...preferred, ...remaining];
 }
 
+function isTechnicalDetailKey(key) {
+  const normalized = String(key || "").toLocaleLowerCase();
+  return normalized === "metadata"
+    || normalized === "processing"
+    || normalized === "configuration"
+    || normalized === "capabilities"
+    || normalized === "dependencies"
+    || normalized === "checksum"
+    || normalized === "content_hash"
+    || normalized === "version"
+    || normalized.endsWith("_version")
+    || normalized.endsWith("_id")
+    || normalized.endsWith("_ids")
+    || normalized.includes("module_id")
+    || normalized.includes("external_id");
+}
+
+function defaultDetailKeys(record) {
+  const preferred = [
+    "canonical_name",
+    "name",
+    "entity_type",
+    "subtype",
+    "identifier",
+    "subject_name",
+    "predicate",
+    "object_name",
+    "literal",
+    "severity",
+    "status",
+    "code",
+    "description",
+    "source_path",
+    "path",
+    "content_type",
+    "extracted_entity_count",
+    "extracted_assertion_count",
+    "parser_warnings",
+    "health_state",
+    "health_message",
+    "permission_metadata",
+    "evidence",
+    "reviews",
+    "size_bytes",
+    "modified_at",
+    "created_at",
+    "started_at",
+    "completed_at",
+  ];
+  return preferred.filter((key) => key in asObject(record));
+}
+
+function detailGroup(key, value) {
+  const group = node("section", "detail-group");
+  group.append(node("span", "detail-label", humanize(key)));
+  group.append(renderDetailValue(value));
+  return group;
+}
+
 function openDetails(title, subtitle, record, preferredKeys = []) {
   ui.returnFocus = document.activeElement instanceof HTMLElement ? document.activeElement : null;
   elements.detailTitle.textContent = title;
   elements.detailSubtitle.textContent = subtitle;
 
   const fragment = document.createDocumentFragment();
-  orderedEntries(record, preferredKeys).forEach(([key, value]) => {
-    const group = node("section", "detail-group");
-    group.append(node("span", "detail-label", humanize(key)));
-    group.append(renderDetailValue(value));
-    fragment.append(group);
-  });
+  const visibleKeys = preferredKeys.length ? preferredKeys : defaultDetailKeys(record);
+  const entries = orderedEntries(record, visibleKeys);
+  const visibleEntries = entries.filter(
+    ([key]) => visibleKeys.includes(key) && !isTechnicalDetailKey(key),
+  );
+  const visibleSet = new Set(visibleEntries.map(([key]) => key));
+  visibleEntries.forEach(([key, value]) => fragment.append(detailGroup(key, value)));
+
+  const technicalEntries = entries.filter(([key]) => !visibleSet.has(key));
+  if (technicalEntries.length) {
+    const disclosure = node("details", "technical-details");
+    disclosure.append(node("summary", "", "Technical details"));
+    const body = node("div", "technical-details-body");
+    technicalEntries.forEach(([key, value]) => body.append(detailGroup(key, value)));
+    disclosure.append(body);
+    fragment.append(disclosure);
+  }
   elements.detailBody.replaceChildren(fragment);
 
   if (typeof elements.detailDialog.showModal === "function") {
@@ -2192,7 +2509,11 @@ elements.changeSourceButton.addEventListener("click", changeSource);
 elements.indexButton.addEventListener("click", startIndex);
 elements.cancelIndexButton.addEventListener("click", cancelIndex);
 elements.shutdownButton.addEventListener("click", stopApplication);
-elements.mobileViewSelect.addEventListener("change", (event) => chooseView(event.target.value));
+elements.globalSearchButton.addEventListener("click", focusSearch);
+elements.trustButton.addEventListener("click", openTrustCenter);
+elements.mobileMenuButton.addEventListener("click", openNavigation);
+elements.mobileMenuClose.addEventListener("click", () => closeNavigation({ restoreFocus: true }));
+elements.sidebarBackdrop.addEventListener("click", () => closeNavigation({ restoreFocus: true }));
 elements.filter.addEventListener("input", (event) => {
   ui.filterByView.set(ui.activeViewId, event.target.value);
   if (viewCategory(activeView()) === "search") {
@@ -2210,6 +2531,21 @@ elements.detailDialog.addEventListener("click", (event) => {
 elements.detailDialog.addEventListener("close", () => {
   ui.returnFocus?.focus();
   ui.returnFocus = null;
+});
+document.addEventListener("keydown", (event) => {
+  if (event.key === "Escape" && document.body.classList.contains("navigation-open")) {
+    closeNavigation({ restoreFocus: true });
+    return;
+  }
+  const target = event.target;
+  const typing = target instanceof HTMLInputElement
+    || target instanceof HTMLTextAreaElement
+    || target instanceof HTMLSelectElement
+    || target?.isContentEditable;
+  if (event.key === "/" && !typing && !elements.detailDialog.open) {
+    event.preventDefault();
+    focusSearch();
+  }
 });
 
 refreshState();
