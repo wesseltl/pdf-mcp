@@ -5,15 +5,12 @@ from __future__ import annotations
 import argparse
 import copy
 import hashlib
-import hmac
-import json
 import logging
 import secrets
 import threading
 import webbrowser
 from collections.abc import Iterable, Sequence
 from datetime import datetime, timezone
-from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from importlib import resources
 from pathlib import Path
 from typing import Any
@@ -22,10 +19,16 @@ from urllib.parse import urlparse
 from smart_lab_index.application import KnowledgeQueryService, build_application
 from smart_lab_index.core.config import RuntimePolicy
 from smart_lab_index.core.storage import KnowledgeStore
+from smart_lab_index.folder_browser import choose_source_folder_in_browser
 from smart_lab_index.folder_picker import (
     FolderPickerUnavailable,
     choose_source_folder,
     folder_picker_available,
+)
+from smart_lab_index.local_web import (
+    LoopbackHandler,
+    LoopbackHTTPServer,
+    bind_loopback_server,
 )
 
 LOGGER = logging.getLogger(__name__)
@@ -184,17 +187,13 @@ class WebAppState:
         return not thread.is_alive()
 
 
-class SmartLabHTTPServer(ThreadingHTTPServer):
-    allow_reuse_address = True
-    daemon_threads = True
-
-
-class SmartLabHandler(BaseHTTPRequestHandler):
+class SmartLabHandler(LoopbackHandler):
     app_state: WebAppState
     server_version = "SmartLabIndex"
 
-    def log_message(self, format: str, *args: object) -> None:
-        LOGGER.debug(format, *args)
+    @property
+    def session_token(self) -> str:
+        return self.app_state.session_token
 
     def do_GET(self) -> None:
         if not self._request_host_is_local():
@@ -227,7 +226,7 @@ class SmartLabHandler(BaseHTTPRequestHandler):
         self._send_json(404, {"error": "Not found."})
 
     def do_POST(self) -> None:
-        if not self._request_host_is_local() or not self._origin_is_local():
+        if not self._request_host_is_local() or not self._origin_is_same():
             self._send_json(403, {"error": "This app accepts local requests only."})
             return
         if not self._valid_session():
@@ -269,69 +268,6 @@ class SmartLabHandler(BaseHTTPRequestHandler):
     def do_OPTIONS(self) -> None:
         self._send_json(405, {"error": "Cross-origin requests are not supported."})
 
-    def _request_host_is_local(self) -> bool:
-        host = (self.headers.get("Host") or "").lower()
-        hostname = host.rsplit(":", 1)[0].strip("[]")
-        return hostname in {"127.0.0.1", "localhost", "::1"}
-
-    def _origin_is_local(self) -> bool:
-        origin = self.headers.get("Origin")
-        if not origin:
-            return True
-        parsed = urlparse(origin)
-        return parsed.scheme == "http" and parsed.hostname in {
-            "127.0.0.1",
-            "localhost",
-            "::1",
-        }
-
-    def _valid_session(self) -> bool:
-        supplied = self.headers.get("X-Smart-Lab-Session", "")
-        return bool(supplied) and hmac.compare_digest(
-            supplied,
-            self.app_state.session_token,
-        )
-
-    def _valid_body_size(self) -> bool:
-        try:
-            length = int(self.headers.get("Content-Length", "0"))
-        except ValueError:
-            return False
-        return 0 <= length <= 4096
-
-    def _send_json(self, status: int, payload: dict[str, Any]) -> None:
-        self._send_bytes(
-            status,
-            json.dumps(payload, ensure_ascii=True).encode("utf-8"),
-            "application/json; charset=utf-8",
-        )
-
-    def _send_bytes(self, status: int, content: bytes, content_type: str) -> None:
-        self.send_response(status)
-        self._security_headers(content_type)
-        self.send_header("Content-Length", str(len(content)))
-        self.end_headers()
-        self.wfile.write(content)
-
-    def _security_headers(self, content_type: str) -> None:
-        self.send_header("Content-Type", content_type)
-        self.send_header("Cache-Control", "no-store")
-        self.send_header(
-            "Content-Security-Policy",
-            "default-src 'self'; script-src 'self'; style-src 'self'; "
-            "img-src 'self' data:; connect-src 'self'; frame-ancestors 'none'; "
-            "base-uri 'none'; form-action 'none'; object-src 'none'",
-        )
-        self.send_header("X-Content-Type-Options", "nosniff")
-        self.send_header("X-Frame-Options", "DENY")
-        self.send_header("Referrer-Policy", "no-referrer")
-        self.send_header("Cross-Origin-Opener-Policy", "same-origin")
-        self.send_header("Cross-Origin-Resource-Policy", "same-origin")
-        self.send_header(
-            "Permissions-Policy",
-            "camera=(), microphone=(), geolocation=(), payment=()",
-        )
-
 
 def create_server(
     root: str | Path,
@@ -342,7 +278,7 @@ def create_server(
     disabled_module_ids: Iterable[str] = (),
     allow_source_change: bool = False,
     port: int = DEFAULT_PORT,
-) -> tuple[SmartLabHTTPServer, WebAppState]:
+) -> tuple[LoopbackHTTPServer, WebAppState]:
     """Create a session-protected server bound only to loopback."""
     if not 0 <= port <= 65535:
         raise ValueError("port must be between 0 and 65535")
@@ -359,17 +295,12 @@ def create_server(
         (SmartLabHandler,),
         {"app_state": state},
     )
-    candidates = [0] if port == 0 else range(port, min(port + 20, 65536))
-    last_error: OSError | None = None
-    for candidate in candidates:
-        try:
-            server = SmartLabHTTPServer(("127.0.0.1", candidate), handler)
-            return server, state
-        except OSError as exc:
-            last_error = exc
-    raise OSError(
-        "No available local port was found for Smart Lab Index."
-    ) from last_error
+    server = bind_loopback_server(
+        handler,
+        port,
+        error_message="No available local port was found for Smart Lab Index.",
+    )
+    return server, state
 
 
 def _policy(force_no_egress: bool) -> RuntimePolicy:
@@ -405,19 +336,27 @@ def main(argv: Sequence[str] | None = None) -> int:
 
     picker_supported = folder_picker_available()
     selected_at_start = args.root is None
+    requested_port = args.port
+    browser_started = False
     root: str | Path | None = args.root
-    if root is None:
-        if not picker_supported:
-            print(
-                "smart-lab-index-app: no graphical folder picker is available; "
-                "provide a folder path"
-            )
-            return 2
+    if root is None and picker_supported:
         try:
             root = choose_source_folder()
         except FolderPickerUnavailable as exc:
+            LOGGER.error("System folder selection failed (%s)", type(exc).__name__)
+        else:
+            if root is None:
+                return 0
+    if root is None:
+        try:
+            root, requested_port = choose_source_folder_in_browser(
+                port=requested_port,
+                open_browser=not args.no_browser,
+            )
+        except (OSError, RuntimeError, ValueError) as exc:
             print(f"smart-lab-index-app: {exc}")
             return 2
+        browser_started = not args.no_browser
         if root is None:
             return 0
 
@@ -427,9 +366,7 @@ def main(argv: Sequence[str] | None = None) -> int:
     database: str | Path = args.database or DEFAULT_DATABASE
     if managed_database:
         database = _desktop_database(root)
-    requested_port = args.port
     index_on_start = args.index_on_start or selected_at_start
-    browser_started = False
     recovery: tuple[str | Path, str | Path, str | None] | None = None
 
     while True:
@@ -440,7 +377,7 @@ def main(argv: Sequence[str] | None = None) -> int:
                 source_id=source_id,
                 policy=policy,
                 disabled_module_ids=args.disable,
-                allow_source_change=picker_supported,
+                allow_source_change=True,
                 port=requested_port,
             )
         except (OSError, RuntimeError, ValueError) as exc:
@@ -486,10 +423,22 @@ def main(argv: Sequence[str] | None = None) -> int:
             return 0
 
         selected: Path | None = None
-        try:
-            selected = choose_source_folder(state.root)
-        except FolderPickerUnavailable as exc:
-            LOGGER.error("Folder selection failed (%s)", type(exc).__name__)
+        use_browser_picker = not picker_supported
+        if picker_supported:
+            try:
+                selected = choose_source_folder(state.root)
+            except FolderPickerUnavailable as exc:
+                LOGGER.error("System folder selection failed (%s)", type(exc).__name__)
+                use_browser_picker = True
+        if use_browser_picker:
+            try:
+                selected, requested_port = choose_source_folder_in_browser(
+                    state.root,
+                    port=requested_port,
+                    open_browser=False,
+                )
+            except (OSError, RuntimeError, ValueError) as exc:
+                LOGGER.error("Browser folder selection failed (%s)", type(exc).__name__)
         if selected is not None:
             changed = selected != Path(state.root)
             if changed:

@@ -1,0 +1,62 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="smart-lab-session" content="__SMART_LAB_SESSION__">
+    <title>Choose a folder · Smart Lab Index</title>
+    <link rel="stylesheet" href="/folder-browser.css">
+  </head>
+  <body>
+    <main class="picker-shell">
+      <header class="picker-header">
+        <div class="brand-mark" aria-hidden="true">SL</div>
+        <div>
+          <p class="product-name">Smart Lab Index</p>
+          <h1>Choose a laboratory folder</h1>
+        </div>
+      </header>
+
+      <section class="picker-toolbar" aria-label="Folder navigation">
+        <button id="up-button" class="icon-button" type="button" title="Go to parent folder" aria-label="Go to parent folder">↑</button>
+        <nav id="breadcrumbs" class="breadcrumbs" aria-label="Current folder"></nav>
+        <button id="refresh-button" class="icon-button" type="button" title="Refresh folders" aria-label="Refresh folders">↻</button>
+      </section>
+
+      <div class="picker-workspace">
+        <aside class="quick-locations" aria-label="Quick locations">
+          <p class="section-label">Locations</p>
+          <div id="quick-locations" class="quick-location-list"></div>
+        </aside>
+
+        <section class="folder-panel" aria-labelledby="folder-heading">
+          <div class="folder-panel-heading">
+            <div>
+              <p class="section-label">Current folder</p>
+              <h2 id="folder-heading">Loading</h2>
+            </div>
+            <label class="hidden-toggle">
+              <input id="hidden-toggle" type="checkbox">
+              <span>Show hidden</span>
+            </label>
+          </div>
+          <div id="folder-list" class="folder-list" role="list" aria-live="polite"></div>
+          <div id="folder-state" class="folder-state" role="status"></div>
+        </section>
+      </div>
+
+      <footer class="picker-footer">
+        <div class="selection-summary">
+          <span>Selected folder</span>
+          <strong id="selected-path">Loading</strong>
+        </div>
+        <div class="footer-actions">
+          <button id="cancel-button" class="button button-secondary" type="button">Cancel</button>
+          <button id="select-button" class="button button-primary" type="button">Use this folder</button>
+        </div>
+      </footer>
+    </main>
+    <div id="announcement" class="visually-hidden" aria-live="polite"></div>
+    <script src="/folder-browser.js" defer></script>
+  </body>
+</html>

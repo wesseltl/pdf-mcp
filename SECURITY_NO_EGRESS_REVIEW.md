@@ -38,6 +38,13 @@ addressed the critical connector/provenance findings identified during integrati
   validate the selected directory, and do not inspect source contents. Picker-created workspaces are
   isolated by a root-derived hash. The standalone executable smoke test verifies a complete
   synthetic no-egress index through the packaged GUI.
+- Smart Lab Index `0.4.0` adds a bundled folder-navigator fallback for systems without a native
+  dialog helper. The navigator serves only on loopback, requires a random session token before
+  listing directory names, validates selected paths without reading file contents, and enforces the
+  exact loopback origin and port for mutations. Runtime assets remain bundled. Release-only signing
+  hooks may contact configured timestamp and Apple notarization services during artifact creation;
+  they are not included in or called by the runtime application. Every desktop archive receives a
+  SHA-256 manifest.
 - Parsers receive read-only streams and failures are isolated per record. Current parser hardening
   does not yet provide subprocess, timeout, memory, or expanded-archive limits.
 
@@ -48,8 +55,8 @@ The remaining findings, especially hostile-parser resource isolation, dependency
 distribution, complete log redaction, packaged-artifact testing, at-rest encryption, and OS-level
 network denial, remain open. Application policy is not a sandbox for malicious in-process plugins.
 
-Post-implementation validation on 2026-08-11 passed all 159 repository tests, including 54 focused
-Smart Lab tests, six real-HTTP GUI tests, and picker/restart-loop tests. A complete built-in
+Post-implementation validation on 2026-08-11 passed all 174 repository tests, including 68 focused
+Smart Lab tests, eight real-HTTP GUI tests, and picker/restart-loop tests. A complete built-in
 no-egress indexing run was executed with socket connection calls intercepted and made zero attempts.
 This supports controlled synthetic evaluation; it is not a claim that the process contains malicious
 code or is ready for hostile documents and confidential shared laboratory roots.

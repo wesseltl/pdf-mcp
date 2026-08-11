@@ -46,6 +46,25 @@ will still publish successfully.
    python scripts/build_smart_lab_desktop_app.py
    ```
 
+   The Smart Lab build writes a matching `.zip.sha256` manifest. Windows and macOS builds are
+   unsigned unless release credentials are configured. For GitHub Actions, use these secrets:
+
+   | Secret | Purpose |
+   |---|---|
+   | `WINDOWS_CODESIGN_CERTIFICATE_BASE64` | Base64-encoded Authenticode PFX |
+   | `WINDOWS_CODESIGN_CERTIFICATE_PASSWORD` | PFX password |
+   | `MACOS_CODESIGN_CERTIFICATE_BASE64` | Base64-encoded Developer ID Application P12 |
+   | `MACOS_CODESIGN_CERTIFICATE_PASSWORD` | P12 password |
+   | `MACOS_CODESIGN_IDENTITY` | Exact Developer ID Application identity |
+   | `MACOS_NOTARY_APPLE_ID` | Apple account used by `notarytool` |
+   | `MACOS_NOTARY_PASSWORD` | App-specific password for notarization |
+   | `MACOS_NOTARY_TEAM_ID` | Apple Developer team ID |
+
+   Set repository variable `DESKTOP_SIGNING_REQUIRED=true` only after the Windows and macOS
+   credentials are installed. With that variable enabled, those platform builds fail closed rather
+   than publishing unsigned Smart Lab artifacts. macOS notarization runs when all three notary
+   credentials are present.
+
 4. Run the paid-beta metadata and launch checks:
 
    ```bash

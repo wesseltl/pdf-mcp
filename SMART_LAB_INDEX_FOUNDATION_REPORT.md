@@ -8,8 +8,11 @@ Foundation/Core API version: `0.1.0`
 
 Post-foundation updates add the local capability-aware operator GUI in Smart Lab Index `0.2.0` and
 native folder selection, source switching, isolated picker workspaces, and standalone desktop
-packaging in `0.3.0`. The foundation findings remain the record for the `0.1.0` iteration; the
-validation and limitations sections include the current post-update state.
+packaging in `0.3.0`. Version `0.4.0` adds a zero-dependency browser folder navigator, exact-origin
+enforcement, checksummed archives, certificate-driven platform signing/notarization hooks, and a
+public request-only beta page built around actual product output. The foundation findings remain the
+record for the `0.1.0` iteration; the validation and limitations sections include the current
+post-update state.
 
 ## Existing Architecture
 
@@ -123,9 +126,12 @@ indexing works with those categories absent.
 
 ### UI Capability Model
 
-Module snapshots expose capabilities, lifecycle, health, settings, and security metadata for a
-future capability-aware interface. The current operator surface is the local `smart-lab-index` JSON
-CLI. No Smart Lab Index browser UI or frontend plugin framework was added in this foundation.
+Module snapshots expose capabilities, lifecycle, health, settings, and security metadata to the
+capability-aware local interface. The `smart-lab-index-app` workspace derives navigation and module
+status from those snapshots and indexed entity categories; it does not require each module to edit a
+central navigation component. Modules cannot yet inject arbitrary frontend code, which keeps the
+first-party modular monolith small and avoids a premature browser plugin framework. The JSON CLI
+remains available for automation and diagnostics.
 
 ## Modules Implemented
 
@@ -210,8 +216,8 @@ knowledge store. Schema version 1 is not yet a production migration history.
 
 Validation completed on 2026-08-11:
 
-- Full repository suite: 159 tests passed in 15.278 seconds.
-- Focused Smart Lab suite: 54 tests passed in 6.991 seconds.
+- Full repository suite: 174 tests passed in 16.253 seconds.
+- Focused Smart Lab suite: 68 tests passed in 8.181 seconds.
 - Ruff: all new Smart Lab code/tests and touched cloud bridge files passed.
 - Existing sample, simulated development, and simulated holdout evaluation gates passed with 1.0
   field precision/recall/F1, exact-record rate, and decision accuracy.
@@ -221,12 +227,17 @@ Validation completed on 2026-08-11:
 - The compatibility distribution wheel containing the Smart Lab Index `0.2.0` GUI installed into a
   separate environment, served all bundled assets, and completed the synthetic no-egress index
   through `smart-lab-index-app` from outside the checkout.
-- The Smart Lab Index `0.3.0` Linux standalone executable completed the packaged synthetic no-egress
-  smoke test with 4 sources, 4 documents, 4 entities, 3 assertions, and 1 open issue. The release
+- The Smart Lab Index `0.4.0` Linux standalone executable completed both the packaged synthetic
+  no-egress smoke test and the no-argument browser-folder selection flow with 4 sources, 4 documents,
+  4 entities, 3 assertions, and 1 open issue. Its generated SHA-256 manifest verified. The release
   workflow builds the equivalent artifact on Windows and macOS.
+- The `0.4.0` folder navigator completed desktop and 390-pixel mobile browser checks without console
+  errors or horizontal overflow. Startup selection and cancelled source changes completed on the
+  same loopback port and restored the indexed workspace.
 
-Coverage includes the loopback GUI session/origin/CSP controls, authenticated source switching,
-picker command/path validation, same-port session rotation, isolated picker workspaces, and full
+Coverage includes the loopback GUI session/exact-origin/CSP controls, authenticated source switching,
+native and browser picker path validation, same-port session rotation, isolated picker workspaces,
+release checksum/signing helpers, and full
 GUI-triggered incremental indexing with provenance. It also covers module registration, disable,
 dependencies, policy blocking before initialization, event failure isolation, private state modes,
 multiple source instances, checksummed incremental discovery, symlink/special-file handling, all
@@ -275,8 +286,8 @@ smart-lab-index status
 - The graphical UI is a local single-user operator workspace. It does not provide multi-user
   authentication, access control, editable review decisions, or source-permission enforcement.
   Permission metadata is retained but not applied to queries.
-- Standalone archives are unsigned. Windows and macOS use built-in platform folder dialogs; Linux
-  requires `zenity`, `kdialog`, or `yad` from the desktop environment.
+- Standalone archives are ZIP applications, not native installers. They remain unsigned until real
+  publisher credentials are configured; SHA-256 manifests are generated for verification.
 - Only the filesystem connector and one broad general-lab domain pack exist.
 - Extraction rules cover configured table shapes and a narrow deterministic text relation; they are
   not general document understanding.

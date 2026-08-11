@@ -58,7 +58,10 @@ class SmartLabWebAppTests(unittest.TestCase):
         return result
 
     def api_headers(self) -> dict[str, str]:
-        return {"X-Smart-Lab-Session": self.state.session_token}
+        return {
+            "Origin": f"http://127.0.0.1:{self.port}",
+            "X-Smart-Lab-Session": self.state.session_token,
+        }
 
     def state_payload(self) -> dict:
         status, _headers, content = self.request(
@@ -124,12 +127,49 @@ class SmartLabWebAppTests(unittest.TestCase):
         )
 
     def test_index_action_requires_session_and_same_origin(self) -> None:
-        status, _headers, content = self.request("POST", "/api/index", body=b"")
+        status, _headers, content = self.request(
+            "POST",
+            "/api/index",
+            body=b"",
+            headers={"Origin": f"http://127.0.0.1:{self.port}"},
+        )
         self.assertEqual(status, 403)
         self.assertIn("not authorized", json.loads(content)["error"])
 
+        status, _headers, content = self.request(
+            "POST",
+            "/api/index",
+            body=b"",
+            headers={"X-Smart-Lab-Session": self.state.session_token},
+        )
+        self.assertEqual(status, 403)
+        self.assertIn("local requests", json.loads(content)["error"])
+
         headers = self.api_headers()
         headers["Origin"] = "https://malicious.example"
+        status, _headers, content = self.request(
+            "POST",
+            "/api/index",
+            body=b"",
+            headers=headers,
+        )
+        self.assertEqual(status, 403)
+        self.assertIn("local requests", json.loads(content)["error"])
+
+        forged_port = self.port + 1
+        headers = self.api_headers()
+        headers["Host"] = f"127.0.0.1:{forged_port}"
+        headers["Origin"] = f"http://127.0.0.1:{forged_port}"
+        status, _headers, content = self.request(
+            "POST",
+            "/api/index",
+            body=b"",
+            headers=headers,
+        )
+        self.assertEqual(status, 403)
+        self.assertIn("local requests", json.loads(content)["error"])
+
+        headers["Origin"] = f"http://127.0.0.1:{self.port + 1}"
         status, _headers, content = self.request(
             "POST",
             "/api/index",
@@ -262,6 +302,39 @@ class SmartLabWebAppMainTests(unittest.TestCase):
         state.start_index.assert_called_once_with()
         server.serve_forever.assert_called_once_with(poll_interval=0.25)
 
+    def test_no_root_falls_back_to_local_browser_folder_navigator(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary) / "lab"
+            root.mkdir()
+            server = Mock()
+            server.server_address = ("127.0.0.1", 9025)
+            state = Mock()
+            state.root = str(root)
+            state.database = str(Path(temporary) / "index.db")
+            state.policy = RuntimePolicy(no_egress=True)
+            state.source_change_requested = False
+            with (
+                patch(
+                    "smart_lab_index.web_app.folder_picker_available",
+                    return_value=False,
+                ),
+                patch(
+                    "smart_lab_index.web_app.choose_source_folder_in_browser",
+                    return_value=(root, 9025),
+                ) as browser_picker,
+                patch(
+                    "smart_lab_index.web_app.create_server",
+                    return_value=(server, state),
+                ) as create,
+            ):
+                result = main(["--no-browser", "--port", "9025"])
+
+        self.assertEqual(result, 0)
+        browser_picker.assert_called_once_with(port=9025, open_browser=False)
+        self.assertTrue(create.call_args.kwargs["allow_source_change"])
+        self.assertTrue(create.call_args.kwargs["policy"].no_egress)
+        state.start_index.assert_called_once_with()
+
     def test_source_change_restarts_same_port_and_clears_explicit_source_id(
         self,
     ) -> None:
@@ -335,6 +408,64 @@ class SmartLabWebAppMainTests(unittest.TestCase):
             ],
         )
         states[0].start_index.assert_not_called()
+        states[1].start_index.assert_called_once_with()
+
+    def test_source_change_uses_browser_navigator_when_system_dialog_is_absent(
+        self,
+    ) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            first_root = Path(temporary) / "first"
+            second_root = Path(temporary) / "second"
+            first_root.mkdir()
+            second_root.mkdir()
+            servers = [Mock(), Mock()]
+            states = [Mock(), Mock()]
+            for server in servers:
+                server.server_address = ("127.0.0.1", 9050)
+            for state, root, changing in zip(
+                states,
+                (first_root, second_root),
+                (True, False),
+                strict=True,
+            ):
+                state.root = str(root)
+                state.database = str(Path(temporary) / "index.db")
+                state.policy = RuntimePolicy(no_egress=True)
+                state.source_change_requested = changing
+            with (
+                patch(
+                    "smart_lab_index.web_app.folder_picker_available",
+                    return_value=False,
+                ),
+                patch(
+                    "smart_lab_index.web_app.choose_source_folder_in_browser",
+                    return_value=(second_root, 9050),
+                ) as browser_picker,
+                patch(
+                    "smart_lab_index.web_app.create_server",
+                    side_effect=list(zip(servers, states, strict=True)),
+                ) as create,
+            ):
+                result = main(
+                    [
+                        str(first_root),
+                        "--database",
+                        states[0].database,
+                        "--no-browser",
+                        "--port",
+                        "9050",
+                    ]
+                )
+
+        self.assertEqual(result, 0)
+        browser_picker.assert_called_once_with(
+            str(first_root),
+            port=9050,
+            open_browser=False,
+        )
+        self.assertEqual(create.call_count, 2)
+        self.assertEqual(create.call_args_list[1].args[0], second_root)
+        self.assertTrue(create.call_args_list[1].kwargs["allow_source_change"])
         states[1].start_index.assert_called_once_with()
 
     def test_failed_source_change_restores_previous_workspace(self) -> None:

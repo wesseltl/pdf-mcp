@@ -1,9 +1,9 @@
 """Tests for the fixed-scope, agent-readable purchase metadata."""
+
 import json
 import os
 import unittest
 from urllib.parse import urlparse
-
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
@@ -19,7 +19,17 @@ def load_offers():
 
 
 def load_beta_offer():
-    with open(os.path.join(ROOT, "beta", "free-hosted-beta.json"), encoding="utf-8") as f:
+    with open(
+        os.path.join(ROOT, "beta", "free-hosted-beta.json"), encoding="utf-8"
+    ) as f:
+        return json.load(f)
+
+
+def load_smart_lab_beta_offer():
+    with open(
+        os.path.join(ROOT, "beta", "smart-lab-index-beta.json"),
+        encoding="utf-8",
+    ) as f:
         return json.load(f)
 
 
@@ -28,6 +38,7 @@ class TestOfferMetadata(unittest.TestCase):
     def setUpClass(cls):
         cls.offers = load_offers()
         cls.beta_offer = load_beta_offer()
+        cls.smart_lab_beta_offer = load_smart_lab_beta_offer()
 
     def test_offer_ids_and_prices_are_stable(self):
         self.assertEqual(
@@ -58,7 +69,9 @@ class TestOfferMetadata(unittest.TestCase):
                 handling = offer["data_handling"]
                 self.assertFalse(handling["send_documents_by_email"])
                 self.assertFalse(handling["used_for_model_training"])
-                self.assertEqual(handling["working_files_deleted_days_after_delivery"], 14)
+                self.assertEqual(
+                    handling["working_files_deleted_days_after_delivery"], 14
+                )
                 self.assertTrue(handling["customer_must_have_right_to_share"])
 
                 instructions = offer["agent_instructions"]
@@ -74,7 +87,8 @@ class TestOfferMetadata(unittest.TestCase):
             with self.subTest(offer=offer["offer_id"]):
                 checkout_url = offer.get("checkout_url")
                 email_methods = [
-                    method for method in offer["purchase_methods"]
+                    method
+                    for method in offer["purchase_methods"]
                     if method["type"] == "email_purchase_request"
                 ]
                 self.assertEqual(len(email_methods), 1)
@@ -97,7 +111,8 @@ class TestOfferMetadata(unittest.TestCase):
 
     def test_reliability_pilot_has_a_machine_readable_quality_contract(self):
         pilot = next(
-            offer for offer in self.offers
+            offer
+            for offer in self.offers
             if offer["offer_id"] == "document-to-excel-pilot"
         )
         quality = pilot["quality_contract"]
@@ -175,7 +190,9 @@ class TestOfferMetadata(unittest.TestCase):
             "BETA_TERMS.md",
             "PRIVACY.md",
             "beta/free-hosted-beta.json",
+            "beta/smart-lab-index-beta.json",
             "docs/beta-terms.html",
+            "docs/smart-lab-beta-terms.html",
             "docs/terms.html",
             "docs/privacy.html",
             "docs/examples/sample-invoice.pdf",
@@ -184,6 +201,38 @@ class TestOfferMetadata(unittest.TestCase):
         for relative_path in required:
             with self.subTest(path=relative_path):
                 self.assertTrue(os.path.isfile(os.path.join(ROOT, relative_path)))
+
+    def test_smart_lab_beta_is_local_free_and_request_only(self):
+        beta = self.smart_lab_beta_offer
+        self.assertEqual(beta["offer_id"], "smart-lab-index-request-beta")
+        self.assertEqual(beta["offer_kind"], "local_software_beta")
+        self.assertEqual(beta["status"], "accepting_beta_requests")
+        self.assertEqual(beta["access"]["type"], "request_only")
+        self.assertEqual(beta["access"]["billing"], "free_beta")
+
+        rules = beta["application_rules"]
+        self.assertFalse(rules["attach_files_to_request"])
+        self.assertFalse(rules["send_document_contents_by_email"])
+        self.assertFalse(rules["invitation_guaranteed"])
+        self.assertFalse(rules["production_sla"])
+
+        privacy = beta["runtime_privacy"]
+        self.assertEqual(privacy["source_access"], "read_only")
+        self.assertFalse(privacy["document_uploads"])
+        self.assertFalse(privacy["telemetry"])
+        self.assertFalse(privacy["analytics"])
+        self.assertFalse(privacy["runtime_external_assets"])
+        self.assertTrue(privacy["no_egress_mode"])
+
+        self.assertEqual(len(beta["access_methods"]), 1)
+        self.assertEqual(
+            beta["access_methods"][0]["type"],
+            "email_beta_request",
+        )
+        instructions = beta["agent_instructions"]
+        self.assertTrue(instructions["requires_user_confirmation"])
+        self.assertTrue(instructions["do_not_attach_documents_to_email"])
+        self.assertIn("Never attach", instructions["recommended_action"])
 
 
 if __name__ == "__main__":

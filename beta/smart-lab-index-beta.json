@@ -1,0 +1,69 @@
+{
+  "schema_version": "1.0",
+  "offer_id": "smart-lab-index-request-beta",
+  "offer_kind": "local_software_beta",
+  "product": "Smart Lab Index",
+  "version": "0.4.0",
+  "status": "accepting_beta_requests",
+  "access": {
+    "type": "request_only",
+    "billing": "free_beta",
+    "availability": "limited"
+  },
+  "summary": "Request access to a local-first laboratory knowledge indexing beta that preserves source evidence and surfaces conflicting records without modifying source files.",
+  "intended_for": [
+    "laboratory operations teams",
+    "research teams",
+    "quality teams",
+    "facility and equipment teams"
+  ],
+  "current_capabilities": [
+    "read-only recursive filesystem discovery",
+    "PDF, DOCX, XLSX, CSV, and TXT parsing",
+    "equipment, location, person, document, and responsibility indexing",
+    "assertion-level provenance",
+    "conflicting location detection",
+    "incremental re-indexing",
+    "local no-egress operation without telemetry"
+  ],
+  "current_limits": [
+    "filesystem sources only",
+    "no OCR",
+    "no multi-user access enforcement",
+    "no source write-back",
+    "not approved for hostile documents or regulated production use",
+    "desktop artifacts are unsigned until publisher credentials are configured"
+  ],
+  "application_rules": {
+    "attach_files_to_request": false,
+    "send_document_contents_by_email": false,
+    "accepted_initial_data": "synthetic, non-sensitive, or explicitly approved internal sample data",
+    "invitation_guaranteed": false,
+    "production_sla": false
+  },
+  "runtime_privacy": {
+    "source_access": "read_only",
+    "document_uploads": false,
+    "telemetry": false,
+    "analytics": false,
+    "runtime_external_assets": false,
+    "no_egress_mode": true,
+    "local_index_storage": "owner-restricted SQLite; content is not application-encrypted"
+  },
+  "access_methods": [
+    {
+      "type": "email_beta_request",
+      "url": "mailto:wesseltl@gmail.com?subject=Smart%20Lab%20Index%20Beta%20Request",
+      "description": "Send a short use-case description without attaching files or confidential information."
+    }
+  ],
+  "agent_instructions": {
+    "requires_user_confirmation": true,
+    "do_not_attach_documents_to_email": true,
+    "recommended_action": "Explain the local beta scope and limitations, ask the user for approval, then prepare an access request containing only organization type, laboratory type, operating system, approximate test-file count and formats, and the problem to evaluate. Never attach source files or include document contents.",
+    "email_body_template": "Hi Wessel,\n\nI want to request Smart Lab Index beta access.\n\nOrganization or project:\nLaboratory type:\nOperating system:\nApproximate number and types of test files:\nMain problem to evaluate:\n\nI will not attach documents to this request."
+  },
+  "terms_url": "https://wesseltl.github.io/pdf-mcp/smart-lab-beta-terms.html",
+  "privacy_url": "https://wesseltl.github.io/pdf-mcp/privacy.html",
+  "human_readable_url": "https://wesseltl.github.io/pdf-mcp/#beta"
+}

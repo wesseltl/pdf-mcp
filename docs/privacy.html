@@ -3,18 +3,17 @@
   <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>Privacy Notice | pdf-mcp</title>
-    <meta name="description" content="Privacy notice for the local pdf-mcp tool, free hosted agent beta, and paid document reliability beta.">
+    <title>Privacy Notice | Smart Lab Index and pdf-mcp</title>
+    <meta name="description" content="Privacy notice for the local Smart Lab Index beta and compatible pdf-mcp document tools.">
     <link rel="canonical" href="https://wesseltl.github.io/pdf-mcp/privacy.html">
     <link rel="stylesheet" href="styles.css">
   </head>
   <body>
     <header class="site-header inner-header">
-      <a class="brand" href="./">pdf-mcp</a>
+      <a class="brand" href="./"><span class="brand-mark" aria-hidden="true">SL</span><span>Smart Lab Index</span></a>
       <nav aria-label="Legal navigation">
-        <a href="./#free-beta">Free beta</a>
-        <a href="./#pricing">Pricing</a>
-        <a href="terms.html">Terms</a>
+        <a href="./#beta">Request beta</a>
+        <a href="smart-lab-beta-terms.html">Beta terms</a>
         <a href="mailto:wesseltl@gmail.com">Contact</a>
       </nav>
     </header>
@@ -23,7 +22,23 @@
         <p class="eyebrow">Data handling</p>
         <h1>Privacy Notice</h1>
         <p class="effective">Effective 11 August 2026</p>
-        <p>This notice separates the local tool, optional free hosted beta, and paid beta.</p>
+        <p>This notice separates the local Smart Lab Index beta from the compatible document tools and optional hosted document beta.</p>
+
+        <h2>Smart Lab Index local beta</h2>
+        <p>
+          Smart Lab Index runs on the user's own computer. It does not upload indexed documents,
+          collect telemetry, send usage analytics, or load runtime assets from a CDN. Its local
+          folder navigator lists directory names only inside a random-session-protected loopback
+          browser interface. Indexing reads supported files and stores normalized records,
+          assertions, evidence, issues, and run history in a local SQLite database.
+        </p>
+        <p>
+          Local state files are restricted to the operating-system owner but are not
+          application-encrypted. The person or organization operating the app controls the source
+          files and local index. Beta request emails contain only the contact and use-case details
+          voluntarily supplied by the requester; applicants are instructed not to attach files or
+          include document contents.
+        </p>
 
         <h2>Local open-source tool</h2>
         <p>
@@ -108,9 +123,11 @@
 
         <h2>Website</h2>
         <p>
-          This static website sets no analytics or advertising cookies. It fetches public offer JSON
-          from GitHub to select the current request or checkout link. GitHub and the visitor's
-          network provider may process ordinary request metadata under their own privacy notices.
+          This static website sets no analytics or advertising cookies. Links to GitHub-hosted
+          screenshots, documentation, releases, or structured offer metadata cause the visitor's
+          browser to contact GitHub only after the visitor follows the link or loads this GitHub
+          Pages site. GitHub and the visitor's network provider may process ordinary request metadata
+          under their own privacy notices.
         </p>
 
         <h2>Your requests</h2>
@@ -123,9 +140,9 @@
       </article>
     </main>
     <footer>
-      <span>pdf-mcp</span>
+      <span>Smart Lab Index</span>
       <a href="./">Home</a>
-      <a href="beta-terms.html">Beta terms</a>
+      <a href="smart-lab-beta-terms.html">Smart Lab beta terms</a>
       <a href="terms.html">Terms</a>
       <a href="https://github.com/wesseltl/pdf-mcp">GitHub</a>
     </footer>

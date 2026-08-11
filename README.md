@@ -21,13 +21,15 @@ python -m venv .venv
 .venv/bin/smart-lab-index-app
 ```
 
-Choose a laboratory folder in the system dialog. The browser opens the Overview workspace and starts
-the first index automatically. Equipment, Locations, People, Responsibilities, Documents, Review
-queue, Sources, and Modules remain local. **Change folder** switches workspaces without a terminal.
-The app binds only to loopback and serves bundled assets.
+Choose a laboratory folder in the system dialog or the built-in local folder navigator. The browser
+opens the Overview workspace and starts the first index automatically. Equipment, Locations, People,
+Responsibilities, Documents, Review queue, Sources, and Modules remain local. **Change folder**
+switches workspaces without a terminal. The app binds only to loopback and serves bundled assets.
 
-The release workflow also creates standalone `smart-lab-index` ZIP applications for Windows, macOS,
-and Linux. After extraction, open the application directly; Python is not required.
+The release workflow also creates standalone `smart-lab-index` ZIP applications and SHA-256
+manifests for Windows, macOS, and Linux. After extraction, open the application directly; Python is
+not required. Windows signing and macOS signing/notarization activate when publisher credentials are
+configured for the release workflow.
 
 ## Document ingestion compatibility
 
@@ -47,7 +49,7 @@ Need a profile and measured baseline for real documents? See the
 Agents can use the structured offer at
 [`offers/document-to-excel-pilot.json`](https://raw.githubusercontent.com/wesseltl/pdf-mcp/main/offers/document-to-excel-pilot.json).
 
-Website: [simple conversion, local tools, and the free hosted agent beta](https://wesseltl.github.io/pdf-mcp/).
+Website: [Smart Lab Index request-only beta and compatible document tools](https://wesseltl.github.io/pdf-mcp/).
 
 > **Current limitation:** PDF extraction supports born-digital documents. Scanned or image-only PDFs
 > require OCR, which is not included. An `accepted` decision means the configured checks passed; it

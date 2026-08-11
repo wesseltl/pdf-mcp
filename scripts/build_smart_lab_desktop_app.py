@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import argparse
+import hashlib
 import json
 import os
 import platform
@@ -27,6 +28,7 @@ BUILD_ROOT = ROOT / "build" / "smart-lab-desktop-app"
 APP_DIST = BUILD_ROOT / "dist"
 FINAL_DIST = ROOT / "dist"
 APP_NAME = "smart-lab-index"
+SIGNING_REQUIRED_ENV = "SMART_LAB_REQUIRE_SIGNING"
 _SMOKE_ENVIRONMENT = {
     "HOME",
     "LANG",
@@ -55,6 +57,115 @@ def executable_path() -> Path:
         return APP_DIST / f"{APP_NAME}.app" / "Contents" / "MacOS" / APP_NAME
     suffix = ".exe" if sys.platform == "win32" else ""
     return APP_DIST / f"{APP_NAME}{suffix}"
+
+
+def signing_target() -> Path:
+    if sys.platform == "darwin":
+        return APP_DIST / f"{APP_NAME}.app"
+    return executable_path()
+
+
+def sign_desktop_app() -> str:
+    """Sign the platform artifact when release credentials are configured."""
+    target = signing_target()
+    if sys.platform == "win32":
+        certificate_value = os.environ.get("SMART_LAB_WINDOWS_CERTIFICATE_PATH")
+        if not certificate_value:
+            return "unsigned"
+        certificate = Path(certificate_value).expanduser().resolve(strict=True)
+        password = os.environ.get("SMART_LAB_WINDOWS_CERTIFICATE_PASSWORD")
+        command = [
+            str(_windows_signtool()),
+            "sign",
+            "/fd",
+            "SHA256",
+            "/tr",
+            os.environ.get(
+                "SMART_LAB_WINDOWS_TIMESTAMP_URL",
+                "http://timestamp.digicert.com",
+            ),
+            "/td",
+            "SHA256",
+            "/f",
+            str(certificate),
+        ]
+        if password:
+            command.extend(["/p", password])
+        command.append(str(target))
+        subprocess.run(command, check=True)
+        subprocess.run(
+            [str(_windows_signtool()), "verify", "/pa", "/v", str(target)],
+            check=True,
+        )
+        return "signed"
+
+    if sys.platform == "darwin":
+        identity = os.environ.get("SMART_LAB_MACOS_SIGNING_IDENTITY")
+        if not identity:
+            return "unsigned"
+        subprocess.run(
+            [
+                "codesign",
+                "--deep",
+                "--force",
+                "--options",
+                "runtime",
+                "--timestamp",
+                "--sign",
+                identity,
+                str(target),
+            ],
+            check=True,
+        )
+        subprocess.run(
+            ["codesign", "--verify", "--deep", "--strict", "--verbose=2", str(target)],
+            check=True,
+        )
+        profile = os.environ.get("SMART_LAB_MACOS_NOTARY_PROFILE")
+        if profile:
+            _notarize_macos_app(target, profile)
+            return "notarized"
+        return "signed"
+
+    return "unsigned"
+
+
+def _windows_signtool() -> Path:
+    discovered = shutil.which("signtool.exe") or shutil.which("signtool")
+    if discovered:
+        return Path(discovered)
+    program_files = os.environ.get("ProgramFiles(x86)")
+    if program_files:
+        candidates = sorted(
+            Path(program_files).glob("Windows Kits/10/bin/*/x64/signtool.exe"),
+            reverse=True,
+        )
+        if candidates:
+            return candidates[0]
+    raise FileNotFoundError("signtool.exe was not found in the Windows SDK")
+
+
+def _notarize_macos_app(target: Path, profile: str) -> None:
+    with tempfile.TemporaryDirectory() as temporary:
+        submission = Path(temporary) / f"{APP_NAME}.zip"
+        subprocess.run(
+            ["ditto", "-c", "-k", "--keepParent", str(target), str(submission)],
+            check=True,
+        )
+        subprocess.run(
+            [
+                "xcrun",
+                "notarytool",
+                "submit",
+                str(submission),
+                "--keychain-profile",
+                profile,
+                "--wait",
+            ],
+            check=True,
+        )
+    subprocess.run(["xcrun", "stapler", "staple", str(target)], check=True)
+    subprocess.run(["xcrun", "stapler", "validate", str(target)], check=True)
 
 
 def available_port() -> int:
@@ -169,7 +280,7 @@ def _startup_detail(output: BinaryIO) -> str:
     return output.read().decode("utf-8", errors="replace").strip()
 
 
-def archive_app() -> Path:
+def archive_app(signing_status: str) -> Path:
     staging = BUILD_ROOT / "archive" / APP_NAME
     shutil.rmtree(staging.parent, ignore_errors=True)
     staging.mkdir(parents=True)
@@ -183,6 +294,14 @@ def archive_app() -> Path:
         shutil.copy2(executable, staging / executable.name)
         launch_instruction = f"Double-click {executable.name}."
 
+    trust_note = {
+        "notarized": "This macOS build is signed, notarized, and has its notarization ticket stapled.",
+        "signed": "This build is digitally signed by its publisher.",
+        "unsigned": (
+            "This build is unsigned. Your operating system may ask you to confirm that you want to "
+            "open it."
+        ),
+    }[signing_status]
     (staging / "README.txt").write_text(
         "Smart Lab Index local operator app\n"
         "==================================\n\n"
@@ -191,9 +310,8 @@ def archive_app() -> Path:
         "and indexes supported files without modifying them. Use Change folder to switch sources "
         "and Stop app when finished.\n\n"
         "The desktop flow starts in no-egress mode and serves only bundled assets on loopback. "
-        "Linux folder selection requires zenity, kdialog, or yad from the desktop environment.\n\n"
-        "This build is unsigned. Your operating system may ask you to confirm that you want to "
-        "open it.\n",
+        "If a system folder dialog is unavailable, the app opens its own local folder navigator.\n\n"
+        f"{trust_note}\n",
         encoding="utf-8",
     )
 
@@ -205,6 +323,17 @@ def archive_app() -> Path:
             if path.is_file():
                 bundle.write(path, path.relative_to(staging.parent))
     return archive
+
+
+def write_checksum(archive: Path) -> Path:
+    hasher = hashlib.sha256()
+    with archive.open("rb") as stream:
+        for block in iter(lambda: stream.read(1024 * 1024), b""):
+            hasher.update(block)
+    digest = hasher.hexdigest()
+    checksum = archive.with_suffix(f"{archive.suffix}.sha256")
+    checksum.write_text(f"{digest}  {archive.name}\n", encoding="ascii")
+    return checksum
 
 
 def main() -> int:
@@ -233,11 +362,28 @@ def main() -> int:
     executable = executable_path()
     if not executable.exists():
         raise FileNotFoundError(f"PyInstaller did not create {executable}")
+    signing_status = sign_desktop_app()
+    require_signing = os.environ.get(SIGNING_REQUIRED_ENV, "").lower() in {
+        "1",
+        "true",
+        "yes",
+        "on",
+    }
+    if (
+        require_signing
+        and sys.platform in {"win32", "darwin"}
+        and signing_status == "unsigned"
+    ):
+        raise RuntimeError(
+            "platform signing is required but no signing identity was configured"
+        )
     if not args.skip_smoke:
         smoke_test(executable)
 
-    archive = archive_app()
+    archive = archive_app(signing_status)
+    checksum = write_checksum(archive)
     print(archive)
+    print(checksum)
     return 0
 
 

@@ -21,6 +21,12 @@ python -m venv .venv
 Choose a folder in the system dialog. The browser opens locally, enables no-egress mode, and starts
 indexing. **Change folder** returns to the system chooser without requiring a terminal. Picker-created
 workspaces use separate local databases so unrelated laboratory folders are not silently combined.
+If the operating system has no folder-dialog helper, the app opens its own secured local folder
+navigator instead.
+
+The public [request-only beta page](https://wesseltl.github.io/pdf-mcp/#beta) explains the current
+scope for people. Agents can read the matching
+[structured beta offer](https://raw.githubusercontent.com/wesseltl/pdf-mcp/main/beta/smart-lab-index-beta.json).
 
 To open the included demonstration without a picker:
 
@@ -197,21 +203,23 @@ Documents, Review queue, Issues, Sources, and Modules. Navigation is generated f
 categories and stored data. Evidence rows open a detail dialog showing source path, structural
 locator, confidence, module, and issue evidence.
 
-The app accepts an explicit source root or invokes a platform folder dialog. A source change performs
-a controlled same-port restart, rotates the browser-session token, and reloads only after the new
+The app accepts an explicit source root or opens a folder chooser. A source change performs a
+controlled same-port restart, rotates the browser-session token, and reloads only after the new
 session is available. Indexing runs in a background thread and SQLite connections remain thread
 local. All API routes containing index data require a random browser-session token. Mutating routes
-additionally require a same-origin request. Assets are bundled and the Content Security Policy
-permits only same-origin resources.
+additionally require the exact loopback origin and port. Assets are bundled and the Content Security
+Policy permits only same-origin resources.
 
 Folder selection uses fixed local system commands without a shell: PowerShell on Windows,
-`osascript` on macOS, and `zenity`, `kdialog`, or `yad` on Linux. Only necessary desktop environment
-variables are forwarded. No source contents are read or copied by the chooser.
+`osascript` on macOS, and `zenity`, `kdialog`, or `yad` when available on Linux. If no system dialog
+is available, a bundled loopback folder navigator provides the same workflow without an extra
+package or terminal. Its authenticated API lists directory names only; it does not read or copy file
+contents.
 
 ## Current limitations
 
-- Standalone desktop archives are unsigned ZIP applications rather than signed OS installers. Linux
-  folder selection requires `zenity`, `kdialog`, or `yad` from the desktop environment.
+- Standalone artifacts are ZIP applications rather than native OS installers. Builds are unsigned
+  unless publisher signing credentials are configured; every archive includes a SHA-256 manifest.
 - Only a filesystem connector and one general laboratory domain pack are implemented.
 - Deterministic rules cover the synthetic MVP columns and a narrow `located_in` text form; they are
   not a general natural-language understanding system.

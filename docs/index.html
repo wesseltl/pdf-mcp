@@ -3,372 +3,239 @@
   <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>Convert PDF and Word Tables to Excel, CSV, or JSON | pdf-mcp</title>
-    <meta name="description" content="Turn tables in PDF and Word documents into Excel, CSV, or JSON. Check every value against its source and flag uncertain results for review.">
+    <title>Smart Lab Index | Find and verify knowledge across laboratory files</title>
+    <meta name="description" content="Smart Lab Index creates a local, evidence-backed map above laboratory files. Find equipment, locations, people, responsibilities, documents, and conflicting records without migrating source systems.">
     <meta name="robots" content="index,follow">
     <link rel="canonical" href="https://wesseltl.github.io/pdf-mcp/">
-    <meta property="og:title" content="pdf-mcp | PDF and Word tables into usable data">
-    <meta property="og:description" content="Turn document tables into Excel, CSV, or JSON with source references and clear review flags.">
+    <meta property="og:title" content="Smart Lab Index | Local laboratory knowledge index">
+    <meta property="og:description" content="See what your laboratory has, how it connects, and which records disagree. Every result links back to its source.">
     <meta property="og:type" content="website">
     <meta property="og:url" content="https://wesseltl.github.io/pdf-mcp/">
-    <meta property="og:image" content="https://wesseltl.github.io/pdf-mcp/assets/hero-profile-checked-v2.jpg">
+    <meta property="og:image" content="https://wesseltl.github.io/pdf-mcp/assets/smart-lab-index-workspace.png">
     <meta name="twitter:card" content="summary_large_image">
-    <meta name="theme-color" content="#171d1a">
-    <link rel="preload" href="assets/hero-profile-checked-v2.webp" as="image" type="image/webp">
+    <meta name="theme-color" content="#223137">
+    <link rel="preload" href="assets/smart-lab-index-workspace.png" as="image" type="image/png">
     <link rel="stylesheet" href="styles.css">
     <script type="application/ld+json">
       {
         "@context": "https://schema.org",
         "@type": "SoftwareApplication",
-        "name": "pdf-mcp",
+        "name": "Smart Lab Index",
         "applicationCategory": "BusinessApplication",
         "operatingSystem": "Windows, macOS, Linux",
         "softwareVersion": "0.4.0",
-        "downloadUrl": "https://github.com/wesseltl/pdf-mcp/releases/tag/v0.4.0",
-        "description": "Turn tables in born-digital PDF and Word documents into Excel, CSV, or JSON with source references and review flags.",
-        "offers": [
-          {
-            "@type": "Offer",
-            "name": "pdf-mcp Free Agent Beta",
-            "price": "0.00",
-            "priceCurrency": "EUR",
-            "availability": "https://schema.org/LimitedAvailability",
-            "url": "https://wesseltl.github.io/pdf-mcp/#free-beta"
-          },
-          {
-            "@type": "Offer",
-            "name": "Profile Feasibility Check",
-            "price": "19.00",
-            "priceCurrency": "EUR",
-            "availability": "https://schema.org/PreOrder",
-            "url": "https://wesseltl.github.io/pdf-mcp/#pricing"
-          },
-          {
-            "@type": "Offer",
-            "name": "Document Reliability Pilot",
-            "price": "99.00",
-            "priceCurrency": "EUR",
-            "availability": "https://schema.org/PreOrder",
-            "url": "https://wesseltl.github.io/pdf-mcp/#pricing"
-          }
-        ]
+        "description": "A local-first, read-only laboratory knowledge index with source evidence and conflict detection.",
+        "offers": {
+          "@type": "Offer",
+          "name": "Smart Lab Index request-only beta",
+          "price": "0.00",
+          "priceCurrency": "EUR",
+          "availability": "https://schema.org/LimitedAvailability",
+          "url": "https://wesseltl.github.io/pdf-mcp/#beta"
+        }
       }
     </script>
   </head>
   <body>
     <header class="site-header">
-      <a class="brand" href="./" aria-label="pdf-mcp home">pdf-mcp</a>
+      <a class="brand" href="./" aria-label="Smart Lab Index home">
+        <span class="brand-mark" aria-hidden="true">SL</span>
+        <span>Smart Lab Index</span>
+      </a>
       <nav aria-label="Primary">
-        <a href="#download-app">Download</a>
-        <a href="#product">Example</a>
-        <a href="#access">Ways to use it</a>
-        <a href="#pricing">Pricing</a>
+        <a href="#product">Product</a>
+        <a href="#evidence">Evidence</a>
+        <a href="#scope">Beta scope</a>
       </nav>
-      <a class="header-link" href="https://github.com/wesseltl/pdf-mcp">GitHub</a>
+      <a class="header-link" href="#beta">Request beta</a>
     </header>
 
     <main>
       <section class="hero" aria-labelledby="hero-title">
         <picture>
-          <source srcset="assets/hero-profile-checked-v2.webp" type="image/webp">
-          <img src="assets/hero-profile-checked-v2.jpg" width="1717" height="916" fetchpriority="high" alt="A document beside a laptop showing extracted fields, source references, checks, and review decisions" class="hero-image">
+          <source media="(max-width: 700px)" srcset="assets/smart-lab-index-workspace-mobile.png">
+          <img src="assets/smart-lab-index-workspace.png" width="1600" height="1000" fetchpriority="high" alt="Smart Lab Index overview showing four source files, four entities, three assertions, and one conflicting equipment location">
         </picture>
         <div class="hero-shade" aria-hidden="true"></div>
         <div class="hero-content">
-          <p class="eyebrow light">PDF and Word table converter</p>
-          <h1 id="hero-title">pdf-mcp</h1>
-          <p class="hero-kicker">Turn document tables into Excel, CSV, or JSON.</p>
+          <p class="eyebrow light">Local laboratory knowledge index</p>
+          <h1 id="hero-title">Smart Lab Index</h1>
+          <p class="hero-kicker">Find what your lab has. See how it connects. Catch records that disagree.</p>
           <p class="lead">
-            Give it a PDF or Word file. It finds the tables, extracts the rows, and returns data
-            your software or AI agent can use. Every value can point back to its source, and
-            uncertain results are marked for review.
+            Point it at a laboratory folder. It builds a browsable map of equipment, locations,
+            people, responsibilities, and documents while keeping every result linked to its source.
           </p>
           <div class="actions">
-            <a class="button primary" href="#download-app">Download the simple app</a>
-            <a class="button secondary" href="#product">See input become output</a>
+            <a class="button primary" href="#beta">Request beta access</a>
+            <a class="button secondary" href="#evidence">See a real conflict</a>
           </div>
-          <p class="hero-status">PDF or DOCX in <span aria-hidden="true">|</span> Excel, CSV, or JSON out <span aria-hidden="true">|</span> No OCR for scanned files</p>
+          <p class="hero-status">Read-only sources <span aria-hidden="true">|</span> Local by default <span aria-hidden="true">|</span> Useful without AI</p>
         </div>
       </section>
 
-      <section class="proof-strip" aria-label="Product capabilities">
-        <div><strong>Input</strong><span>PDF and Word tables</span></div>
-        <div><strong>Output</strong><span>Excel, CSV, and JSON</span></div>
-        <div><strong>Checks</strong><span>uncertain rows are flagged</span></div>
-        <div><strong>Privacy</strong><span>local mode uploads nothing</span></div>
-      </section>
-
-      <section class="download-band" id="download-app" aria-labelledby="download-title">
-        <div class="section-inner download-layout">
-          <div class="download-copy">
-            <p class="eyebrow">Simple browser app</p>
-            <h2 id="download-title">Choose your computer. No Python or terminal.</h2>
-            <p>Download the ZIP, unzip it, and double-click the app. It opens in your browser and processes documents only on your computer.</p>
-          </div>
-          <div>
-            <div class="download-options" aria-label="App downloads by operating system">
-              <a class="download-option" href="https://github.com/wesseltl/pdf-mcp/releases/download/v0.4.0/pdf-mcp-app-v0.4.0-windows-x64.zip">
-                <span><strong>Windows</strong><small>64-bit PC</small></span>
-                <span class="download-command">Download ZIP</span>
-              </a>
-              <a class="download-option" href="https://github.com/wesseltl/pdf-mcp/releases/download/v0.4.0/pdf-mcp-app-v0.4.0-macos-arm64.zip">
-                <span><strong>Mac</strong><small>Apple silicon, M1 or newer</small></span>
-                <span class="download-command">Download ZIP</span>
-              </a>
-              <a class="download-option" href="https://github.com/wesseltl/pdf-mcp/releases/download/v0.4.0/pdf-mcp-app-v0.4.0-linux-x64.zip">
-                <span><strong>Linux</strong><small>64-bit computer</small></span>
-                <span class="download-command">Download ZIP</span>
-              </a>
-            </div>
-            <p class="download-note">Community beta, currently unsigned. Your computer may ask you to confirm before opening it. <a class="text-link" href="https://github.com/wesseltl/pdf-mcp/releases/tag/v0.4.0">See all v0.4.0 downloads</a>.</p>
-          </div>
-        </div>
+      <section class="proof-strip" aria-label="Product principles">
+        <div><strong>Source stays source</strong><span>No migration or write-back</span></div>
+        <div><strong>Every claim has evidence</strong><span>File, sheet, cell, page, or paragraph</span></div>
+        <div><strong>Conflicts stay visible</strong><span>Contradicting records are never overwritten</span></div>
+        <div><strong>No cloud required</strong><span>Local database, local browser, bundled assets</span></div>
       </section>
 
       <section class="section product-section" id="product">
-        <div class="section-inner product-layout">
-          <div class="product-copy">
-            <p class="eyebrow">A simple example</p>
-            <h2>A PDF table goes in. Clean spreadsheet rows come out.</h2>
-            <p class="section-intro">
-              This sample invoice contains an item, quantity, and price table. pdf-mcp extracts all
-              three rows and creates an Excel workbook plus CSV or JSON data. It also records where
-              each value appeared in the document.
-            </p>
-            <dl class="output-facts">
-              <div><dt>Input</dt><dd>1 PDF invoice with 3 line items</dd></div>
-              <div><dt>Output</dt><dd>The same 3 rows in Excel, CSV, or JSON</dd></div>
-              <div><dt>Result</dt><dd>Accepted, with no issues found</dd></div>
-            </dl>
-            <div class="inline-links">
-              <a class="text-link" href="examples/sample-invoice.pdf" target="_blank" rel="noopener">Open the input PDF</a>
-              <a class="text-link" href="examples/sample-invoice-output.xlsx" download>Download the output Excel file</a>
-            </div>
-          </div>
-
-          <figure class="conversion-panel">
-            <figcaption>
-              <span>sample-invoice-output.xlsx</span>
-              <span class="result-state">Accepted</span>
-            </figcaption>
-            <div class="sheet-tabs" aria-hidden="true"><span class="active">Data</span><span>Review</span><span>Evidence</span></div>
-            <div class="table-scroll">
-              <table class="output-table">
-                <thead>
-                  <tr><th>Item</th><th>Quantity</th><th>Unit price</th><th>Source</th></tr>
-                </thead>
-                <tbody>
-                  <tr><td>Widget</td><td>3</td><td>12.50</td><td>Page 1, row 1</td></tr>
-                  <tr><td>Gadget</td><td>1</td><td>40.00</td><td>Page 1, row 2</td></tr>
-                  <tr><td>Bolt</td><td>10</td><td>0.25</td><td>Page 1, row 3</td></tr>
-                </tbody>
-              </table>
-            </div>
-            <div class="conversion-summary">
-              <div><strong>3</strong><span>rows extracted</span></div>
-              <div><strong>0</strong><span>issues found</span></div>
-              <div><strong>Accepted</strong><span>ready to use</span></div>
-            </div>
-            <p>Real output from the included synthetic invoice example.</p>
-          </figure>
-        </div>
-      </section>
-
-      <section class="section access-section" id="access">
-        <div class="section-inner">
-          <div class="section-heading split-heading">
-            <div>
-              <p class="eyebrow">Access</p>
-              <h2>Use it locally, through an API, or with our help.</h2>
-            </div>
-            <p>The downloadable browser app works without Python or an agent. Hosted API access and document setup services are request-only.</p>
-          </div>
-
-          <div class="access-list" role="list">
-            <article class="access-row" role="listitem">
-              <div>
-                <p class="access-name">Simple browser app</p>
-                <p class="access-price">For anyone converting a document</p>
-              </div>
-              <p class="availability available"><span></span>Available now</p>
-              <p>Download it, open it, and drop in a PDF or Word file. It runs locally, so nothing is uploaded.</p>
-              <a class="button outline" href="#download-app">Choose a download</a>
-            </article>
-
-            <article class="access-row" id="free-beta" role="listitem">
-              <div>
-                <p class="access-name">Hosted API beta</p>
-                <p class="access-price">Free during beta</p>
-              </div>
-              <p class="availability pending"><span></span>Applications open</p>
-              <div>
-                <p>Send a redacted file to an API and receive the extracted data without running the tool yourself.</p>
-                <p class="offer-status compact" data-offer-status="pdf-mcp-hosted-free-beta">Applications are open. Invitations begin after endpoint deployment. Send no documents by email.</p>
-              </div>
-              <a class="button outline" data-offer="pdf-mcp-hosted-free-beta" data-request-label="Apply for beta access" href="mailto:wesseltl@gmail.com?subject=pdf-mcp%20Free%20Agent%20Beta">Apply for access</a>
-            </article>
-
-            <article class="access-row" role="listitem">
-              <div>
-                <p class="access-name">Document setup pilot</p>
-                <p class="access-price">From EUR 19</p>
-              </div>
-              <p class="availability request"><span></span>Requests open</p>
-              <p>We test sample documents, configure the fields you need, and show what works and what needs review.</p>
-              <a class="button outline" href="#pricing">View pilot scopes</a>
-            </article>
-          </div>
-
-          <p class="access-footnote">
-            Hosted usage records exclude filenames, document contents, extracted text, and table cells.
-            <a class="text-link" href="privacy.html">Read the privacy boundary</a>.
+        <div class="section-inner product-intro">
+          <p class="eyebrow">What it does</p>
+          <h2>One index above the files and systems your laboratory already uses.</h2>
+          <p class="section-lead">
+            Smart Lab Index does not replace a LIMS, QMS, ELN, shared drive, or asset system. It
+            creates the layer that lets people see those sources together and verify why a result exists.
           </p>
         </div>
+        <div class="section-inner process-list" role="list">
+          <article class="process-row" role="listitem">
+            <span class="step-number">01</span>
+            <div><h3>Discover</h3><p>Scans a selected folder recursively and detects new, changed, unchanged, and deleted files.</p></div>
+            <span class="step-output">Source records</span>
+          </article>
+          <article class="process-row" role="listitem">
+            <span class="step-number">02</span>
+            <div><h3>Index</h3><p>Parses PDF, Word, Excel, CSV, and text into a normalized, searchable structure.</p></div>
+            <span class="step-output">Documents</span>
+          </article>
+          <article class="process-row" role="listitem">
+            <span class="step-number">03</span>
+            <div><h3>Connect</h3><p>Links assets, locations, people, responsibilities, and source evidence without requiring AI.</p></div>
+            <span class="step-output">Entities and assertions</span>
+          </article>
+          <article class="process-row" role="listitem">
+            <span class="step-number">04</span>
+            <div><h3>Monitor</h3><p>Surfaces contradictions and keeps both observations available for human review.</p></div>
+            <span class="step-output">Issues</span>
+          </article>
+        </div>
       </section>
 
-      <section class="evidence-band" id="evidence" aria-labelledby="evidence-title">
+      <section class="section evidence-section" id="evidence">
         <div class="section-inner evidence-layout">
           <div class="evidence-copy">
-            <p class="eyebrow light">What has been tested</p>
-            <h2 id="evidence-title">Clean tables, uncertain rows, and wrong documents.</h2>
+            <p class="eyebrow">Evidence, not guesswork</p>
+            <h2>Two files name two locations. Smart Lab Index keeps both.</h2>
             <p>
-              We created 18 fictional water-report documents to test all three outcomes. These
-              tests show that the software behaves consistently on those examples. They are not
-              customer evidence and do not predict accuracy on your documents.
+              The included synthetic lab has a spreadsheet that places Freezer-001 in Room A-101
+              and a procedure that places it in Room A-102. The index does not choose silently. It
+              opens a conflict with both exact source locations.
             </p>
-            <a class="text-link on-dark" href="https://github.com/wesseltl/pdf-mcp/tree/main/evaluations/simulated-customer">See every test document and result</a>
+            <a class="text-link" href="https://github.com/wesseltl/pdf-mcp/tree/main/examples/smart_lab_index/sample_lab">Inspect the synthetic source files</a>
           </div>
-          <dl class="evidence-stats">
-            <div><dt>18</dt><dd>fictional test documents</dd></div>
-            <div><dt>12</dt><dd>used while building</dd></div>
-            <div><dt>6</dt><dd>kept as separate tests</dd></div>
-            <div><dt>3</dt><dd>possible outcomes</dd></div>
-          </dl>
+          <div class="assertion-table" role="table" aria-label="Conflicting source assertions">
+            <div class="assertion-head" role="row">
+              <span role="columnheader">Source</span>
+              <span role="columnheader">Observed location</span>
+              <span role="columnheader">Evidence</span>
+            </div>
+            <div class="assertion-row" role="row">
+              <span role="cell"><strong>equipment.xlsx</strong><small>Asset register</small></span>
+              <span role="cell">Room A-101</span>
+              <span role="cell">Assets · cell D2</span>
+            </div>
+            <div class="assertion-row" role="row">
+              <span role="cell"><strong>SOP_freezers.docx</strong><small>Procedure</small></span>
+              <span role="cell">Room A-102</span>
+              <span role="cell">Paragraph 2</span>
+            </div>
+            <div class="conflict-result">
+              <span class="issue-badge">Open issue</span>
+              <strong>Conflicting location for Freezer-001</strong>
+            </div>
+          </div>
         </div>
       </section>
 
-      <section class="section method-section" id="method">
-        <div class="section-inner">
-          <div class="section-heading">
-            <p class="eyebrow">How reliable extraction is set up</p>
-            <h2>Show it what to find, then test the answers.</h2>
+      <section class="section workspace-section" aria-labelledby="workspace-title">
+        <div class="section-inner workspace-heading">
+          <div>
+            <p class="eyebrow">Operator workspace</p>
+            <h2 id="workspace-title">The index is the interface.</h2>
           </div>
-          <ol class="workflow">
-            <li><span class="step-number">01</span><strong>Name the fields</strong><p>Specify the columns you need, such as item, quantity, price, or sample ID.</p></li>
-            <li><span class="step-number">02</span><strong>Extract the rows</strong><p>Read the table and keep a reference to the source of every value.</p></li>
-            <li><span class="step-number">03</span><strong>Check the answers</strong><p>Compare the extracted rows with answers approved by a person.</p></li>
-            <li><span class="step-number">04</span><strong>Handle uncertainty</strong><p>Use clean results and hold uncertain or unsupported documents for review.</p></li>
-          </ol>
+          <p>Browse equipment, locations, people, responsibilities, documents, issues, sources, and module health without a chat prompt.</p>
         </div>
+        <figure class="workspace-media">
+          <img src="assets/smart-lab-index-workspace.png" width="1600" height="1000" loading="lazy" alt="Full Smart Lab Index overview with indexed source counts and a conflicting location issue">
+          <figcaption>Actual output from the four-file synthetic laboratory example. No cloud service or AI model was used.</figcaption>
+        </figure>
       </section>
 
       <section class="section scope-section" id="scope">
-        <div class="section-inner scope-layout">
-          <div class="scope-copy">
-            <p class="eyebrow">Good fit</p>
-            <h2>Best for document types you receive again and again.</h2>
-            <ul class="check-list">
-              <li>Lab reports and certificates of analysis</li>
-              <li>Invoices, vendor statements, and operational reports</li>
-              <li>Tables that use the same columns across many files</li>
-              <li>Workflows where a person can check unusual results</li>
-            </ul>
-          </div>
-          <aside class="limits-block">
-            <p class="eyebrow amber">Current boundary</p>
-            <h3>Born-digital tables only.</h3>
+        <div class="section-inner scope-heading">
+          <p class="eyebrow">Request-only beta</p>
+          <h2>Useful now, with a deliberately narrow first scope.</h2>
+        </div>
+        <div class="section-inner scope-columns">
+          <section class="scope-column ready" aria-labelledby="ready-title">
+            <h3 id="ready-title"><span aria-hidden="true">✓</span> Included now</h3>
             <ul>
-              <li>No scans, OCR, handwriting, charts, or image-only PDFs</li>
-              <li>No password-protected files or manual data entry</li>
-              <li>No patient data or other special-category personal data</li>
-              <li>No accuracy claim for layouts outside the evaluation set</li>
+              <li>Local Windows, macOS, and Linux desktop builds</li>
+              <li>Read-only recursive filesystem indexing</li>
+              <li>PDF, DOCX, XLSX, CSV, and TXT parsing</li>
+              <li>Equipment, location, person, and responsibility extraction</li>
+              <li>Assertion-level source evidence and conflict detection</li>
+              <li>Incremental re-indexing and module health</li>
+              <li>No-egress mode with no telemetry or runtime CDN</li>
             </ul>
-          </aside>
+          </section>
+          <section class="scope-column later" aria-labelledby="later-title">
+            <h3 id="later-title"><span aria-hidden="true">→</span> Not claimed yet</h3>
+            <ul>
+              <li>No LIMS, SharePoint, QMS, or ELN connector yet</li>
+              <li>No OCR for scanned documents</li>
+              <li>No general natural-language understanding</li>
+              <li>No multi-user permissions or source access enforcement</li>
+              <li>No signed installer until publisher credentials are configured</li>
+              <li>No production approval for hostile or regulated document roots</li>
+              <li>No automatic source modification or write-back</li>
+            </ul>
+          </section>
         </div>
       </section>
 
-      <section class="section pricing-section" id="pricing">
-        <div class="section-inner">
-          <div class="section-heading pricing-heading">
-            <p class="eyebrow">Try it on your documents</p>
-            <h2>Test one real document before committing.</h2>
-            <p class="section-intro">Self-serve checkout remains disabled until business registration details are published.</p>
-          </div>
-
-          <div class="pricing-grid">
-            <article class="price-card">
-              <div>
-                <p class="offer-name">Single-Document Feasibility Check</p>
-                <p class="price">EUR 19 <span>excluding VAT</span></p>
-                <p class="scope-line">1 document | 10 pages | 5 detected tables</p>
-                <ul>
-                  <li>Excel, CSV, and/or JSON output with source references</li>
-                  <li>Notes explaining what was extracted and what may fail</li>
-                  <li>One correction round within 7 days</li>
-                  <li>Target delivery in 2 business days</li>
-                </ul>
-              </div>
-              <div>
-                <a class="button primary full" data-offer="sample-conversion" data-request-label="Request feasibility check" data-checkout-label="Open feasibility checkout" href="mailto:wesseltl@gmail.com?subject=Profile%20Feasibility%20Check%20Request">Request feasibility check</a>
-                <p class="offer-status" data-offer-status="sample-conversion">Scope request by email. Do not attach the document.</p>
-              </div>
-            </article>
-
-            <article class="price-card featured">
-              <div>
-                <p class="offer-label">For recurring workflows</p>
-                <p class="offer-name">Document Reliability Pilot</p>
-                <p class="price">EUR 99 <span>excluding VAT</span></p>
-                <p class="scope-line">5 similar documents | 50 pages | 1 workflow</p>
-                <ul>
-                  <li>Reusable settings for one recurring document type</li>
-                  <li>Excel, CSV, and/or JSON outputs with source references</li>
-                  <li>Results checked against person-approved answers</li>
-                  <li>Report showing errors and when review is needed</li>
-                  <li>One correction round within 7 days</li>
-                  <li>Target delivery in 5 business days</li>
-                </ul>
-              </div>
-              <div>
-                <a class="button dark full" data-offer="document-to-excel-pilot" data-request-label="Request reliability pilot" data-checkout-label="Open pilot checkout" href="mailto:wesseltl@gmail.com?subject=Document%20Reliability%20Pilot%20Request">Request reliability pilot</a>
-                <p class="offer-status" data-offer-status="document-to-excel-pilot">Scope request by email. Do not attach documents.</p>
-              </div>
-            </article>
-          </div>
-          <p class="refund-note">If accepted documents cannot produce a usable versioned profile and evaluation baseline, choose a full refund or no-cost cancellation before manual rework.</p>
-        </div>
-      </section>
-
-      <section class="boundary-section">
-        <div class="section-inner boundary-layout">
+      <section class="beta-section" id="beta">
+        <div class="section-inner beta-layout">
           <div>
-            <p class="eyebrow light">Free local software, private customer data</p>
-            <h2>Inspect the code. Keep your documents and test answers private.</h2>
-          </div>
-          <div>
+            <p class="eyebrow light">Applications open</p>
+            <h2>Request the free Smart Lab Index beta.</h2>
             <p>
-              The local pdf-mcp software is MIT licensed and sends no usage data. Settings made for
-              a customer's document type and the correct answers used for testing stay private
-              unless that customer chooses to share them. The hosted beta is a separate service.
+              The beta is for laboratory, research, quality, and facility teams willing to test a
+              local index on synthetic, non-sensitive, or explicitly approved internal sample data.
+              No documents are needed to apply.
             </p>
-            <div class="inline-links dark-links">
-              <a class="text-link on-dark" href="https://github.com/wesseltl/pdf-mcp">View source</a>
-              <a class="text-link on-dark" href="https://raw.githubusercontent.com/wesseltl/pdf-mcp/main/beta/free-hosted-beta.json">Read the agent offer</a>
-            </div>
           </div>
+          <div class="beta-actions">
+            <a class="button primary" href="mailto:wesseltl@gmail.com?subject=Smart%20Lab%20Index%20Beta%20Request&amp;body=Hi%20Wessel%2C%0A%0AI%20want%20to%20request%20Smart%20Lab%20Index%20beta%20access.%0A%0AOrganization%20or%20project%3A%0ALaboratory%20type%3A%0AOperating%20system%3A%0AApproximate%20number%20and%20types%20of%20test%20files%3A%0AMain%20problem%20to%20evaluate%3A%0A%0AI%20will%20not%20attach%20documents%20to%20this%20request.%0A">Request beta access</a>
+            <a class="button secondary" href="https://raw.githubusercontent.com/wesseltl/pdf-mcp/main/beta/smart-lab-index-beta.json">Agent-readable beta offer</a>
+            <p>Send only a short use-case description. Do not attach laboratory files or confidential data.</p>
+          </div>
+        </div>
+      </section>
+
+      <section class="compatibility-band">
+        <div class="section-inner compatibility-layout">
+          <div>
+            <p class="eyebrow">Document ingestion compatibility</p>
+            <h2>The existing PDF and Word table tools remain available.</h2>
+          </div>
+          <p>
+            Deterministic document-to-Excel tools and MCP endpoints are retained as ingestion
+            capabilities. Smart Lab Index is the product layer above them.
+            <a class="text-link" href="https://github.com/wesseltl/pdf-mcp#document-ingestion-compatibility">Read the compatibility documentation</a>.
+          </p>
         </div>
       </section>
     </main>
 
     <footer>
-      <span>pdf-mcp</span>
-      <a href="https://github.com/wesseltl/pdf-mcp/blob/main/BUY.md">Offer details</a>
-      <a href="beta-terms.html">Beta terms</a>
-      <a href="terms.html">Terms</a>
+      <span>Smart Lab Index</span>
+      <a href="smart-lab-beta-terms.html">Beta terms</a>
       <a href="privacy.html">Privacy</a>
+      <a href="https://github.com/wesseltl/pdf-mcp/blob/main/SMART_LAB_INDEX.md">Technical documentation</a>
       <a href="mailto:wesseltl@gmail.com">Contact</a>
     </footer>
-
-    <script src="offers.js"></script>
   </body>
 </html>
