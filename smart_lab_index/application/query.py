@@ -99,7 +99,9 @@ class KnowledgeQueryService:
             issue["reviews"] = reviews_by_issue.get(issue["issue_id"], [])
         facts_by_entity: dict[str, list[dict[str, Any]]] = {}
         for assertion in assertions:
-            facts_by_entity.setdefault(assertion["subject_entity_id"], []).append(assertion)
+            facts_by_entity.setdefault(assertion["subject_entity_id"], []).append(
+                assertion
+            )
         for entity in entity_values:
             entity["facts"] = facts_by_entity.get(entity["entity_id"], [])
         summary = self._store.summary()
@@ -127,9 +129,7 @@ class KnowledgeQueryService:
             "modules": normalized_modules,
             "collections": {
                 "entities": _collection(len(entity_values), counts["entities"]),
-                "assertions": _collection(
-                    len(assertions), counts["active_assertions"]
-                ),
+                "assertions": _collection(len(assertions), counts["active_assertions"]),
                 "documents": _collection(len(documents), counts["documents"]),
                 "issues": _collection(len(issues), counts["issues"]),
                 "sources": _collection(len(sources), counts["sources"]),
@@ -138,7 +138,11 @@ class KnowledgeQueryService:
 
     def search(self, query: str, *, limit: int = 50) -> dict[str, Any]:
         results = self._store.search(query, limit=limit)
-        return {"query": " ".join(query.split()), "results": results, "count": len(results)}
+        return {
+            "query": " ".join(query.split()),
+            "results": results,
+            "count": len(results),
+        }
 
 
 def _entity_value(entity: EntityRecord) -> dict[str, Any]:
@@ -204,8 +208,18 @@ def _view_manifest(
         for entity_type in EntityType
     }
     values: list[dict[str, Any]] = [
-        {"view_id": "overview", "label": "Overview", "kind": "overview"},
-        {"view_id": "search", "label": "Search", "kind": "search"},
+        {
+            "view_id": "overview",
+            "label": "Home",
+            "kind": "overview",
+            "group": "Workspace",
+        },
+        {
+            "view_id": "search",
+            "label": "Search",
+            "kind": "search",
+            "group": "Workspace",
+        },
     ]
     if "ENTITY_EXTRACTOR" in active_types or entities:
         values.extend(
@@ -214,6 +228,7 @@ def _view_manifest(
                     "view_id": "equipment",
                     "label": "Equipment",
                     "kind": "entity_list",
+                    "group": "Lab knowledge",
                     "entity_type": EntityType.ASSET.value,
                     "count": entity_counts[EntityType.ASSET.value],
                 },
@@ -221,6 +236,7 @@ def _view_manifest(
                     "view_id": "locations",
                     "label": "Locations",
                     "kind": "entity_list",
+                    "group": "Lab knowledge",
                     "entity_type": EntityType.LOCATION.value,
                     "count": entity_counts[EntityType.LOCATION.value],
                 },
@@ -228,13 +244,15 @@ def _view_manifest(
                     "view_id": "people",
                     "label": "People",
                     "kind": "entity_list",
+                    "group": "Lab knowledge",
                     "entity_type": EntityType.PERSON.value,
                     "count": entity_counts[EntityType.PERSON.value],
                 },
                 {
                     "view_id": "organizations",
-                    "label": "Organizations",
+                    "label": "Teams",
                     "kind": "entity_list",
+                    "group": "Lab knowledge",
                     "entity_types": [
                         EntityType.ORGANIZATION.value,
                         EntityType.ORGANIZATIONAL_UNIT.value,
@@ -252,6 +270,7 @@ def _view_manifest(
                 "view_id": "responsibilities",
                 "label": "Responsibilities",
                 "kind": "relationship_list",
+                "group": "Lab knowledge",
                 "count": counts["responsibilities"],
             }
         )
@@ -261,42 +280,48 @@ def _view_manifest(
                 "view_id": "documents",
                 "label": "Documents",
                 "kind": "document_list",
+                "group": "Lab knowledge",
                 "count": counts["documents"],
             }
         )
     if "ISSUE_RULE" in active_types or issues:
         open_issues = counts["issues_by_status"].get("OPEN", 0)
-        values.extend(
-            (
-                {
-                    "view_id": "review",
-                    "label": "Review queue",
-                    "kind": "issue_list",
-                    "status": "OPEN",
-                    "count": open_issues,
-                },
+        values.append(
+            {
+                "view_id": "review",
+                "label": "Needs review",
+                "kind": "issue_list",
+                "group": "Review",
+                "status": "OPEN",
+                "count": open_issues,
+            }
+        )
+        if counts["issues"] > open_issues:
+            values.append(
                 {
                     "view_id": "issues",
-                    "label": "All issues",
+                    "label": "Review history",
                     "kind": "issue_list",
+                    "group": "Review",
                     "count": counts["issues"],
-                },
+                }
             )
-        )
     if "CONNECTOR" in active_types or sources:
         values.append(
             {
                 "view_id": "sources",
-                "label": "Sources",
+                "label": "Files",
                 "kind": "source_list",
+                "group": "System",
                 "count": counts["sources"],
             }
         )
     values.append(
         {
             "view_id": "modules",
-            "label": "Modules",
+            "label": "System status",
             "kind": "module_list",
+            "group": "System",
             "count": len(modules),
         }
     )

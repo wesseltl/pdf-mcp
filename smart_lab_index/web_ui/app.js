@@ -109,6 +109,7 @@ function humanize(value) {
     .replace(/[._-]+/g, " ")
     .replace(/\s+/g, " ")
     .trim()
+    .toLocaleLowerCase()
     .replace(/\b\w/g, (character) => character.toUpperCase());
 }
 
@@ -156,6 +157,26 @@ function formatBytes(value) {
     unit = units[index];
   }
   return `${size >= 10 ? size.toFixed(0) : size.toFixed(1)} ${unit}`;
+}
+
+function contentTypeLabel(value) {
+  const contentType = String(value || "").toLocaleLowerCase();
+  if (contentType.includes("wordprocessingml") || contentType.includes("msword")) {
+    return "Word document";
+  }
+  if (contentType.includes("spreadsheetml") || contentType.includes("excel")) {
+    return "Excel workbook";
+  }
+  if (contentType.includes("pdf")) {
+    return "PDF";
+  }
+  if (contentType.includes("csv")) {
+    return "CSV";
+  }
+  if (contentType.startsWith("text/")) {
+    return "Text file";
+  }
+  return humanize(value) || "File";
 }
 
 function formatConfidence(value) {
@@ -322,7 +343,7 @@ async function refreshState(options = {}) {
     if (ui.lastOperationState === "INDEXING") {
       schedulePoll();
     } else if (previousOperation === "INDEXING" && !options.finalRefresh) {
-      announce(ui.lastOperationState === "FAILED" ? "Indexing failed" : "Indexing complete");
+      announce(ui.lastOperationState === "FAILED" ? "File scan failed" : "File scan complete");
       ui.pollTimer = window.setTimeout(
         () => refreshState({ finalRefresh: true }),
         FINAL_REFRESH_DELAY_MS,
@@ -359,13 +380,13 @@ async function startIndex() {
       };
       ui.lastOperationState = "INDEXING";
     }
-    announce("Indexing started");
+    announce("File scan started");
     renderApplication();
     ui.pollTimer = window.setTimeout(() => refreshState(), FINAL_REFRESH_DELAY_MS);
   } catch (error) {
-    ui.actionError = error instanceof Error ? error.message : "Unable to start indexing.";
+    ui.actionError = error instanceof Error ? error.message : "Unable to start the file scan.";
     renderApplication();
-    announce("Indexing could not be started");
+    announce("File scan could not be started");
   } finally {
     ui.requestBusy = false;
     updateCommandState();
@@ -384,7 +405,7 @@ async function cancelIndex() {
     if (ui.state?.operation) {
       ui.state.operation.cancel_requested = true;
     }
-    announce("Index cancellation requested");
+    announce("File scan cancellation requested");
     renderOperationStatus();
     schedulePoll();
   } catch (error) {
@@ -442,7 +463,7 @@ async function stopApplication() {
   if (ui.requestBusy || ui.stopped) {
     return;
   }
-  const confirmed = window.confirm("Stop Smart Lab Index on this computer?");
+  const confirmed = window.confirm("Close Smart Lab Index on this computer?");
   if (!confirmed) {
     return;
   }
@@ -455,7 +476,7 @@ async function stopApplication() {
     ui.stopped = true;
     clearPoll();
     renderStopped();
-    announce("Smart Lab Index stopped");
+    announce("Smart Lab Index closed");
   } catch (error) {
     ui.actionError = error instanceof Error ? error.message : "Unable to stop the application.";
     renderApplication();
@@ -559,6 +580,7 @@ function renderNavigation() {
   const views = currentViews();
   const navFragment = document.createDocumentFragment();
   const selectFragment = document.createDocumentFragment();
+  let previousGroup = "";
 
   if (!views.length) {
     navFragment.append(node("div", "navigation-empty", "No views available"));
@@ -566,6 +588,13 @@ function renderNavigation() {
 
   views.forEach((view) => {
     const viewId = String(view.view_id);
+    const group = scalarText(view.group, "Workspace");
+    if (group !== previousGroup) {
+      const heading = node("div", "nav-group-label", group);
+      heading.setAttribute("aria-hidden", "true");
+      navFragment.append(heading);
+      previousGroup = group;
+    }
     const button = node("button", "nav-button");
     button.type = "button";
     button.dataset.viewId = viewId;
@@ -599,7 +628,7 @@ function renderNavigation() {
 function renderChrome() {
   const source = asObject(ui.state?.source);
   const root = scalarText(source.root, "No source configured");
-  elements.sourceRoot.textContent = root;
+  elements.sourceRoot.textContent = scalarText(source.display_name, root);
   elements.sourceRoot.title = root;
   elements.productVersion.textContent = `Version ${scalarText(ui.state?.product_version)}`;
   elements.changeSourceButton.hidden = source.can_change_source !== true;
@@ -610,10 +639,10 @@ function renderChrome() {
 
   const noEgress = source.no_egress === true;
   elements.egressStatus.className = `status-badge ${noEgress ? "status-success" : "status-warning"}`;
-  elements.egressStatus.textContent = noEgress ? "No egress on" : "Network access allowed";
+  elements.egressStatus.textContent = noEgress ? "Files stay local" : "Cloud connections on";
   elements.egressStatus.title = noEgress
-    ? "Outbound network access is disabled"
-    : "No-egress mode is not enabled";
+    ? "Document content is processed on this computer"
+    : "This workspace permits configured outbound connections";
 }
 
 function renderViewHeader() {
@@ -642,12 +671,21 @@ function setViewCount(total, filtered = null) {
 function summarizeOperationResult(result) {
   const data = asObject(result);
   const stats = asObject(data.stats);
-  const preferredKeys = ["discovered", "unchanged", "changed", "parsed", "failed", "entities", "assertions", "issues"];
-  const parts = preferredKeys
-    .map((key) => [key, data[key] ?? stats[key]])
+  const preferredFields = [
+    ["discovered", "Files checked"],
+    ["unchanged", "Unchanged"],
+    ["changed", "Updated"],
+    ["parsed", "Documents read"],
+    ["failed", "Could not read"],
+    ["entities", "Items added"],
+    ["assertions", "Connections added"],
+    ["issues", "Review items"],
+  ];
+  const parts = preferredFields
+    .map(([key, label]) => [label, data[key] ?? stats[key]])
     .filter(([, value]) => value !== null && value !== undefined)
-    .map(([key, value]) => `${humanize(key)} ${formatNumber(value)}`);
-  return parts.length ? parts.join(" · ") : "Index state updated";
+    .map(([label, value]) => `${label} ${formatNumber(value)}`);
+  return parts.length ? parts.join(" · ") : "Scan state updated";
 }
 
 function progressDetail(operation) {
@@ -655,7 +693,15 @@ function progressDetail(operation) {
   if (operation.cancel_requested) {
     return "Cancelling after the current file";
   }
-  const phase = humanize(progress.phase || "Indexing");
+  const phases = {
+    DISCOVERY: "Checking files",
+    FINALIZING: "Finishing scan",
+    PARSING: "Reading documents",
+    PREFLIGHT: "Checking folder",
+    PROCESSING: "Reading documents",
+    STARTING: "Starting scan",
+  };
+  const phase = phases[String(progress.phase || "").toUpperCase()] || "Scanning files";
   const current = Number(progress.current);
   const total = Number(progress.total);
   const count = Number.isFinite(current) && Number.isFinite(total) && total > 0
@@ -665,7 +711,7 @@ function progressDetail(operation) {
       : "";
   const bytes = progress.bytes_total ? formatBytes(progress.bytes_total) : "";
   const path = progress.path ? scalarText(progress.path) : "";
-  return [phase, count, bytes, path].filter(Boolean).join(" · ") || "Starting index run";
+  return [phase, count, bytes, path].filter(Boolean).join(" · ") || "Starting scan";
 }
 
 function renderOperationStatus() {
@@ -684,7 +730,7 @@ function renderOperationStatus() {
     elements.operationStatus.append(
       createOperationStrip(
         "indexing",
-        "Indexing files",
+        "Scanning files",
         progressDetail(operation),
         "spinner",
         formatDate(operation.started_at),
@@ -694,7 +740,7 @@ function renderOperationStatus() {
     elements.operationStatus.append(
       createOperationStrip(
         "failed",
-        "Indexing failed",
+        "Scan failed",
         scalarText(operation.error, "The indexing run did not complete."),
         "!",
         formatDate(operation.completed_at),
@@ -705,7 +751,7 @@ function renderOperationStatus() {
     elements.operationStatus.append(
       createOperationStrip(
         cancelled ? "warning" : "success",
-        cancelled ? "Index cancelled" : "Index complete",
+        cancelled ? "Scan cancelled" : "Scan complete",
         summarizeOperationResult(operation.result),
         cancelled ? "■" : "✓",
         formatDate(operation.completed_at),
@@ -768,8 +814,8 @@ function renderApplication() {
 function renderChangingSource() {
   elements.operationStatus.replaceChildren();
   const panel = emptyState(
-    "Choose a source folder",
-    "The local folder chooser is open.",
+    "Choose a folder",
+    "Folder selection is open.",
     "⌖",
   );
   panel.classList.add("stopped-panel");
@@ -783,7 +829,7 @@ function renderLoading() {
   const panel = node("div", "state-panel state-panel-loading");
   const spinner = node("span", "spinner");
   spinner.setAttribute("aria-hidden", "true");
-  panel.append(spinner, node("strong", "", "Loading index"));
+  panel.append(spinner, node("strong", "", "Opening workspace"));
   elements.viewRoot.replaceChildren(panel);
 }
 
@@ -793,7 +839,7 @@ function renderUnavailable() {
   if (ui.actionError) {
     elements.operationStatus.append(createOperationStrip("failed", "Connection failed", ui.actionError, "!"));
   }
-  const panel = emptyState("Index unavailable", "The local application did not return its current state.", "↻");
+  const panel = emptyState("Workspace unavailable", "The application did not return its current state.", "↻");
   panel.append(commandButton("Retry", "↻", () => refreshState()));
   elements.viewRoot.replaceChildren(panel);
   updateCommandState();
@@ -802,7 +848,7 @@ function renderUnavailable() {
 function renderStopped() {
   clearPoll();
   elements.operationStatus.replaceChildren();
-  const panel = emptyState("Application stopped", "You can close this browser tab.", "■");
+  const panel = emptyState("Application closed", "You can close this browser tab.", "■");
   panel.classList.add("stopped-panel");
   elements.viewRoot.replaceChildren(panel);
   elements.viewRoot.setAttribute("aria-busy", "false");
@@ -968,27 +1014,42 @@ function openSearchResult(result) {
 
 function renderOverview(view) {
   const summary = asObject(ui.state.summary);
-  const hasData = Number(summary.documents || 0) > 0
+  const hasData = Number(summary.sources || 0) > 0
+    || Number(summary.documents || 0) > 0
     || Number(summary.entities || 0) > 0
-    || Boolean(summary.latest_run);
+    || Number(summary.active_assertions || 0) > 0;
 
   if (!hasData) {
-    const panel = emptyState("No indexed data", "The configured source has not been indexed yet.", "▦");
-    panel.append(commandButton("Index now", "▶", startIndex));
+    const scanning = operationState() === "INDEXING";
+    const scanned = Boolean(summary.latest_run);
+    const panel = emptyState(
+      scanning ? "Scanning your folder" : scanned ? "No supported files found" : "Your folder is connected",
+      scanning
+        ? "The first results will appear here automatically."
+        : scanned
+          ? "Choose another folder or scan again after files are added."
+          : "Start the first file scan to create this workspace.",
+      scanning ? "↻" : scanned ? "⌕" : "✓",
+    );
+    panel.append(renderSetupProgress(scanning, scanned));
+    if (!scanning) {
+      panel.append(commandButton(scanned ? "Scan again" : "Scan files", "▶", startIndex));
+    }
     elements.viewRoot.replaceChildren(panel);
     setViewCount(null);
     return;
   }
 
   const container = document.createDocumentFragment();
+  container.append(renderWorkspaceStatus());
   const metrics = node("section", "metric-grid");
-  metrics.setAttribute("aria-label", "Index totals");
+  metrics.setAttribute("aria-label", "Workspace totals");
   [
-    ["Sources", summary.sources],
-    ["Documents", summary.documents],
-    ["Entities", summary.entities],
-    ["Assertions", summary.active_assertions],
-    ["Open issues", summary.open_issues, "metric-issue"],
+    ["Files found", summary.sources],
+    ["Documents read", summary.documents],
+    ["Items found", summary.entities],
+    ["Connections", summary.active_assertions],
+    ["Needs review", summary.open_issues, "metric-issue"],
   ].forEach(([label, value, extraClass]) => {
     const metric = node("div", `metric ${extraClass || ""}`.trim());
     metric.append(node("span", "metric-label", label), node("strong", "metric-value", formatNumber(value)));
@@ -998,11 +1059,11 @@ function renderOverview(view) {
 
   const latestRun = asObject(summary.latest_run);
   const runSection = node("section", "section-block");
-  runSection.append(sectionHeading("Latest index run", latestRun.completed_at ? formatDate(latestRun.completed_at) : ""));
+  runSection.append(sectionHeading("Latest scan", latestRun.completed_at ? formatDate(latestRun.completed_at) : ""));
   if (Object.keys(latestRun).length) {
     runSection.append(renderRunSummary(latestRun));
   } else {
-    runSection.append(node("div", "state-panel", "No completed index runs"));
+    runSection.append(node("div", "state-panel", "No completed scans"));
   }
   container.append(runSection);
 
@@ -1013,12 +1074,12 @@ function renderOverview(view) {
     (issue) => String(issue.status || "OPEN").toUpperCase() === "OPEN",
   );
   const issueSection = node("section", "section-block");
-  issueSection.append(sectionHeading("Open issues", `${formatNumber(openIssues.length)} shown`));
+  issueSection.append(sectionHeading("Needs review", `${formatNumber(openIssues.length)} shown`));
   if (openIssues.length) {
-    issueSection.append(issueTable(openIssues, "Open issues"));
+    issueSection.append(issueTable(openIssues, "Needs review"));
   } else {
     issueSection.append(
-      node("div", "state-panel", currentFilter() ? "No issues match this filter" : "No open issues"),
+      node("div", "state-panel", currentFilter() ? "Nothing matches this filter" : "Nothing needs review"),
     );
   }
   container.append(issueSection);
@@ -1027,15 +1088,51 @@ function renderOverview(view) {
   setViewCount(null);
 }
 
+function renderSetupProgress(scanning, scanned) {
+  const progress = node("div", "setup-progress");
+  [
+    ["Folder connected", "done"],
+    ["Files scanned", scanned ? "done" : scanning ? "active" : "waiting"],
+    ["Ready to search", "waiting"],
+  ].forEach(([label, state]) => {
+    const row = node("div", `setup-step is-${state}`);
+    const marker = node("span", "setup-step-marker", state === "done" ? "✓" : state === "active" ? "" : "·");
+    if (state === "active") {
+      marker.classList.add("spinner");
+    }
+    marker.setAttribute("aria-hidden", "true");
+    row.append(marker, node("span", "", label));
+    progress.append(row);
+  });
+  return progress;
+}
+
+function renderWorkspaceStatus() {
+  const source = asObject(ui.state?.source);
+  const automation = asObject(source.automation);
+  const status = node("section", "workspace-status");
+  const marker = node("span", "workspace-status-marker");
+  marker.setAttribute("aria-hidden", "true");
+  const copy = node("div", "workspace-status-copy");
+  copy.append(node("strong", "", operationState() === "INDEXING" ? "Scanning files" : "Workspace ready"));
+  if (automation.enabled) {
+    copy.append(node("span", "", `Automatic scan every ${formatNumber(automation.interval_minutes)} minutes`));
+  } else {
+    copy.append(node("span", "", "Automatic scanning is off"));
+  }
+  status.append(marker, copy);
+  return status;
+}
+
 function renderRunSummary(run) {
   const summary = node("div", "run-summary");
   const stats = asObject(run.stats);
   const fields = [
-    ["Status", run.status || "Completed"],
-    ["Discovered", run.discovered ?? stats.discovered],
-    ["Parsed", run.parsed ?? stats.parsed],
-    ["Entities", run.entities ?? stats.entities],
-    ["Issues", run.issues ?? stats.issues],
+    ["Status", humanize(run.status || "Completed")],
+    ["Files checked", run.discovered ?? stats.discovered],
+    ["Documents read", run.parsed ?? stats.parsed],
+    ["Items found", run.entities ?? stats.entities],
+    ["Needs review", run.issues ?? stats.issues],
   ];
   fields.forEach(([label, value]) => {
     const item = node("div", "run-summary-item");
@@ -1045,9 +1142,9 @@ function renderRunSummary(run) {
   summary.tabIndex = 0;
   summary.setAttribute("role", "button");
   summary.setAttribute("aria-haspopup", "dialog");
-  summary.setAttribute("aria-label", "Open latest index run details");
+  summary.setAttribute("aria-label", "Open latest scan details");
   const open = () => openDetails(
-    "Latest index run",
+    "Latest scan",
     scalarText(run.index_run_id ?? run.run_id, "Run details"),
     run,
   );
@@ -1112,7 +1209,7 @@ function renderEntities(view) {
       { key: "canonical_name", label: "Name", className: "primary-cell" },
       { label: "Type", value: (row) => typePair(row.entity_type, row.subtype) },
       { key: "identifier", label: "Identifier", className: "cell-mono" },
-      { label: "Metadata", value: (row) => summarizeMetadata(row.metadata), className: "cell-muted" },
+      { label: "Details", value: (row) => summarizeMetadata(row.metadata), className: "cell-muted" },
     ],
     rows,
     rowLabel: (row) => `Open ${scalarText(row.canonical_name, "entity")} details`,
@@ -1153,8 +1250,8 @@ function renderResponsibilities(view) {
   if (!rows.length) {
     elements.viewRoot.replaceChildren(
       emptyState(
-        currentFilter() ? "No matching responsibilities" : "No responsibilities",
-        currentFilter() ? "Change the current filter to see other records." : "No responsibility assertions are available.",
+        currentFilter() ? "No matching responsibilities" : "No responsibilities found",
+        currentFilter() ? "Change the current filter to see other records." : "No responsibility records were found in the connected folder.",
         "✓",
       ),
     );
@@ -1168,12 +1265,11 @@ function assertionTable(rows, caption) {
   return createTable({
     caption,
     columns: [
-      { key: "subject_name", label: "Subject", className: "primary-cell" },
+      { key: "subject_name", label: "Who", className: "primary-cell" },
       { label: "Relationship", value: (row) => formatPredicate(row.predicate) },
-      { label: "Object", value: (row) => scalarText(row.object_name || row.literal) },
-      { label: "Source", value: (row) => sourcePair(row.source_path, row.source_record_id) },
+      { label: "For", value: (row) => scalarText(row.object_name || row.literal) },
+      { label: "Evidence", value: (row) => scalarText(row.source_path, "Unknown file") },
       { label: "Confidence", value: (row) => formatConfidence(row.confidence) },
-      { label: "Status", value: (row) => statusBadge(row.status) },
     ],
     rows,
     rowLabel: (row) => `Open assertion details for ${scalarText(row.subject_name, "subject")}`,
@@ -1202,8 +1298,8 @@ function renderDocuments(view) {
   if (!rows.length) {
     elements.viewRoot.replaceChildren(
       emptyState(
-        currentFilter() ? "No matching documents" : "No documents",
-        currentFilter() ? "Change the current filter to see other records." : "No parsed documents are available.",
+        currentFilter() ? "No matching documents" : "No documents found",
+        currentFilter() ? "Change the current filter to see other records." : "No supported documents were found in the connected folder.",
         "▧",
       ),
     );
@@ -1214,12 +1310,10 @@ function renderDocuments(view) {
     caption: scalarText(view.label, "Documents"),
     columns: [
       { key: "source_path", label: "Document", className: "primary-cell" },
-      { key: "content_type", label: "Content type" },
-      { label: "Parser", value: (row) => modulePair(row.parser_module_id, row.parser_version) },
-      { label: "Extracted", value: extractionCoverage },
+      { label: "Type", value: (row) => contentTypeLabel(row.content_type) },
+      { label: "Information found", value: extractionCoverage },
       { label: "Warnings", value: extractionWarnings },
-      { key: "source_generation", label: "Generation" },
-      { label: "Indexed", value: (row) => formatDate(row.created_at) },
+      { label: "Last scanned", value: (row) => formatDate(row.created_at) },
     ],
     rows,
     rowLabel: (row) => `Open document details for ${scalarText(row.source_path, "document")}`,
@@ -1234,7 +1328,7 @@ function renderDocuments(view) {
 function extractionCoverage(row) {
   const entities = Number(row.extracted_entity_count || 0);
   const assertions = Number(row.extracted_assertion_count || 0);
-  return `${formatNumber(entities)} entities · ${formatNumber(assertions)} assertions`;
+  return `${formatNumber(entities)} items · ${formatNumber(assertions)} connections`;
 }
 
 function extractionWarnings(row) {
@@ -1263,9 +1357,9 @@ function issueTable(rows, caption) {
   return createTable({
     caption,
     columns: [
-      { label: "Severity", value: (row) => statusBadge(row.severity) },
-      { label: "Issue", value: (row) => issueLabel(row.code), className: "primary-cell" },
-      { key: "entity_name", label: "Entity" },
+      { label: "Priority", value: (row) => statusBadge(row.severity) },
+      { label: "Finding", value: (row) => issueLabel(row.code), className: "primary-cell" },
+      { key: "entity_name", label: "Item" },
       { label: "Evidence", value: (row) => evidenceSummary(row.evidence), className: "cell-muted" },
       { label: "Status", value: (row) => statusBadge(row.status) },
     ],
@@ -1420,8 +1514,8 @@ function renderIssues(view) {
   if (!rows.length) {
     elements.viewRoot.replaceChildren(
       emptyState(
-        currentFilter() ? "No matching issues" : "No issues",
-        currentFilter() ? "Change the current filter to see other records." : "No review items are currently available.",
+        currentFilter() ? "Nothing matches this filter" : "Nothing needs review",
+        currentFilter() ? "Change the current filter to see other records." : "There are no review items in this view.",
         currentFilter() ? "⌕" : "✓",
       ),
     );
@@ -1437,8 +1531,8 @@ function renderSources(view) {
   if (!rows.length) {
     elements.viewRoot.replaceChildren(
       emptyState(
-        currentFilter() ? "No matching sources" : "No source records",
-        currentFilter() ? "Change the current filter to see other records." : "No files have been discovered.",
+        currentFilter() ? "No matching files" : "No files found",
+        currentFilter() ? "Change the current filter to see other records." : "The connected folder does not contain supported files.",
         "↗",
       ),
     );
@@ -1446,14 +1540,13 @@ function renderSources(view) {
   }
 
   elements.viewRoot.replaceChildren(createTable({
-    caption: scalarText(view.label, "Sources"),
+    caption: scalarText(view.label, "Files"),
     columns: [
-      { label: "Path", value: (row) => sourcePair(row.path || row.name, row.external_id), className: "primary-cell" },
-      { key: "content_type", label: "Content type" },
+      { label: "File", value: (row) => scalarText(row.path || row.name), className: "primary-cell" },
+      { label: "Type", value: (row) => contentTypeLabel(row.content_type) },
       { label: "Size", value: (row) => formatBytes(row.size_bytes) },
       { label: "Modified", value: (row) => formatDate(row.modified_at) },
       { label: "Access", value: sourceAccess },
-      { key: "source_generation", label: "Generation" },
       { label: "State", value: (row) => statusBadge(row.deleted_at ? "Deleted" : "Active") },
     ],
     rows,
@@ -1523,8 +1616,8 @@ function renderModules(view) {
   if (!rows.length) {
     elements.viewRoot.replaceChildren(
       emptyState(
-        currentFilter() ? "No matching modules" : "No modules registered",
-        currentFilter() ? "Change the current filter to see other records." : "The module registry is empty.",
+        currentFilter() ? "No matching system components" : "System status unavailable",
+        currentFilter() ? "Change the current filter to see other records." : "No system components reported their status.",
         "◇",
       ),
     );
@@ -1532,14 +1625,11 @@ function renderModules(view) {
   }
 
   elements.viewRoot.replaceChildren(createTable({
-    caption: scalarText(view.label, "Modules"),
+    caption: scalarText(view.label, "System status"),
     columns: [
-      { label: "Module", value: (row) => moduleName(row), className: "primary-cell" },
-      { key: "module_type", label: "Type" },
-      { label: "Version", value: (row) => scalarText(row.version), className: "cell-mono" },
-      { label: "Enabled", value: (row) => statusBadge(row.enabled ? "Enabled" : "Disabled") },
-      { label: "Health", value: (row) => statusBadge(row.health_state) },
-      { key: "health_message", label: "Message", className: "cell-muted" },
+      { label: "Component", value: (row) => scalarText(row.name, scalarText(row.module_id)), className: "primary-cell" },
+      { label: "Status", value: (row) => statusBadge(row.enabled ? row.health_state : "Disabled") },
+      { key: "health_message", label: "Details", className: "cell-muted" },
     ],
     rows,
     rowLabel: (row) => `Open module details for ${scalarText(row.module_id, "module")}`,
@@ -1595,7 +1685,19 @@ function statusTone(value) {
 }
 
 function statusBadge(value) {
-  return node("span", `status-badge ${statusTone(value)}`, humanize(value) || "Unknown");
+  const status = String(value || "").toUpperCase();
+  const labels = {
+    DEGRADED: "Limited",
+    DIRECT: "From source",
+    ERROR: "Important",
+    MISCONFIGURED: "Setup needed",
+    OPEN: "Needs review",
+  };
+  return node(
+    "span",
+    `status-badge ${statusTone(value)}`,
+    labels[status] || humanize(value) || "Unknown",
+  );
 }
 
 function createTable({ caption, columns, rows, onOpen, rowLabel }) {

@@ -199,8 +199,8 @@ function showOpeningState() {
   document.querySelector(".picker-shell").innerHTML = `
     <section class="closed-state">
       <div class="loading-ring" aria-hidden="true"></div>
-      <h1>Opening workspace</h1>
-      <p>Your local index is starting.</p>
+      <h1>Preparing workspace</h1>
+      <p>Your first file scan starts automatically.</p>
     </section>`;
 }
 

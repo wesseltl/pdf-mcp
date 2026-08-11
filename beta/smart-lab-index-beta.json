@@ -3,7 +3,7 @@
   "offer_id": "smart-lab-index-request-beta",
   "offer_kind": "local_software_beta",
   "product": "Smart Lab Index",
-  "version": "0.6.0",
+  "version": "0.7.0",
   "status": "accepting_beta_requests",
   "access": {
     "type": "request_only",
@@ -26,6 +26,9 @@
     "local search across entities, assertions, documents, issues, and sources",
     "auditable issue confirmation and dismissal",
     "bounded source preflight with progress and cancellation",
+    "one-time graphical folder setup with remembered private workspace settings",
+    "automatic first scan and scheduled incremental scans",
+    "plain-language desktop and mobile browser workspace",
     "overdue calibration date detection",
     "incremental re-indexing",
     "scheduled incremental indexing",

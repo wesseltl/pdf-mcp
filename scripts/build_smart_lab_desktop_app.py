@@ -317,9 +317,10 @@ def archive_app(signing_status: str) -> Path:
         "Smart Lab Index local operator app\n"
         "==================================\n\n"
         f"{launch_instruction}\n"
-        "Choose a laboratory folder in the system dialog. The local browser workspace opens "
-        "and indexes supported files without modifying them. Use Change folder to switch sources "
-        "and Stop app when finished.\n\n"
+        "The first time, connect a laboratory folder in the system dialog. The local browser "
+        "workspace opens and starts a read-only file scan. Smart Lab Index remembers that folder "
+        "and repeats incremental scans automatically. Use Change to switch folders and Close app "
+        "when finished.\n\n"
         "The desktop flow starts in no-egress mode and serves only bundled assets on loopback. "
         "If a system folder dialog is unavailable, the app opens its own local folder navigator.\n\n"
         f"{trust_note}\n",
@@ -337,6 +338,10 @@ def archive_app(signing_status: str) -> Path:
     shutil.copy2(
         ROOT / "PRODUCTION_DEPLOYMENT.md",
         staging / "PRODUCTION_DEPLOYMENT.md",
+    )
+    shutil.copy2(
+        ROOT / "SELF_SERVICE_ARCHITECTURE.md",
+        staging / "SELF_SERVICE_ARCHITECTURE.md",
     )
 
     FINAL_DIST.mkdir(exist_ok=True)

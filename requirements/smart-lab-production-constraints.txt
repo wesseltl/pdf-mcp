@@ -1,4 +1,4 @@
-# Cross-platform tested runtime versions for Smart Lab Index 0.6.0.
+# Cross-platform tested runtime versions for Smart Lab Index 0.7.0.
 # Controlled Linux production uses the target-specific hash lock beside this file.
 cffi==2.1.1
 charset-normalizer==3.4.9

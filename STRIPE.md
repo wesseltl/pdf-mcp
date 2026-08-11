@@ -4,12 +4,19 @@ The connector builds Stripe Products, Prices, and Payment Links from `offers/*.j
 automatic tax, collects billing addresses and tax IDs, and redirects successful checkouts to the
 order instructions page.
 
+Recurring prices use `price.billing: monthly` or `yearly`. The connector rejects a recurring offer
+unless it declares webhook-backed entitlement fulfillment, an entitlement ID, and an HTTPS success
+URL containing `{CHECKOUT_SESSION_ID}`. A recurring Payment Link without verified webhook
+fulfillment does not grant application access.
+
 Live checkout is a launch gate, not a development default. Before creating live links:
 
 - Complete the Stripe business profile and activate live payments.
 - Publish the seller's business registration number, VAT status/ID, address, and phone in the terms.
 - Configure and verify Stripe Tax for the countries where the offer will be sold.
 - Review the offer scope, refund policy, privacy notice, and success-page instructions.
+- Deploy and test idempotent Stripe webhooks and device-entitlement provisioning before publishing a
+  recurring offer.
 
 Install the optional dependency:
 
@@ -52,3 +59,5 @@ unset STRIPE_SECRET_KEY
 
 Review the changed offer files and run the complete test suite before publishing them. Agents only
 use checkout when an offer has `status: available`; otherwise they use the purchase-request flow.
+The complete Smart Lab subscription boundary is specified in
+[SELF_SERVICE_ARCHITECTURE.md](SELF_SERVICE_ARCHITECTURE.md).

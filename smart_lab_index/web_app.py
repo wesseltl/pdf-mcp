@@ -8,6 +8,7 @@ import hashlib
 import logging
 import math
 import multiprocessing
+import os
 import secrets
 import sqlite3
 import threading
@@ -22,9 +23,16 @@ from typing import Any
 from urllib.parse import parse_qs, urlparse
 
 from smart_lab_index.application import (
+    DEFAULT_DESKTOP_INDEX_INTERVAL_MINUTES,
+    DesktopSettings,
+    DesktopSettingsError,
     IssueReviewService,
     KnowledgeQueryService,
     build_application,
+    default_desktop_settings_path,
+    forget_desktop_settings,
+    load_desktop_settings,
+    save_desktop_settings,
 )
 from smart_lab_index.core.config import RuntimePolicy
 from smart_lab_index.core.locking import DatabaseLease
@@ -81,6 +89,7 @@ class WebAppState:
         exclude_patterns: Iterable[str] = (),
         operator_token: str | None = None,
         index_interval_seconds: float | None = None,
+        managed_desktop: bool = False,
     ) -> None:
         if str(database) == ":memory:":
             raise ValueError("the graphical app requires a durable database path")
@@ -105,6 +114,7 @@ class WebAppState:
         ):
             raise ValueError("index interval must be positive when enabled")
         self.index_interval_seconds = index_interval_seconds
+        self.managed_desktop = managed_desktop
         self._database_lease = DatabaseLease(self.database).acquire()
         self._lock = threading.Lock()
         self._cancel_event = threading.Event()
@@ -161,10 +171,20 @@ class WebAppState:
                 source={
                     "source_id": self.source_id,
                     "root": self.root,
+                    "display_name": Path(self.root).name or self.root,
                     "no_egress": self.policy.no_egress,
                     "production_mode": self.policy.production_mode,
+                    "managed_desktop": self.managed_desktop,
                     "parser_isolation": dict(self._parser_isolation),
                     "index_interval_seconds": self.index_interval_seconds,
+                    "automation": {
+                        "enabled": self.index_interval_seconds is not None,
+                        "interval_minutes": (
+                            None
+                            if self.index_interval_seconds is None
+                            else self.index_interval_seconds / 60
+                        ),
+                    },
                     "can_change_source": self.allow_source_change,
                     "limits": {
                         "max_files": self.max_files,
@@ -369,9 +389,9 @@ class SmartLabHandler(LoopbackHandler):
             return
         if parsed.path == "/readyz":
             ready = self.app_state.is_ready()
-            self._send_json(200 if ready else 503, {
-                "status": "ready" if ready else "unavailable"
-            })
+            self._send_json(
+                200 if ready else 503, {"status": "ready" if ready else "unavailable"}
+            )
             return
         if not self._valid_operator():
             self._send_operator_challenge()
@@ -512,6 +532,7 @@ def create_server(
     exclude_patterns: Iterable[str] = (),
     operator_token: str | None = None,
     index_interval_seconds: float | None = None,
+    managed_desktop: bool = False,
     port: int = DEFAULT_PORT,
 ) -> tuple[LoopbackHTTPServer, WebAppState]:
     """Create a session-protected server bound only to loopback."""
@@ -530,6 +551,7 @@ def create_server(
         exclude_patterns=exclude_patterns,
         operator_token=operator_token,
         index_interval_seconds=index_interval_seconds,
+        managed_desktop=managed_desktop,
     )
     handler = type(
         "ConfiguredSmartLabHandler",
@@ -596,6 +618,15 @@ def main(argv: Sequence[str] | None = None) -> int:
     parser.add_argument("--no-browser", action="store_true")
     parser.add_argument("--index-on-start", action="store_true")
     parser.add_argument(
+        "--settings-file",
+        help=argparse.SUPPRESS,
+    )
+    parser.add_argument(
+        "--forget-setup",
+        action="store_true",
+        help="forget the remembered desktop folder before opening",
+    )
+    parser.add_argument(
         "--index-interval-minutes",
         type=float,
         help="repeat incremental indexing at this interval; production default: 15",
@@ -626,9 +657,34 @@ def main(argv: Sequence[str] | None = None) -> int:
     if production_mode and operator_token is None:
         print("smart-lab-index-app: production mode requires --operator-token-file")
         return 2
+    desktop_mode = args.root is None and not production_mode
+    settings_path = (
+        Path(args.settings_file)
+        if args.settings_file
+        else default_desktop_settings_path()
+    )
+    if args.forget_setup:
+        try:
+            forget_desktop_settings(settings_path)
+        except DesktopSettingsError as exc:
+            print(f"smart-lab-index-app: {exc}")
+            return 2
+
+    remembered: DesktopSettings | None = None
+    if desktop_mode:
+        try:
+            remembered = load_desktop_settings(settings_path)
+        except DesktopSettingsError as exc:
+            print(f"smart-lab-index-app: {exc}")
+            return 2
+
     index_interval_minutes = args.index_interval_minutes
+    if index_interval_minutes is None and remembered is not None:
+        index_interval_minutes = remembered.index_interval_minutes
     if index_interval_minutes is None and production_mode:
         index_interval_minutes = 15.0
+    if index_interval_minutes is None and desktop_mode:
+        index_interval_minutes = DEFAULT_DESKTOP_INDEX_INTERVAL_MINUTES
     if index_interval_minutes is not None and (
         not math.isfinite(index_interval_minutes) or index_interval_minutes <= 0
     ):
@@ -636,10 +692,16 @@ def main(argv: Sequence[str] | None = None) -> int:
         return 2
 
     picker_supported = folder_picker_available()
-    selected_at_start = args.root is None
     requested_port = args.port
     browser_started = False
     root: str | Path | None = args.root
+    remembered_database: Path | None = None
+    if root is None and remembered is not None:
+        if remembered.root.is_dir() and os.access(remembered.root, os.R_OK):
+            root = remembered.root
+            remembered_database = remembered.database
+        else:
+            LOGGER.warning("Remembered source folder is unavailable; opening setup")
     if root is None and picker_supported:
         try:
             root = choose_source_folder()
@@ -662,18 +724,18 @@ def main(argv: Sequence[str] | None = None) -> int:
             return 0
 
     policy = _policy(
-        args.no_egress or selected_at_start,
+        args.no_egress or desktop_mode,
         production_mode=production_mode,
     )
     source_id = args.source_id
-    managed_database = selected_at_start and args.database is None
-    database: str | Path = args.database or DEFAULT_DATABASE
+    managed_database = desktop_mode and args.database is None
+    database: str | Path = args.database or remembered_database or DEFAULT_DATABASE
     if managed_database:
-        database = _desktop_database(root)
+        database = remembered_database or _desktop_database(root)
     if not math.isfinite(args.max_total_gb) or args.max_total_gb <= 0:
         print("smart-lab-index-app: --max-total-gb must be positive")
         return 2
-    index_on_start = args.index_on_start or production_mode
+    index_on_start = args.index_on_start or production_mode or desktop_mode
     recovery: tuple[str | Path, str | Path, str | None] | None = None
 
     while True:
@@ -695,6 +757,7 @@ def main(argv: Sequence[str] | None = None) -> int:
                     if index_interval_minutes is None
                     else index_interval_minutes * 60
                 ),
+                managed_desktop=desktop_mode,
                 port=requested_port,
             )
         except (OSError, RuntimeError, ValueError) as exc:
@@ -708,6 +771,23 @@ def main(argv: Sequence[str] | None = None) -> int:
                 continue
             print(f"smart-lab-index-app: {exc}")
             return 2
+        if desktop_mode:
+            try:
+                save_desktop_settings(
+                    DesktopSettings(
+                        root=Path(state.root),
+                        database=Path(state.database).expanduser().resolve(),
+                        index_interval_minutes=(
+                            index_interval_minutes
+                            or DEFAULT_DESKTOP_INDEX_INTERVAL_MINUTES
+                        ),
+                    ),
+                    settings_path,
+                )
+            except (DesktopSettingsError, OSError) as exc:
+                server.server_close()
+                print(f"smart-lab-index-app: desktop setup could not be saved: {exc}")
+                return 2
         recovery = None
         actual_port = server.server_address[1]
         requested_port = actual_port
@@ -771,7 +851,7 @@ def main(argv: Sequence[str] | None = None) -> int:
                 source_id = None
                 if managed_database:
                     database = _desktop_database(selected)
-            index_on_start = False
+            index_on_start = desktop_mode and changed
         else:
             root = state.root
             index_on_start = False

@@ -64,7 +64,7 @@ class SmartLabPublicSiteTests(unittest.TestCase):
     def test_structured_data_describes_limited_free_smart_lab_beta(self) -> None:
         payload = json.loads("".join(self.parser.json_ld))
         self.assertEqual(payload["name"], "Smart Lab Index")
-        self.assertEqual(payload["softwareVersion"], "0.6.0")
+        self.assertEqual(payload["softwareVersion"], "0.7.0")
         self.assertEqual(payload["offers"]["price"], "0.00")
         self.assertEqual(
             payload["offers"]["availability"],
@@ -82,7 +82,7 @@ class SmartLabPublicSiteTests(unittest.TestCase):
     def test_workspace_images_have_stable_desktop_and_mobile_dimensions(self) -> None:
         expected = {
             "smart-lab-index-workspace.png": (1600, 1000),
-            "smart-lab-index-workspace-mobile.png": (390, 1163),
+            "smart-lab-index-workspace-mobile.png": (390, 1259),
         }
         for name, dimensions in expected.items():
             with self.subTest(image=name):

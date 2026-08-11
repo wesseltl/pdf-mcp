@@ -23,7 +23,7 @@
         "name": "Smart Lab Index",
         "applicationCategory": "BusinessApplication",
         "operatingSystem": "Windows, macOS, Linux",
-        "softwareVersion": "0.6.0",
+        "softwareVersion": "0.7.0",
         "description": "A local-first, read-only laboratory knowledge index with source evidence and conflict detection.",
         "offers": {
           "@type": "Offer",
@@ -54,7 +54,7 @@
       <section class="hero" aria-labelledby="hero-title">
         <picture>
           <source media="(max-width: 700px)" srcset="assets/smart-lab-index-workspace-mobile.png">
-          <img src="assets/smart-lab-index-workspace.png" width="1600" height="1000" fetchpriority="high" alt="Smart Lab Index overview showing four source files, four entities, three assertions, and one conflicting equipment location">
+          <img src="assets/smart-lab-index-workspace.png" width="1600" height="1000" fetchpriority="high" alt="Smart Lab Index Home workspace showing four files, four items, three connections, and one conflicting equipment location that needs review">
         </picture>
         <div class="hero-shade" aria-hidden="true"></div>
         <div class="hero-content">
@@ -155,10 +155,10 @@
             <p class="eyebrow">Operator workspace</p>
             <h2 id="workspace-title">The index is the interface.</h2>
           </div>
-          <p>Browse equipment, locations, people, responsibilities, documents, issues, sources, and module health without a chat prompt.</p>
+          <p>Browse equipment, locations, people, responsibilities, documents, files, and findings that need review without a chat prompt.</p>
         </div>
         <figure class="workspace-media">
-          <img src="assets/smart-lab-index-workspace.png" width="1600" height="1000" loading="lazy" alt="Full Smart Lab Index overview with indexed source counts and a conflicting location issue">
+          <img src="assets/smart-lab-index-workspace.png" width="1600" height="1000" loading="lazy" alt="Smart Lab Index Home workspace with scan totals and a conflicting location finding linked to source evidence">
           <figcaption>Actual output from the four-file synthetic laboratory example. No cloud service or AI model was used.</figcaption>
         </figure>
       </section>
@@ -173,6 +173,7 @@
             <h3 id="ready-title"><span aria-hidden="true">✓</span> Included now</h3>
             <ul>
               <li>Local Windows, macOS, and Linux desktop builds</li>
+              <li>One-time folder setup with automatic first and incremental scans</li>
               <li>Read-only recursive filesystem indexing</li>
               <li>PDF, DOCX, XLSX, CSV, and TXT parsing</li>
               <li>Equipment, location, person, and responsibility extraction</li>

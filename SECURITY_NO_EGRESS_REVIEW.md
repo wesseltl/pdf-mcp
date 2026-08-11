@@ -50,7 +50,7 @@ addressed the critical connector/provenance findings identified during integrati
   cancellation, and never infers deletions from cancelled scans. The filesystem connector records
   POSIX ownership/mode/effective-process access but explicitly does not claim rich ACL capture or
   enforcement.
-- Smart Lab Index `0.6.0` executes each selected parser in a disposable spawned process. Inputs are
+- Smart Lab Index `0.7.0` executes each selected parser in a disposable spawned process. Inputs are
   checksum-verified bytes and outputs are bounded normalized JSON. Parent timeout/cancellation plus
   worker CPU, address-space, file-size, network, subprocess, file-write, and serialized-output limits
   prevent one malformed document from taking down the indexer on the supported production target.

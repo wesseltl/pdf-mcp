@@ -18,12 +18,12 @@ python -m venv .venv
 .venv/bin/smart-lab-index-app
 ```
 
-Choose a folder in the system dialog. The browser opens locally and enables no-egress mode. Confirm
-the selected path and use **Index now**; folder selection never starts a recursive scan by itself.
-**Change folder** returns to the system chooser without requiring a terminal. Picker-created
-workspaces use separate local databases so unrelated laboratory folders are not silently combined.
-If the operating system has no folder-dialog helper, the app opens its own secured local folder
-navigator instead.
+Choose a folder once in the system dialog. The browser opens locally, enables no-egress mode, and
+starts the first read-only scan. The app stores only the approved path and local database location in
+an owner-only settings file, then reopens that workspace automatically. Incremental scans repeat every
+15 minutes. **Change** returns to the chooser without requiring a terminal. Picker-created workspaces
+use separate local databases so unrelated folders are not silently combined. If the operating system
+has no folder-dialog helper, the app opens its own secured local folder navigator instead.
 
 The public [request-only beta page](https://wesseltl.github.io/pdf-mcp/#beta) explains the current
 scope for people. Agents can read the matching
@@ -36,7 +36,7 @@ To open the included demonstration without a picker:
   --database .smart-lab-index-demo.db --source-id lab-alpha --no-egress
 ```
 
-Open the Review queue to inspect the deliberate location conflict and its exact spreadsheet/Word
+Open Needs review to inspect the deliberate location conflict and its exact spreadsheet/Word
 evidence. Select the authoritative location or dismiss the issue with a required review note. Use
 Search to find names, identifiers, document text, assertions, issues, and source paths.
 
@@ -64,7 +64,11 @@ smart-lab-index index /path/to/read-only/lab-folder --no-egress
 
 Picker-created workspaces store durable state under `~/.smart-lab-index/workspaces/`. Explicit CLI
 runs default to `~/.smart-lab-index/index.db`. Core rejects a database path inside the indexed source
-root.
+root. The last approved desktop workspace is remembered in the private
+`~/.smart-lab-index/desktop-settings.json` file; it contains no credentials.
+
+For the hosted subscription/local-agent split, see
+[SELF_SERVICE_ARCHITECTURE.md](SELF_SERVICE_ARCHITECTURE.md).
 
 For a dedicated single-tenant Linux deployment, use the release gates and hardened service templates
 in [PRODUCTION_DEPLOYMENT.md](PRODUCTION_DEPLOYMENT.md). Controlled-production mode adds an operator
@@ -224,9 +228,9 @@ transition.
 
 ## Graphical interface
 
-The local GUI exposes Overview, Search, Equipment, Locations, People, Organizations, Responsibilities,
-Documents, Review queue, Issues, Sources, and Modules. Navigation is generated from enabled module
-categories and stored data. Evidence rows open a detail dialog showing source path, structural
+The local GUI exposes Home, Search, Equipment, Locations, People, Teams, Responsibilities, Documents,
+Needs review, Files, and System status. Navigation is generated from enabled module categories and
+stored data. Evidence rows open a detail dialog showing source path, structural
 locator, confidence, module, and issue evidence. Search is server-side and bounded, so it covers the
 whole SQLite index even when large list views return only their first 500 rows. Conflict review keeps
 all original assertions, marks the selected evidence confirmed and alternatives rejected, records a
@@ -271,7 +275,7 @@ contents.
   application-encrypted; deployments should use encrypted local storage and a dedicated OS account.
 - SQLite schema version 2 includes one tested forward migration. Back up and verify before every
   application upgrade; long migration history and automated downgrade are not available.
-- The repository distribution is still named `pdf-agent-mcp` at version `0.6.0` to preserve the
+- The repository distribution is still named `pdf-agent-mcp` at version `0.7.0` to preserve the
   existing compatibility product. A distinct Smart Lab Index release identity and version must be
   chosen before publishing this branch.
 - The hash-verified runtime lock covers CPython 3.12 on Linux x86_64 only. Other production targets

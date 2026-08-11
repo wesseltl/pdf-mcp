@@ -4,7 +4,7 @@ This runbook targets one on-premises Linux host, one approved read-only filesyst
 small trusted operator group. It does not claim regulatory validation, Windows/AD ACL enforcement,
 or tenant isolation.
 
-The hash-verified dependency lock supplied with `0.6.0` targets CPython 3.12 on Linux x86_64 with
+The hash-verified dependency lock supplied with `0.7.0` targets CPython 3.12 on Linux x86_64 with
 glibc 2.34 or newer. Build and validate a separate lock and artifact before using another production
 platform. The normal package remains compatible with Python 3.10 and newer for non-production use.
 
@@ -48,7 +48,7 @@ sudo /opt/smart-lab-index/venv/bin/pip install --no-index \
   --find-links /approved-media/wheelhouse --require-hashes \
   -r /approved-media/smart-lab-production-linux-x86_64-py312.lock
 sudo /opt/smart-lab-index/venv/bin/pip install --no-index --no-deps \
-  /approved-media/pdf_agent_mcp-0.6.0-py3-none-any.whl
+  /approved-media/pdf_agent_mcp-0.7.0-py3-none-any.whl
 /opt/smart-lab-index/venv/bin/pip check
 ```
 

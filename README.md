@@ -21,11 +21,16 @@ python -m venv .venv
 .venv/bin/smart-lab-index-app
 ```
 
-Choose a laboratory folder in the system dialog or the built-in local folder navigator. The browser
-opens the Overview workspace; review the selected path, then use **Index now**. Equipment, Locations,
-People, Responsibilities, Documents, local Search, Review queue, Sources, and Modules remain local.
-Indexing reports its phase and progress and can be cancelled between files. **Change folder** switches
-workspaces without a terminal. The app binds only to loopback and serves bundled assets.
+Choose a laboratory folder once in the system dialog or bundled folder navigator. The browser opens
+the Home workspace and starts the first read-only scan automatically. The app remembers that approved
+folder, reopens it without setup, and repeats incremental scans every 15 minutes. Search, Equipment,
+Locations, People, Responsibilities, Documents, Files, and Needs review remain local. **Change**
+switches workspaces without a terminal. The app binds only to loopback and serves bundled assets.
+
+The target subscription architecture keeps billing and device enrollment in a hosted control plane
+while documents and extracted knowledge stay in the laboratory. See
+[SELF_SERVICE_ARCHITECTURE.md](SELF_SERVICE_ARCHITECTURE.md) for implemented behavior and remaining
+self-service launch gates.
 
 For a dedicated, single-tenant Linux deployment, see
 [PRODUCTION_DEPLOYMENT.md](PRODUCTION_DEPLOYMENT.md). Controlled-production mode adds operator

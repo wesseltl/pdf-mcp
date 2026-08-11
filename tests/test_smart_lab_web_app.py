@@ -488,10 +488,11 @@ class SmartLabWebAppMainTests(unittest.TestCase):
         self.assertEqual(create.call_args.kwargs["index_interval_seconds"], 900)
         state.start_index.assert_called_once_with()
 
-    def test_no_root_uses_picker_enables_no_egress_without_automatic_scan(self) -> None:
+    def test_no_root_uses_picker_remembers_workspace_and_starts_automatic_scan(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:
             root = Path(temporary) / "lab"
             root.mkdir()
+            settings = Path(temporary) / "desktop-settings.json"
             server = Mock()
             server.server_address = ("127.0.0.1", 9020)
             state = Mock()
@@ -513,7 +514,14 @@ class SmartLabWebAppMainTests(unittest.TestCase):
                     return_value=(server, state),
                 ) as create,
             ):
-                result = main(["--no-browser", "--port", "0"])
+                result = main([
+                    "--no-browser",
+                    "--port",
+                    "0",
+                    "--settings-file",
+                    str(settings),
+                ])
+            settings_saved = settings.exists()
 
         self.assertEqual(result, 0)
         self.assertTrue(create.call_args.kwargs["policy"].no_egress)
@@ -521,13 +529,17 @@ class SmartLabWebAppMainTests(unittest.TestCase):
         managed_database = Path(create.call_args.kwargs["database"])
         self.assertEqual(managed_database.parent.name, "workspaces")
         self.assertNotIn(root.name, managed_database.name)
-        state.start_index.assert_not_called()
+        self.assertEqual(create.call_args.kwargs["index_interval_seconds"], 900)
+        self.assertTrue(create.call_args.kwargs["managed_desktop"])
+        self.assertTrue(settings_saved)
+        state.start_index.assert_called_once_with()
         server.serve_forever.assert_called_once_with(poll_interval=0.25)
 
     def test_no_root_falls_back_to_local_browser_folder_navigator(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:
             root = Path(temporary) / "lab"
             root.mkdir()
+            settings = Path(temporary) / "desktop-settings.json"
             server = Mock()
             server.server_address = ("127.0.0.1", 9025)
             state = Mock()
@@ -549,13 +561,71 @@ class SmartLabWebAppMainTests(unittest.TestCase):
                     return_value=(server, state),
                 ) as create,
             ):
-                result = main(["--no-browser", "--port", "9025"])
+                result = main([
+                    "--no-browser",
+                    "--port",
+                    "9025",
+                    "--settings-file",
+                    str(settings),
+                ])
 
         self.assertEqual(result, 0)
         browser_picker.assert_called_once_with(port=9025, open_browser=False)
         self.assertTrue(create.call_args.kwargs["allow_source_change"])
         self.assertTrue(create.call_args.kwargs["policy"].no_egress)
-        state.start_index.assert_not_called()
+        self.assertEqual(create.call_args.kwargs["index_interval_seconds"], 900)
+        state.start_index.assert_called_once_with()
+
+    def test_remembered_workspace_reopens_without_folder_picker(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary) / "lab"
+            root.mkdir()
+            settings = Path(temporary) / "desktop-settings.json"
+            database = Path(temporary) / "workspace.db"
+            settings.write_text(
+                json.dumps({
+                    "schema_version": 1,
+                    "workspace": {
+                        "root": str(root.resolve()),
+                        "database": str(database.resolve()),
+                        "index_interval_minutes": 20,
+                    },
+                }),
+                encoding="utf-8",
+            )
+            settings.chmod(0o600)
+            server = Mock()
+            server.server_address = ("127.0.0.1", 9027)
+            state = Mock()
+            state.root = str(root)
+            state.database = str(database)
+            state.policy = RuntimePolicy(no_egress=True)
+            state.source_change_requested = False
+            with (
+                patch(
+                    "smart_lab_index.web_app.folder_picker_available",
+                    return_value=True,
+                ),
+                patch("smart_lab_index.web_app.choose_source_folder") as picker,
+                patch(
+                    "smart_lab_index.web_app.create_server",
+                    return_value=(server, state),
+                ) as create,
+            ):
+                result = main([
+                    "--no-browser",
+                    "--port",
+                    "9027",
+                    "--settings-file",
+                    str(settings),
+                ])
+
+        self.assertEqual(result, 0)
+        picker.assert_not_called()
+        self.assertEqual(create.call_args.args[0], root.resolve())
+        self.assertEqual(create.call_args.kwargs["database"], database.resolve())
+        self.assertEqual(create.call_args.kwargs["index_interval_seconds"], 1200)
+        state.start_index.assert_called_once_with()
 
     def test_source_change_restarts_same_port_and_clears_explicit_source_id(
         self,
@@ -622,6 +692,7 @@ class SmartLabWebAppMainTests(unittest.TestCase):
                     exclude_patterns=[],
                     operator_token=None,
                     index_interval_seconds=None,
+                    managed_desktop=False,
                     port=9030,
                 ),
                 call(
@@ -637,6 +708,7 @@ class SmartLabWebAppMainTests(unittest.TestCase):
                     exclude_patterns=[],
                     operator_token=None,
                     index_interval_seconds=None,
+                    managed_desktop=False,
                     port=9030,
                 ),
             ],
