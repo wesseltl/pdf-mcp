@@ -12,6 +12,10 @@ In the PyPI project settings for `pdf-agent-mcp`, add a trusted publisher:
 - Workflow name: `publish.yml`
 - Environment name: `pypi`
 
+After the publisher exists, add the GitHub Actions repository variable
+`PYPI_PUBLISH_ENABLED=true`. Leave it unset until then; desktop releases remain independent and
+will still publish successfully.
+
 ## Release checklist
 
 1. Update the version in `pyproject.toml`, `pdf_mcp/__init__.py`, and `server.json`.
@@ -57,6 +61,7 @@ In the PyPI project settings for `pdf-agent-mcp`, add a trusted publisher:
    ```
 
 The `Publish` workflow builds and smoke-tests standalone browser apps on Windows, macOS, and Linux,
-then creates a GitHub release with those archives and the Python distributions. Independently, it
-uploads the package to PyPI and, after that succeeds, publishes matching metadata to the MCP
-Registry. The `Pages` workflow deploys the public site from `docs/` on every push to `main`.
+then creates a prerelease GitHub release with those archives and the Python distributions. When
+`PYPI_PUBLISH_ENABLED=true`, it also uploads the package to PyPI and, after that succeeds, publishes
+matching metadata to the MCP Registry. The `Pages` workflow deploys the public site from `docs/` on
+every push to `main`.
