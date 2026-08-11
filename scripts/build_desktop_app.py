@@ -3,15 +3,18 @@ from __future__ import annotations
 
 import argparse
 import importlib.metadata
+import os
 import platform
 import shutil
 import socket
 import subprocess
 import sys
+import tempfile
 import time
 import urllib.request
 import zipfile
 from pathlib import Path
+from typing import BinaryIO
 
 import PyInstaller.__main__
 
@@ -45,32 +48,47 @@ def available_port() -> int:
 
 def smoke_test(executable: Path) -> None:
     port = available_port()
-    process = subprocess.Popen(
-        [str(executable), "--no-browser", "--port", str(port)],
-        stdout=subprocess.DEVNULL,
-        stderr=subprocess.DEVNULL,
-    )
-    try:
-        deadline = time.monotonic() + 30
-        while time.monotonic() < deadline:
-            if process.poll() is not None:
-                raise RuntimeError(f"desktop app exited during startup with code {process.returncode}")
-            try:
-                with urllib.request.urlopen(f"http://127.0.0.1:{port}/", timeout=1) as response:
-                    page = response.read()
-                if b"Turn a PDF or Word table into a spreadsheet" not in page:
-                    raise RuntimeError("desktop app returned an unexpected page")
-                return
-            except OSError:
-                time.sleep(0.4)
-        raise RuntimeError("desktop app did not start within 30 seconds")
-    finally:
-        process.terminate()
+    with tempfile.TemporaryFile() as startup_output:
+        environment = os.environ.copy()
+        environment["PYTHONUNBUFFERED"] = "1"
+        process = subprocess.Popen(
+            [str(executable), "--no-browser", "--port", str(port)],
+            stdout=startup_output,
+            stderr=subprocess.STDOUT,
+            env=environment,
+        )
         try:
-            process.wait(timeout=5)
-        except subprocess.TimeoutExpired:
-            process.kill()
-            process.wait(timeout=5)
+            deadline = time.monotonic() + 30
+            while time.monotonic() < deadline:
+                if process.poll() is not None:
+                    detail = _startup_detail(startup_output)
+                    message = f"desktop app exited during startup with code {process.returncode}"
+                    raise RuntimeError(f"{message}:\n{detail}" if detail else message)
+                try:
+                    with urllib.request.urlopen(f"http://127.0.0.1:{port}/", timeout=1) as response:
+                        page = response.read()
+                    if b"Turn a PDF or Word table into a spreadsheet" not in page:
+                        raise RuntimeError("desktop app returned an unexpected page")
+                    return
+                except OSError:
+                    time.sleep(0.4)
+            detail = _startup_detail(startup_output)
+            message = "desktop app did not start within 30 seconds"
+            raise RuntimeError(f"{message}:\n{detail}" if detail else message)
+        finally:
+            if process.poll() is None:
+                process.terminate()
+                try:
+                    process.wait(timeout=5)
+                except subprocess.TimeoutExpired:
+                    process.kill()
+                    process.wait(timeout=5)
+
+
+def _startup_detail(output: BinaryIO) -> str:
+    output.flush()
+    output.seek(0)
+    return output.read().decode("utf-8", errors="replace").strip()
 
 
 def archive_app(version: str) -> Path:
@@ -118,10 +136,11 @@ def main() -> int:
 
     shutil.rmtree(BUILD_ROOT, ignore_errors=True)
     APP_DIST.mkdir(parents=True)
+    bundle_mode = "--onedir" if sys.platform == "darwin" else "--onefile"
     PyInstaller.__main__.run([
         str(ROOT / "pdf_mcp" / "web_app.py"),
         "--name=pdf-mcp-app",
-        "--onefile",
+        bundle_mode,
         "--windowed",
         "--noconfirm",
         "--clean",
