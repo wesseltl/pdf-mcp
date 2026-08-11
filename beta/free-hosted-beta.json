@@ -1,0 +1,90 @@
+{
+  "schema_version": "2026-08-11",
+  "offer_id": "pdf-mcp-hosted-free-beta",
+  "offer_kind": "hosted_software_beta",
+  "name": "pdf-mcp Free Agent Beta",
+  "operator": {
+    "name": "Wessel ter Laak",
+    "email": "wesseltl@gmail.com"
+  },
+  "status": "accepting_beta_requests",
+  "audience": "businesses_and_professionals_only",
+  "price": {
+    "amount": "0.00",
+    "currency": "EUR",
+    "billing": "free_beta",
+    "display": "Free during the beta"
+  },
+  "summary": "Apply for an invitation-based hosted extraction beta for redacted or non-sensitive born-digital PDF and DOCX documents with privacy-safe operational measurement.",
+  "included": [
+    "25 hosted extraction operations per calendar month",
+    "Text, structured-table, and CSV extraction",
+    "Born-digital PDF and Word .docx documents",
+    "Per-result extraction warnings and remaining-operation count"
+  ],
+  "excluded": [
+    "Scanned or image-only documents requiring OCR",
+    "Patient data, special-category personal data, or confidential source documents",
+    "Passwords, payment details, credentials, and government identifiers",
+    "Excel file generation, production SLA, and ongoing integrations"
+  ],
+  "input_formats": ["pdf", "docx"],
+  "output_formats": ["text", "structured_json", "csv"],
+  "limits": {
+    "operations_per_calendar_month": 25,
+    "upload_bytes_per_operation": 10000000,
+    "pdf_pages_per_operation": 50
+  },
+  "service": {
+    "deployment_status": "pending",
+    "url": null,
+    "authentication": "individual_beta_api_key",
+    "public_client_license": "MIT",
+    "hosted_backend_license": "proprietary_not_source_distributed"
+  },
+  "data_handling": {
+    "documents_uploaded_for_requested_operation": true,
+    "send_documents_by_email": false,
+    "temporary_upload_deleted_when_request_completes": true,
+    "used_for_model_training": false,
+    "operational_metrics_retention_days": 90,
+    "operational_metrics": [
+      "non_secret_api_key_id",
+      "timestamp",
+      "tool_name",
+      "pdf_or_docx",
+      "upload_byte_count",
+      "page_table_and_warning_counts",
+      "duration",
+      "success_or_bounded_error_code"
+    ],
+    "never_in_operational_metrics": [
+      "raw_api_key",
+      "source_filename",
+      "document_contents",
+      "extracted_text",
+      "table_cells"
+    ]
+  },
+  "access_methods": [
+    {
+      "type": "email_beta_request",
+      "url": "mailto:wesseltl@gmail.com?subject=pdf-mcp%20Free%20Agent%20Beta",
+      "requires_user_confirmation": true,
+      "description": "Apply for individual beta access. Invitations begin after endpoint deployment. Send no documents or document contents by email."
+    }
+  ],
+  "agent_instructions": {
+    "recommended_action": "Explain that the hosted beta uploads the selected document and records bounded operational counters. Ask for explicit user approval before requesting access or uploading any file.",
+    "requires_user_confirmation": true,
+    "do_not_attach_documents_to_email": true,
+    "do_not_upload_without_user_approval": true,
+    "only_redacted_or_non_sensitive_documents": true,
+    "email_subject": "pdf-mcp Free Agent Beta",
+    "email_body_template": "Hi Wessel,\n\nI want to apply for access to the free pdf-mcp agent beta.\n\nBusiness or project name:\nExpected document type: PDF / DOCX\nExpected monthly operations:\nMCP client:\n\nI understand that invitations begin after endpoint deployment. Once invited, selected documents are uploaded for processing, temporary uploads are deleted when the request completes, and bounded operational usage is measured. I will use only redacted or non-sensitive documents.\n\nPlease add me to the beta access list and send setup instructions when an invitation is available."
+  },
+  "terms_url": "https://wesseltl.github.io/pdf-mcp/beta-terms.html",
+  "privacy_url": "https://wesseltl.github.io/pdf-mcp/privacy.html",
+  "human_readable_url": "https://wesseltl.github.io/pdf-mcp/#free-beta",
+  "local_unmeasured_alternative": "https://github.com/wesseltl/pdf-mcp"
+}

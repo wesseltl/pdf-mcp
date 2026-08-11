@@ -1,0 +1,216 @@
+{
+  "evaluation_schema_version": "1.0",
+  "evidence_label": "simulated_fictional_customer",
+  "profile": "profile.json",
+  "minimums": {
+    "field_precision": 1.0,
+    "field_recall": 1.0,
+    "field_f1": 1.0,
+    "exact_record_rate": 1.0,
+    "decision_accuracy": 1.0
+  },
+  "cases": [
+    {
+      "id": "dev-01-standard",
+      "document": "fixtures/dev-01-standard.pdf",
+      "expected_decision": "accepted",
+      "expected_records": [
+        {
+          "sample_id": "NS-1001",
+          "analyte": "pH",
+          "result": "7.20",
+          "unit": "pH units"
+        },
+        {
+          "sample_id": "NS-1001",
+          "analyte": "Chloride",
+          "result": "125",
+          "unit": "mg/L"
+        },
+        {
+          "sample_id": "NS-1002",
+          "analyte": "Turbidity",
+          "result": "0.45",
+          "unit": "NTU"
+        }
+      ]
+    },
+    {
+      "id": "dev-02-aliases",
+      "document": "fixtures/dev-02-aliases.pdf",
+      "expected_decision": "accepted",
+      "expected_records": [
+        {
+          "sample_id": "NS-1010",
+          "analyte": "Nitrate",
+          "result": "4.5",
+          "unit": "mg/L"
+        },
+        {
+          "sample_id": "NS-1010",
+          "analyte": "Conductivity",
+          "result": "415",
+          "unit": "uS/cm"
+        }
+      ]
+    },
+    {
+      "id": "dev-03-title-row",
+      "document": "fixtures/dev-03-title-row.pdf",
+      "expected_decision": "accepted",
+      "expected_records": [
+        {
+          "sample_id": "NS-1020",
+          "analyte": "Iron",
+          "result": "0.12",
+          "unit": "mg/L"
+        },
+        {
+          "sample_id": "NS-1020",
+          "analyte": "Manganese",
+          "result": "0.03",
+          "unit": "mg/L"
+        }
+      ]
+    },
+    {
+      "id": "dev-04-extra-column",
+      "document": "fixtures/dev-04-extra-column.pdf",
+      "expected_decision": "accepted",
+      "expected_records": [
+        {
+          "sample_id": "NS-1030",
+          "analyte": "Hardness",
+          "result": "180",
+          "unit": "mg/L"
+        },
+        {
+          "sample_id": "NS-1030",
+          "analyte": "Alkalinity",
+          "result": "95",
+          "unit": "mg/L"
+        }
+      ]
+    },
+    {
+      "id": "dev-05-standard-docx",
+      "document": "fixtures/dev-05-standard.docx",
+      "expected_decision": "accepted",
+      "expected_records": [
+        {
+          "sample_id": "NS-1040",
+          "analyte": "Calcium",
+          "result": "42.5",
+          "unit": "mg/L"
+        },
+        {
+          "sample_id": "NS-1040",
+          "analyte": "Magnesium",
+          "result": "11.2",
+          "unit": "mg/L"
+        }
+      ]
+    },
+    {
+      "id": "dev-06-two-tables",
+      "document": "fixtures/dev-06-two-tables.pdf",
+      "expected_decision": "accepted",
+      "expected_records": [
+        {
+          "sample_id": "NS-1050",
+          "analyte": "pH",
+          "result": "7.1",
+          "unit": "pH units"
+        },
+        {
+          "sample_id": "NS-1051",
+          "analyte": "Chloride",
+          "result": "88",
+          "unit": "mg/L"
+        }
+      ]
+    },
+    {
+      "id": "dev-07-headerless-continuation",
+      "document": "fixtures/dev-07-headerless-continuation.pdf",
+      "expected_decision": "needs_review",
+      "expected_records": [
+        {
+          "sample_id": "NS-1060",
+          "analyte": "pH",
+          "result": "7.0",
+          "unit": "pH units"
+        },
+        {
+          "sample_id": "NS-1060",
+          "analyte": "Chloride",
+          "result": "101",
+          "unit": "mg/L"
+        },
+        {
+          "sample_id": "NS-1061",
+          "analyte": "Turbidity",
+          "result": "0.8",
+          "unit": "NTU"
+        },
+        {
+          "sample_id": "NS-1061",
+          "analyte": "Nitrate",
+          "result": "2.2",
+          "unit": "mg/L"
+        }
+      ]
+    },
+    {
+      "id": "dev-08-invalid-sample-id",
+      "document": "fixtures/dev-08-invalid-sample-id.pdf",
+      "expected_decision": "needs_review",
+      "expected_records": [
+        {
+          "sample_id": "SAMPLE-1070",
+          "analyte": "pH",
+          "result": "7.3",
+          "unit": "pH units"
+        }
+      ]
+    },
+    {
+      "id": "dev-09-negative-result",
+      "document": "fixtures/dev-09-negative-result.pdf",
+      "expected_decision": "needs_review",
+      "expected_records": [
+        {
+          "sample_id": "NS-1080",
+          "analyte": "Turbidity",
+          "result": "-0.2",
+          "unit": "NTU"
+        }
+      ]
+    },
+    {
+      "id": "dev-10-merged-title",
+      "document": "fixtures/dev-10-merged-title.docx",
+      "expected_decision": "needs_review",
+      "expected_records": [
+        {
+          "sample_id": "NS-1090",
+          "analyte": "Nitrate",
+          "result": "3.4",
+          "unit": "mg/L"
+        }
+      ]
+    },
+    {
+      "id": "dev-11-unrelated",
+      "document": "fixtures/dev-11-unrelated.pdf",
+      "expected_decision": "rejected",
+      "expected_records": []
+    },
+    {
+      "id": "dev-12-partial-header",
+      "document": "fixtures/dev-12-partial-header.pdf",
+      "expected_decision": "rejected",
+      "expected_records": []
+    }
+  ]
+}

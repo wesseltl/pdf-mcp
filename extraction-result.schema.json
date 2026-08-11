@@ -1,0 +1,100 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://raw.githubusercontent.com/wesseltl/pdf-mcp/main/extraction-result.schema.json",
+  "title": "pdf-mcp profile extraction result",
+  "type": "object",
+  "required": [
+    "result_schema_version",
+    "decision",
+    "review_required",
+    "profile",
+    "document",
+    "records",
+    "tables",
+    "summary",
+    "review",
+    "audit"
+  ],
+  "properties": {
+    "$schema": {"type": "string", "format": "uri"},
+    "result_schema_version": {"const": "1.0"},
+    "decision": {"enum": ["accepted", "needs_review", "rejected"]},
+    "review_required": {"type": "boolean"},
+    "profile": {
+      "type": "object",
+      "required": ["id", "version", "sha256", "fields"],
+      "properties": {
+        "id": {"type": "string"},
+        "version": {"type": "string"},
+        "description": {"type": "string"},
+        "sha256": {"type": "string", "pattern": "^[a-f0-9]{64}$"},
+        "fields": {"type": "array", "items": {"type": "string"}}
+      }
+    },
+    "document": {
+      "type": "object",
+      "required": ["type", "bytes", "sha256"],
+      "properties": {
+        "type": {"enum": ["pdf", "docx"]},
+        "bytes": {"type": "integer", "minimum": 1},
+        "sha256": {"type": "string", "pattern": "^[a-f0-9]{64}$"},
+        "pages": {"type": "integer", "minimum": 1}
+      }
+    },
+    "records": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["index", "status", "values", "raw_values", "evidence", "issues"],
+        "properties": {
+          "index": {"type": "integer", "minimum": 0},
+          "status": {"enum": ["accepted", "needs_review"]},
+          "values": {"type": "object"},
+          "raw_values": {"type": "object"},
+          "evidence": {"type": "object"},
+          "unmapped_values": {"type": "array"},
+          "issues": {"type": "array", "items": {"$ref": "#/$defs/issue"}}
+        }
+      }
+    },
+    "tables": {"type": "array"},
+    "summary": {
+      "type": "object",
+      "required": ["detected_tables", "matched_tables", "compatible_tables", "records", "accepted_records", "issues"]
+    },
+    "review": {
+      "type": "object",
+      "required": ["issues"],
+      "properties": {
+        "issues": {"type": "array", "items": {"$ref": "#/$defs/issue"}}
+      }
+    },
+    "audit": {
+      "type": "object",
+      "required": ["extraction_fingerprint", "pdf_agent_mcp_version", "engine"],
+      "properties": {
+        "extraction_fingerprint": {"type": "string", "pattern": "^[a-f0-9]{64}$"},
+        "pdf_agent_mcp_version": {"type": "string"},
+        "engine": {
+          "type": "object",
+          "required": ["name", "version"],
+          "properties": {
+            "name": {"type": "string"},
+            "version": {"type": "string"}
+          }
+        }
+      }
+    }
+  },
+  "$defs": {
+    "issue": {
+      "type": "object",
+      "required": ["severity", "code", "message"],
+      "properties": {
+        "severity": {"enum": ["warning", "error"]},
+        "code": {"type": "string"},
+        "message": {"type": "string"}
+      }
+    }
+  }
+}

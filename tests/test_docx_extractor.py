@@ -63,6 +63,10 @@ class TestDocxExtractor(unittest.TestCase):
         self.assertEqual(table["rows"][2], ["Glucose", "5.1", "mmol/L"])
         self.assertEqual(table["column_count"], 3)
         self.assertFalse(table["has_merged_cells"])
+        self.assertEqual(
+            table["cell_provenance"][2][1],
+            {"table_index": 0, "row": 2, "column": 1},
+        )
 
     def test_extract_docx_tables_flags_merged_cells(self):
         path = os.path.join(tempfile.mkdtemp(), "merged.docx")
@@ -78,6 +82,17 @@ class TestDocxExtractor(unittest.TestCase):
         csv = docx_extractor.docx_table_to_csv(self.path)
         self.assertIn("Analyte,Result,Unit", csv)
         self.assertIn("Sodium,140,mmol/L", csv)
+
+    def test_empty_docx_reports_empty_results(self):
+        from docx import Document
+        path = os.path.join(tempfile.mkdtemp(), "empty.docx")
+        Document().save(path)
+        self.assertTrue(docx_extractor.extract_docx_text(path)["warnings"])
+        self.assertTrue(docx_extractor.extract_docx_tables(path)["warnings"])
+
+    def test_docx_table_index_must_exist(self):
+        with self.assertRaises(ValueError):
+            docx_extractor.docx_table_to_csv(self.path, index=1)
 
     def test_mcp_docx_tools_delegate_to_extractor(self):
         class FakeFastMCP:

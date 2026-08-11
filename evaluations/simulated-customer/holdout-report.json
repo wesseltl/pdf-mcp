@@ -1,0 +1,138 @@
+{
+  "evaluation_report_schema_version": "1.0",
+  "evidence_label": "simulated_fictional_customer",
+  "passed": true,
+  "pdf_agent_mcp_version": "0.3.0",
+  "evaluation_manifest_sha256": "ac4dee049b1cd16e50a1a8fc29834f3f4cef91db7f00b969f1f9c71f2d8e59aa",
+  "profile": {
+    "id": "northstar-water-results-v1",
+    "version": "1.0.0",
+    "sha256": "09cad0adb1518dfc03e121993145cc699e4ccf62c2b233d93d7689b799b3b557"
+  },
+  "metrics": {
+    "field_precision": 1.0,
+    "field_recall": 1.0,
+    "field_f1": 1.0,
+    "exact_record_rate": 1.0,
+    "decision_accuracy": 1.0,
+    "cases": 6
+  },
+  "minimums": {
+    "field_precision": 1.0,
+    "field_recall": 1.0,
+    "field_f1": 1.0,
+    "exact_record_rate": 1.0,
+    "decision_accuracy": 1.0
+  },
+  "cases": [
+    {
+      "id": "holdout-01-punctuation-aliases",
+      "document_sha256": "86126c5b92829573ac77eb54c7638ea784a7ac047db201531350686ce6276282",
+      "extraction_fingerprint": "99366bd214c761126059f9181a19bcb6da94f573f171bbbe03fac5fb5a56615c",
+      "engine": {
+        "name": "pdfplumber",
+        "version": "0.11.10"
+      },
+      "decision": "accepted",
+      "expected_decision": "accepted",
+      "decision_correct": true,
+      "expected_records": 2,
+      "extracted_records": 2,
+      "field_precision": 1.0,
+      "field_recall": 1.0,
+      "field_f1": 1.0,
+      "exact_record_rate": 1.0
+    },
+    {
+      "id": "holdout-02-docx-aliases",
+      "document_sha256": "9f89709f6290867acd111c1df8731c99c905f871c446abf61eecac6283db415f",
+      "extraction_fingerprint": "28e2836fc7d330ccf197ae57bd2a40e03da42abd94fa87e78452f08eba80ec03",
+      "engine": {
+        "name": "python-docx",
+        "version": "1.2.0"
+      },
+      "decision": "accepted",
+      "expected_decision": "accepted",
+      "decision_correct": true,
+      "expected_records": 2,
+      "extracted_records": 2,
+      "field_precision": 1.0,
+      "field_recall": 1.0,
+      "field_f1": 1.0,
+      "exact_record_rate": 1.0
+    },
+    {
+      "id": "holdout-03-repeated-header",
+      "document_sha256": "efa634fa2fbd0c9cdefc7e1027b9821485c1591619f0dfbe7d95977f6fb98bf2",
+      "extraction_fingerprint": "80e13d93e346eb91e7ba2c1417c30ec19799ea4f180e34cf08b51bb7056517d1",
+      "engine": {
+        "name": "pdfplumber",
+        "version": "0.11.10"
+      },
+      "decision": "accepted",
+      "expected_decision": "accepted",
+      "decision_correct": true,
+      "expected_records": 4,
+      "extracted_records": 4,
+      "field_precision": 1.0,
+      "field_recall": 1.0,
+      "field_f1": 1.0,
+      "exact_record_rate": 1.0
+    },
+    {
+      "id": "holdout-04-blank-unit",
+      "document_sha256": "75510dc9ccd4aee8d1b52df9e059a0f2619e05724e5a4abfca46270eec6a97ee",
+      "extraction_fingerprint": "1ad03f05e032585bc667d40c53b4abf7fc4e652267c421628be13d32c6c11451",
+      "engine": {
+        "name": "pdfplumber",
+        "version": "0.11.10"
+      },
+      "decision": "needs_review",
+      "expected_decision": "needs_review",
+      "decision_correct": true,
+      "expected_records": 1,
+      "extracted_records": 1,
+      "field_precision": 1.0,
+      "field_recall": 1.0,
+      "field_f1": 1.0,
+      "exact_record_rate": 1.0
+    },
+    {
+      "id": "holdout-05-duplicate-key",
+      "document_sha256": "01ef6e185dcb24160e628e06ced8b53efeb0f8316eed8cbc314bc826aff63540",
+      "extraction_fingerprint": "7192056af3a2bb92a19f0fb88dbd91e4c76aeb4fa2f30ee1c7029a559349888b",
+      "engine": {
+        "name": "pdfplumber",
+        "version": "0.11.10"
+      },
+      "decision": "needs_review",
+      "expected_decision": "needs_review",
+      "decision_correct": true,
+      "expected_records": 2,
+      "extracted_records": 2,
+      "field_precision": 1.0,
+      "field_recall": 1.0,
+      "field_f1": 1.0,
+      "exact_record_rate": 1.0
+    },
+    {
+      "id": "holdout-06-text-only",
+      "document_sha256": "bf285d396cb1b6670b1e3abe86ebc01c838a0d966a5469dd2144cf506a001c63",
+      "extraction_fingerprint": "e7b626e6a9bea414f2c8ae73e29fb6a0457ea1892bce6127f5d2f8e4cd82fff9",
+      "engine": {
+        "name": "pdfplumber",
+        "version": "0.11.10"
+      },
+      "decision": "rejected",
+      "expected_decision": "rejected",
+      "decision_correct": true,
+      "expected_records": 0,
+      "extracted_records": 0,
+      "field_precision": 1.0,
+      "field_recall": 1.0,
+      "field_f1": 1.0,
+      "exact_record_rate": 1.0
+    }
+  ],
+  "privacy": "Report contains hashes and metrics, not extracted or expected cell values."
+}

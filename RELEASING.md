@@ -1,7 +1,7 @@
 # Releasing
 
-This project publishes to PyPI with GitHub Actions and PyPI Trusted Publishing. That avoids storing a
-PyPI API token on a development machine or in GitHub secrets.
+This project publishes to PyPI with Trusted Publishing, then publishes the same `server.json` version
+to the MCP Registry with GitHub OIDC. Neither flow stores a registry token in the repository.
 
 ## One-time PyPI setup
 
@@ -20,6 +20,9 @@ In the PyPI project settings for `pdf-agent-mcp`, add a trusted publisher:
    ```bash
    python -m pip install -e ".[test]"
    python -m unittest discover -s tests
+   evaluate-document-profile evaluations/sample-invoice.json
+   evaluate-document-profile evaluations/simulated-customer/development.json
+   evaluate-document-profile evaluations/simulated-customer/holdout.json
    ```
 
 3. Build and check the distributions:
@@ -31,12 +34,21 @@ In the PyPI project settings for `pdf-agent-mcp`, add a trusted publisher:
    python -m twine check dist/*
    ```
 
-4. Commit and push the release changes.
-5. Create and push a version tag:
+4. Run the paid-beta metadata and launch checks:
 
    ```bash
-   git tag v0.1.4
-   git push origin v0.1.4
+   python scripts/validate_launch.py
    ```
 
-The `Publish` workflow will build the package and upload it to PyPI.
+5. Commit and push the release changes.
+6. Create and push a version tag:
+
+   ```bash
+   VERSION=$(python -c 'import pdf_mcp; print(pdf_mcp.__version__)')
+   git tag "v$VERSION"
+   git push origin "v$VERSION"
+   ```
+
+The `Publish` workflow uploads the package to PyPI and, after that succeeds, publishes the matching
+metadata to the MCP Registry. The `Pages` workflow deploys the commercial site from `docs/` on every
+push to `main`.

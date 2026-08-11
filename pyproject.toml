@@ -4,8 +4,8 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "pdf-agent-mcp"
-version = "0.1.4"
-description = "An MCP server that lets AI agents extract text and tables from PDFs and Word documents."
+version = "0.3.0"
+description = "Evidence-backed, profile-checked table extraction from PDF and Word documents for AI agents."
 readme = "README.md"
 requires-python = ">=3.10"
 license = "MIT"
@@ -15,18 +15,27 @@ dependencies = ["pdfplumber>=0.11", "python-docx>=1.1", "openpyxl>=3.1"]
 
 [project.optional-dependencies]
 mcp = ["fastmcp>=2.0"]
-test = ["reportlab>=4"]
+cloud = ["fastmcp>=2.0", "httpx>=0.27"]
+test = ["reportlab>=4", "httpx>=0.27"]
 commerce = ["stripe>=15"]
 
 [project.urls]
 Homepage = "https://github.com/wesseltl/pdf-mcp"
 Repository = "https://github.com/wesseltl/pdf-mcp"
+"Landing page" = "https://wesseltl.github.io/pdf-mcp/"
 "Paid pilot" = "https://github.com/wesseltl/pdf-mcp/blob/main/BUY.md"
+"Free hosted beta" = "https://wesseltl.github.io/pdf-mcp/#free-beta"
 "Agent offers" = "https://github.com/wesseltl/pdf-mcp/tree/main/offers"
 
 [project.scripts]
 pdf-agent-mcp = "pdf_mcp.server:main"
+pdf-agent-cloud-mcp = "pdf_mcp.cloud_server:main"
 export-document-tables = "pdf_mcp.cli:main"
+extract-document-with-profile = "pdf_mcp.profile_cli:extract_main"
+evaluate-document-profile = "pdf_mcp.profile_cli:evaluate_main"
 
-[tool.setuptools]
-packages = ["pdf_mcp"]
+[tool.setuptools.packages.find]
+include = ["pdf_mcp*"]
+
+[tool.setuptools.package-data]
+"pdf_mcp.profile_templates" = ["*.json"]

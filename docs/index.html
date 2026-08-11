@@ -1,0 +1,307 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Profile-Checked PDF and DOCX Extraction | pdf-mcp</title>
+    <meta name="description" content="Turn recurring born-digital PDF and Word tables into profile-checked records with source evidence and explicit review routing.">
+    <meta name="robots" content="index,follow">
+    <link rel="canonical" href="https://wesseltl.github.io/pdf-mcp/">
+    <meta property="og:title" content="pdf-mcp profile-checked document extraction">
+    <meta property="og:description" content="Versioned extraction profiles, source evidence, exact evaluations, and fail-closed decisions for agents.">
+    <meta property="og:type" content="website">
+    <meta property="og:url" content="https://wesseltl.github.io/pdf-mcp/">
+    <meta property="og:image" content="https://wesseltl.github.io/pdf-mcp/assets/hero-document-to-excel.png">
+    <meta name="twitter:card" content="summary_large_image">
+    <link rel="stylesheet" href="styles.css">
+    <script type="application/ld+json">
+      {
+        "@context": "https://schema.org",
+        "@type": "SoftwareApplication",
+        "name": "pdf-mcp",
+        "applicationCategory": "BusinessApplication",
+        "operatingSystem": "Windows, macOS, Linux",
+        "description": "Extract profile-checked records with source evidence from born-digital PDF and Word documents.",
+        "offers": [
+          {
+            "@type": "Offer",
+            "name": "pdf-mcp Free Agent Beta",
+            "price": "0.00",
+            "priceCurrency": "EUR",
+            "availability": "https://schema.org/LimitedAvailability",
+            "url": "https://wesseltl.github.io/pdf-mcp/#free-beta"
+          },
+          {
+            "@type": "Offer",
+            "name": "Profile Feasibility Check",
+            "price": "19.00",
+            "priceCurrency": "EUR",
+            "availability": "https://schema.org/PreOrder",
+            "url": "https://wesseltl.github.io/pdf-mcp/#pricing"
+          },
+          {
+            "@type": "Offer",
+            "name": "Document Reliability Pilot",
+            "price": "99.00",
+            "priceCurrency": "EUR",
+            "availability": "https://schema.org/PreOrder",
+            "url": "https://wesseltl.github.io/pdf-mcp/#pricing"
+          }
+        ]
+      }
+    </script>
+  </head>
+  <body>
+    <header class="site-header">
+      <a class="brand" href="./" aria-label="pdf-mcp home">pdf-mcp</a>
+      <nav aria-label="Primary">
+        <a href="#free-beta">Free beta</a>
+        <a href="#method">Method</a>
+        <a href="#pricing">Pricing</a>
+        <a href="https://github.com/wesseltl/pdf-mcp">GitHub</a>
+      </nav>
+    </header>
+
+    <main>
+      <section class="hero">
+        <img src="assets/hero-document-to-excel.png" alt="A business document beside its structured spreadsheet output" class="hero-image">
+        <div class="hero-content">
+          <p class="eyebrow">Evidence-backed document workflows</p>
+          <h1>pdf-mcp profile-checked extraction.</h1>
+          <p class="lead">
+            Turn recurring PDF and Word tables into canonical records with source coordinates,
+            deterministic checks, and an explicit accepted, review, or rejected decision.
+          </p>
+          <div class="actions">
+            <a class="button primary" href="examples/sample-invoice-output.xlsx" download>Inspect evidence-rich workbook</a>
+            <a class="button secondary" href="https://github.com/wesseltl/pdf-mcp#profile-checked-extraction">Install the local MCP</a>
+          </div>
+          <p class="hero-status">Born-digital PDF and DOCX | Local by default | Measured per document family</p>
+        </div>
+      </section>
+
+      <section class="proof-strip" aria-label="Service summary">
+        <span>Versioned field profiles</span>
+        <span>Cell-level source evidence</span>
+        <span>Fail-closed decisions</span>
+        <span>Local mode: no uploads</span>
+      </section>
+
+      <section class="section beta-section" id="free-beta">
+        <div class="section-inner">
+          <div class="beta-layout">
+            <div>
+              <p class="eyebrow">Free hosted agent beta</p>
+              <h2>Measure adoption without measuring documents.</h2>
+              <p class="section-intro">
+                Approved invitations will use an authenticated extraction endpoint while keeping
+                filenames, extracted text, and table cells out of the usage ledger. Applications
+                are open while endpoint deployment is completed.
+              </p>
+              <div class="actions">
+                <a class="button primary" data-offer="pdf-mcp-hosted-free-beta" data-request-label="Apply for beta access" href="mailto:wesseltl@gmail.com?subject=pdf-mcp%20Free%20Agent%20Beta">Apply for beta access</a>
+                <a class="text-link" href="https://raw.githubusercontent.com/wesseltl/pdf-mcp/main/beta/free-hosted-beta.json">Agent-readable offer</a>
+              </div>
+              <p class="offer-status beta-status" data-offer-status="pdf-mcp-hosted-free-beta">Applications are open. Invitations begin after endpoint deployment. Send no documents by email.</p>
+            </div>
+            <dl class="beta-facts">
+              <div><dt>Price</dt><dd>Free during beta</dd></div>
+              <div><dt>Allowance</dt><dd>25 operations per calendar month</dd></div>
+              <div><dt>Per upload</dt><dd>10 MB and up to 50 PDF pages</dd></div>
+              <div><dt>Documents</dt><dd>Redacted or non-sensitive PDF and DOCX only</dd></div>
+            </dl>
+          </div>
+          <div class="measurement-grid">
+            <div>
+              <h3>Operational counters retained up to 90 days</h3>
+              <p>Non-secret key ID, time, tool, file type, byte/page/table/warning counts, duration, and bounded outcome.</p>
+            </div>
+            <div>
+              <h3>Excluded from the usage ledger</h3>
+              <p>Raw API keys, source filenames, document contents, extracted text, and table cells.</p>
+            </div>
+            <div class="beta-safety">
+              <h3>Upload boundary</h3>
+              <p>Temporary files are deleted when each request completes or fails. Agents must get explicit approval before uploading.</p>
+            </div>
+          </div>
+          <p class="beta-links">
+            <a class="text-link" href="beta-terms.html">Hosted beta terms</a>
+            <a class="text-link" href="privacy.html">Privacy details</a>
+            <a class="text-link" href="https://github.com/wesseltl/pdf-mcp">Telemetry-free local edition</a>
+          </p>
+        </div>
+      </section>
+
+      <section class="section" id="method">
+        <div class="section-inner sample-layout">
+          <div class="sample-copy">
+            <p class="eyebrow">Inspect every accepted value</p>
+            <h2>A workbook with a decision and its evidence.</h2>
+            <p>
+              The profile-driven workbook separates the decision, canonical data, and cell-level
+              evidence. Every PDF value points back to a page, row, column, and bounding box.
+            </p>
+            <div class="sample-downloads">
+              <a class="text-link" href="examples/sample-invoice.pdf" download>Download synthetic input PDF</a>
+              <a class="text-link" href="examples/sample-invoice-output.xlsx" download>Download profile-checked workbook</a>
+            </div>
+          </div>
+          <div class="sample-preview" aria-label="Example review sheet">
+            <div class="preview-title">Review sheet | sample-invoice-output.xlsx</div>
+            <div class="table-scroll">
+              <table>
+                <thead>
+                  <tr>
+                    <th>field</th>
+                    <th>value</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr>
+                    <td>decision</td>
+                    <td class="clean">accepted</td>
+                  </tr>
+                  <tr>
+                    <td>profile</td>
+                    <td>invoice-lines-v1</td>
+                  </tr>
+                  <tr>
+                    <td>records</td>
+                    <td>3</td>
+                  </tr>
+                  <tr>
+                    <td>issues</td>
+                    <td>0</td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+            <p class="preview-note">Synthetic regression fixture. A real accuracy claim requires a representative, customer-approved evaluation set.</p>
+          </div>
+        </div>
+      </section>
+
+      <section class="section band" aria-labelledby="workflow-title">
+        <div class="section-inner">
+          <div class="section-heading">
+            <p class="eyebrow">Reliability loop</p>
+            <h2 id="workflow-title">Define the contract, then measure it.</h2>
+          </div>
+          <ol class="workflow">
+            <li><strong>Define</strong><span>Name canonical fields, aliases, types, and rejection rules for one recurring layout.</span></li>
+            <li><strong>Check</strong><span>Build expected rows from an accepted sample set and preserve source evidence.</span></li>
+            <li><strong>Measure</strong><span>Report exact field, record, and review-routing performance against that ground truth.</span></li>
+            <li><strong>Run</strong><span>Agents automate accepted results and route every exception to review.</span></li>
+          </ol>
+        </div>
+      </section>
+
+      <section class="section" id="scope">
+        <div class="section-inner scope-layout">
+          <div>
+            <p class="eyebrow">Good fit</p>
+            <h2>Recurring tables with a stable business meaning.</h2>
+            <ul class="check-list">
+              <li>Lab reports and certificates of analysis</li>
+              <li>Vendor statements and operational reports with repeated layouts</li>
+              <li>Workflows with named fields, types, and acceptance rules</li>
+              <li>Processes where exceptions can be routed to a reviewer</li>
+            </ul>
+          </div>
+          <div class="limits-block">
+            <p class="eyebrow amber">Out of scope</p>
+            <h3>No OCR or sensitive health data.</h3>
+            <ul>
+              <li>Scanned or image-only PDFs</li>
+              <li>Handwriting, charts, images, and password-protected files</li>
+              <li>Patient data or other special-category personal data</li>
+              <li>Manual data entry when no usable table is detected</li>
+              <li>Accuracy claims for layouts absent from the evaluation set</li>
+              <li>Production hosting or ongoing integrations in the fixed-price pilot</li>
+            </ul>
+          </div>
+        </div>
+      </section>
+
+      <section class="section band" id="pricing">
+        <div class="section-inner">
+          <div class="section-heading">
+            <p class="eyebrow">Fixed-scope validation</p>
+            <h2>Buy a measured workflow, not parser access.</h2>
+            <p class="section-intro">Requests are open. Self-serve live checkout remains disabled until business registration details are published.</p>
+          </div>
+          <div class="pricing-grid">
+            <article class="price-card">
+              <div>
+                <p class="offer-name">Profile Feasibility Check</p>
+                <p class="price">EUR 19 <span>excluding VAT</span></p>
+                <p class="scope-line">1 document | 10 pages | 5 detected tables</p>
+                <ul>
+                  <li>Evidence-rich Excel, CSV, and/or JSON output</li>
+                  <li>Profile-fit and failure-risk notes</li>
+                  <li>One correction round within 7 days</li>
+                  <li>Target delivery in 2 business days</li>
+                </ul>
+              </div>
+              <div>
+                <a class="button primary full" data-offer="sample-conversion" data-request-label="Request feasibility check" data-checkout-label="Open feasibility checkout" href="mailto:wesseltl@gmail.com?subject=Profile%20Feasibility%20Check%20Request">Request feasibility check</a>
+                <p class="offer-status" data-offer-status="sample-conversion">Scope request by email. Do not attach the document.</p>
+              </div>
+            </article>
+            <article class="price-card">
+              <div>
+                <p class="offer-name">Document Reliability Pilot</p>
+                <p class="price">EUR 99 <span>excluding VAT</span></p>
+                <p class="scope-line">5 similar documents | 50 pages | 1 workflow</p>
+                <ul>
+                  <li>One versioned profile and evidence-rich outputs</li>
+                  <li>Checked expected rows for the sample set</li>
+                  <li>Exact field, record, and routing evaluation</li>
+                  <li>One correction round within 7 days</li>
+                  <li>Target delivery in 5 business days</li>
+                </ul>
+              </div>
+              <div>
+                <a class="button dark full" data-offer="document-to-excel-pilot" data-request-label="Request reliability pilot" data-checkout-label="Open pilot checkout" href="mailto:wesseltl@gmail.com?subject=Document%20Reliability%20Pilot%20Request">Request reliability pilot</a>
+                <p class="offer-status" data-offer-status="document-to-excel-pilot">Scope request by email. Do not attach documents.</p>
+              </div>
+            </article>
+          </div>
+          <p class="refund-note">If accepted documents cannot produce a usable versioned profile and evaluation baseline, choose a full refund or no-cost cancellation before manual rework.</p>
+        </div>
+      </section>
+
+      <section class="section">
+        <div class="section-inner open-source-layout">
+          <div>
+            <p class="eyebrow">Choose the boundary</p>
+            <h2>The parser is open. Reliability is workflow-specific.</h2>
+          </div>
+          <div>
+            <p>
+              pdf-mcp is an MIT-licensed local MCP server with no uploads or telemetry. Customer
+              profiles and evaluation sets stay private unless their owner chooses otherwise. The
+              separate hosted beta is proprietary on the server side and measures bounded operational
+              usage. The paid pilot covers the document-specific mapping, ground truth, measurement,
+              and review policy that a generic parser cannot provide.
+            </p>
+            <a class="text-link" href="https://github.com/wesseltl/pdf-mcp">View source and installation instructions</a>
+          </div>
+        </div>
+      </section>
+    </main>
+
+    <footer>
+      <span>pdf-mcp</span>
+      <a href="https://github.com/wesseltl/pdf-mcp/blob/main/BUY.md">Offer details</a>
+      <a href="https://raw.githubusercontent.com/wesseltl/pdf-mcp/main/beta/free-hosted-beta.json">Free agent offer</a>
+      <a href="beta-terms.html">Beta terms</a>
+      <a href="terms.html">Terms</a>
+      <a href="privacy.html">Privacy</a>
+      <a href="mailto:wesseltl@gmail.com">Contact</a>
+    </footer>
+
+    <script src="offers.js"></script>
+  </body>
+</html>

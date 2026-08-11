@@ -1,0 +1,69 @@
+{
+  "$schema": "../../profile.schema.json",
+  "profile_schema_version": "1.0",
+  "id": "northstar-water-results-v1",
+  "version": "1.0.0",
+  "description": "Fictional Northstar Water result rows used only for simulated customer evaluation.",
+  "table": {
+    "header_search_rows": 3,
+    "minimum_header_match": 1.0,
+    "allow_extra_columns": true,
+    "min_records": 1,
+    "unique_by": [
+      "sample_id",
+      "analyte"
+    ],
+    "columns": [
+      {
+        "name": "sample_id",
+        "aliases": [
+          "Sample ID",
+          "Sample",
+          "Sample No.",
+          "Sample #",
+          "Specimen"
+        ],
+        "type": "string",
+        "required": true,
+        "allow_blank": false,
+        "pattern": "^NS-[0-9]{4}$"
+      },
+      {
+        "name": "analyte",
+        "aliases": [
+          "Analyte",
+          "Test",
+          "Parameter"
+        ],
+        "type": "string",
+        "required": true,
+        "allow_blank": false
+      },
+      {
+        "name": "result",
+        "aliases": [
+          "Result",
+          "Value",
+          "Measured Value",
+          "Measurement"
+        ],
+        "type": "decimal",
+        "required": true,
+        "allow_blank": false,
+        "minimum": "0",
+        "maximum": "100000"
+      },
+      {
+        "name": "unit",
+        "aliases": [
+          "Unit",
+          "Units",
+          "UOM"
+        ],
+        "type": "string",
+        "required": true,
+        "allow_blank": false
+      }
+    ]
+  }
+}

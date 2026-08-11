@@ -59,6 +59,21 @@ def make_two_tables_one_page_pdf(path):
     ])
 
 
+def make_blank_pdf(path):
+    from reportlab.pdfgen import canvas
+    pdf = canvas.Canvas(path)
+    pdf.showPage()
+    pdf.save()
+
+
+def make_text_only_pdf(path):
+    from reportlab.lib.pagesizes import A4
+    from reportlab.lib.styles import getSampleStyleSheet
+    from reportlab.platypus import Paragraph, SimpleDocTemplate
+    doc = SimpleDocTemplate(path, pagesize=A4)
+    doc.build([Paragraph("No structured table on this page", getSampleStyleSheet()["BodyText"])])
+
+
 class TestExtractor(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
@@ -76,10 +91,19 @@ class TestExtractor(unittest.TestCase):
     def test_extract_tables(self):
         r = extractor.extract_tables(self.path)
         self.assertEqual(r["n_tables"], 1)
-        rows = r["tables"][0]["rows"]
+        table = r["tables"][0]
+        rows = table["rows"]
         self.assertEqual(rows[0], ["Item", "Qty", "Price"])
         self.assertEqual(rows[1], ["Widget", "3", "12.50"])
         self.assertEqual(len(rows), 4)
+        self.assertEqual(table["index"], 0)
+        self.assertEqual(len(table["bbox"]), 4)
+        evidence = table["cell_provenance"][1][0]
+        self.assertEqual(
+            (evidence["page"], evidence["table_index"], evidence["row"], evidence["column"]),
+            (1, 0, 1, 0),
+        )
+        self.assertEqual(len(evidence["bbox"]), 4)
 
     def test_table_to_csv(self):
         csv = extractor.table_to_csv(self.path)
@@ -90,6 +114,33 @@ class TestExtractor(unittest.TestCase):
         r = extractor.extract_text(self.path, page=1)
         self.assertEqual(r["n_pages"], 1)
 
+    def test_page_number_must_be_valid_and_one_based(self):
+        for invalid in (0, 2, -1, True, 1.5):
+            with self.subTest(page=invalid):
+                with self.assertRaises(ValueError):
+                    extractor.extract_text(self.path, page=invalid)
+                with self.assertRaises(ValueError):
+                    extractor.extract_tables(self.path, page=invalid)
+
+    def test_blank_pdf_reports_ocr_warning(self):
+        path = os.path.join(tempfile.mkdtemp(), "blank.pdf")
+        make_blank_pdf(path)
+        text_result = extractor.extract_text(path)
+        table_result = extractor.extract_tables(path)
+        self.assertTrue(any("OCR" in warning for warning in text_result["warnings"]))
+        self.assertTrue(any("OCR" in warning for warning in table_result["warnings"]))
+
+    def test_text_only_pdf_reports_no_tables(self):
+        path = os.path.join(tempfile.mkdtemp(), "text-only.pdf")
+        make_text_only_pdf(path)
+        result = extractor.extract_tables(path)
+        self.assertEqual(result["n_tables"], 0)
+        self.assertTrue(result["warnings"])
+
+    def test_table_index_must_exist(self):
+        with self.assertRaises(ValueError):
+            extractor.table_to_csv(self.path, index=1)
+
     def test_assessment_flags_ragged_and_empty(self):
         from pdf_mcp.extractor import _assess
         self.assertTrue(_assess([["A", "B"], ["1", "2"]])["looks_clean"])
@@ -99,14 +150,19 @@ class TestExtractor(unittest.TestCase):
     def test_stitch_multipage_merges_and_drops_repeated_header(self):
         from pdf_mcp.extractor import _stitch_multipage
         page1 = {"page": 1, "rows": [["Item", "Qty"], ["Widget", "3"]], "column_count": 2,
+                 "cell_provenance": [[{"page": 1}], [{"page": 1}]],
                  "warnings": [], "looks_clean": True}
         page2 = {"page": 2, "rows": [["Item", "Qty"], ["Bolt", "10"]], "column_count": 2,
+                 "cell_provenance": [[{"page": 2}], [{"page": 2}]],
                  "warnings": [], "looks_clean": True}
         merged = _stitch_multipage([page1, page2])
         self.assertEqual(len(merged), 1)
         self.assertEqual(merged[0]["merged_from_pages"], [1, 2])
         self.assertEqual(merged[0]["rows"],
                          [["Item", "Qty"], ["Widget", "3"], ["Bolt", "10"]])
+        self.assertEqual([row[0]["page"] for row in merged[0]["cell_provenance"]], [1, 1, 2])
+        self.assertIsNone(merged[0]["bbox"])
+        self.assertEqual([item["page"] for item in merged[0]["bboxes_by_page"]], [1, 2])
         self.assertFalse(merged[0]["looks_clean"])
 
     def test_stitch_multipage_merges_without_repeated_header(self):

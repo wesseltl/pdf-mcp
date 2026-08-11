@@ -1,8 +1,8 @@
-"""extractor.py — pull text and tables out of PDFs reliably.
+"""Pull text, table rows, and source coordinates out of born-digital PDFs.
 
 Agents can't read a PDF: they get a pasted blob where columns collapse and tables turn to mush. This
-uses pdfplumber to extract the text and the actual table structure, so an agent gets clean rows
-instead of guessing. Deterministic extraction; the model never invents a cell.
+uses pdfplumber to extract parser-detected rows rather than asking a model to generate cell values.
+Raw extraction is not an accuracy guarantee; profile checks provide the stricter workflow contract.
 """
 from __future__ import annotations
 
@@ -13,6 +13,13 @@ import pdfplumber
 # Optional sandbox: if PDF_MCP_ALLOWED_DIR is set, only files inside it may be read. This lets you hand
 # the server to an agent without it being able to read arbitrary files on the machine.
 _ALLOWED_DIR = os.environ.get("PDF_MCP_ALLOWED_DIR")
+
+_NO_TEXT_WARNING = (
+    "no text detected; scanned or image-only PDFs require OCR, which is not supported"
+)
+_NO_TABLES_WARNING = (
+    "no tables detected; scanned or image-only PDFs require OCR, which is not supported"
+)
 
 
 def _check_path(path: str) -> str:
@@ -35,15 +42,24 @@ def page_count(path: str) -> int:
         return len(pdf.pages)
 
 
+def _select_pages(pdf, page: int | None):
+    """Return all pages or one validated 1-based page."""
+    if page is None:
+        return pdf.pages
+    if isinstance(page, bool) or not isinstance(page, int):
+        raise ValueError("page must be an integer using 1-based numbering")
+    if page < 1 or page > len(pdf.pages):
+        raise ValueError(f"page must be between 1 and {len(pdf.pages)} (received {page})")
+    return [pdf.pages[page - 1]]
+
+
 def extract_text(path: str, page: int | None = None) -> dict:
     """Text from one page (1-based) or the whole document if page is None."""
     with pdfplumber.open(_check_path(path)) as pdf:
-        if page is not None:
-            pages = [pdf.pages[page - 1]]
-        else:
-            pages = pdf.pages
+        pages = _select_pages(pdf, page)
         parts = [{"page": p.page_number, "text": (p.extract_text() or "")} for p in pages]
-    return {"pages": parts, "n_pages": len(parts)}
+    warnings = [] if any(part["text"].strip() for part in parts) else [_NO_TEXT_WARNING]
+    return {"pages": parts, "n_pages": len(parts), "warnings": warnings}
 
 
 def _assess(rows: list[list]) -> dict:
@@ -70,6 +86,44 @@ def _assess(rows: list[list]) -> dict:
             "empty_ratio": empty_ratio, "warnings": warnings}
 
 
+def _bbox(value) -> list[float] | None:
+    """Return a stable, JSON-safe PDF bounding box."""
+    if value is None:
+        return None
+    return [round(float(coordinate), 3) for coordinate in value]
+
+
+def _table_result(table, page_number: int, table_index: int) -> dict:
+    """Extract one table together with cell-level source coordinates."""
+    rows = [
+        [("" if cell is None else str(cell).strip()) for cell in row]
+        for row in table.extract()
+    ]
+    cell_provenance = []
+    for row_index, row in enumerate(rows):
+        source_cells = table.rows[row_index].cells if row_index < len(table.rows) else []
+        cell_provenance.append([
+            {
+                "page": page_number,
+                "table_index": table_index,
+                "row": row_index,
+                "column": column_index,
+                "bbox": _bbox(source_cells[column_index])
+                if column_index < len(source_cells) else None,
+            }
+            for column_index in range(len(row))
+        ])
+    return {
+        "page": page_number,
+        "index": table_index,
+        "bbox": _bbox(table.bbox),
+        "rows": rows,
+        "cell_provenance": cell_provenance,
+        "n_rows": len(rows),
+        **_assess(rows),
+    }
+
+
 def _stitch_multipage(tables: list[dict]) -> list[dict]:
     """Join tables that continue across page breaks.
 
@@ -91,11 +145,19 @@ def _stitch_multipage(tables: list[dict]) -> list[dict]:
             merged.append({**t, "merged_from_pages": [t["page"]]})
             continue
         rows = t["rows"]
+        cell_provenance = t.get("cell_provenance", [])
         # drop a repeated header on the continuation page
         if rows and rows[0] == prev["rows"][0]:
             rows = rows[1:]
+            cell_provenance = cell_provenance[1:]
         new_rows = prev["rows"] + rows
+        new_provenance = prev.get("cell_provenance", []) + cell_provenance
+        bboxes_by_page = prev.get(
+            "bboxes_by_page", [{"page": prev["page"], "bbox": prev.get("bbox")}]
+        ) + [{"page": t["page"], "bbox": t.get("bbox")}]
         prev.update(rows=new_rows, n_rows=len(new_rows),
+                    cell_provenance=new_provenance,
+                    bbox=None, bboxes_by_page=bboxes_by_page,
                     merged_from_pages=prev["merged_from_pages"] + [t["page"]], **_assess(new_rows))
         prev["warnings"] = list(prev.get("warnings", [])) + [
             f"merged across pages {prev['merged_from_pages']} (continuation guessed from matching columns)"]
@@ -115,14 +177,14 @@ def extract_tables(path: str, page: int | None = None, merge_multipage: bool = F
     """
     out = []
     with pdfplumber.open(_check_path(path)) as pdf:
-        pages = [pdf.pages[page - 1]] if page is not None else pdf.pages
+        pages = _select_pages(pdf, page)
         for p in pages:
-            for tbl in p.extract_tables():
-                clean = [[("" if c is None else str(c).strip()) for c in row] for row in tbl]
-                out.append({"page": p.page_number, "rows": clean, "n_rows": len(clean), **_assess(clean)})
+            for table_index, table in enumerate(p.find_tables()):
+                out.append(_table_result(table, p.page_number, table_index))
     if merge_multipage:
         out = _stitch_multipage(out)
-    return {"tables": out, "n_tables": len(out)}
+    warnings = [] if out else [_NO_TABLES_WARNING]
+    return {"tables": out, "n_tables": len(out), "warnings": warnings}
 
 
 def table_to_csv(path: str, page: int | None = None, index: int = 0) -> str:
@@ -135,6 +197,8 @@ def table_to_csv(path: str, page: int | None = None, index: int = 0) -> str:
     tables = extract_tables(path, page)["tables"]
     if not tables:
         return ""
+    if isinstance(index, bool) or not isinstance(index, int) or not 0 <= index < len(tables):
+        raise ValueError(f"table index must be between 0 and {len(tables) - 1} (received {index})")
     rows = tables[index]["rows"]
     buf = io.StringIO()
     csv.writer(buf).writerows(rows)

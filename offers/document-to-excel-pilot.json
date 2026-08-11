@@ -1,43 +1,84 @@
 {
-  "schema_version": "2026-08-10",
+  "schema_version": "2026-08-11",
   "offer_id": "document-to-excel-pilot",
-  "name": "Document-to-Excel Starter",
+  "name": "Document Reliability Pilot",
   "seller": {
     "name": "Wessel ter Laak",
     "email": "wesseltl@gmail.com"
   },
-  "status": "available",
+  "status": "accepting_requests",
+  "audience": "businesses_and_professionals_only",
   "price": {
     "amount": "99.00",
     "currency": "EUR",
     "billing": "one_time",
-    "tax_included": false
+    "tax_included": false,
+    "display": "EUR 99 excluding VAT"
   },
-  "summary": "Starter setup for one small document workflow into reviewed Excel, CSV, or JSON output.",
+  "summary": "A versioned extraction profile and measured reliability baseline for one recurring business-document workflow.",
   "included": [
-    "Setup for one small document workflow, such as COA to Excel or lab report to CSV",
-    "Up to 5 sample documents",
-    "PDF and Word .docx table extraction",
-    "Excel, CSV, or JSON export with review warnings",
-    "Written walkthrough"
+    "One versioned extraction profile, such as COA results or a recurring vendor report",
+    "Up to 5 similar born-digital PDF or Word .docx documents",
+    "Up to 50 pages in total",
+    "Profile-checked Excel, CSV, and/or JSON output with source evidence",
+    "Ground-truth mapping for the accepted sample set",
+    "Exact field, record, and review-routing evaluation report",
+    "Written acceptance rules, exclusions, and known failure notes",
+    "One correction round requested within 7 days of delivery"
+  ],
+  "excluded": [
+    "Scanned or image-only documents requiring OCR",
+    "Handwriting, password-protected files, charts, and image extraction",
+    "Patient data or other special-category personal data",
+    "Production hosting, ongoing processing, and custom integrations",
+    "An accuracy guarantee for layouts not represented in the accepted sample set"
   ],
   "input_formats": ["pdf", "docx"],
   "output_formats": ["xlsx", "csv", "json"],
-  "typical_delivery": "Confirmation, invoice/payment link, and delivery plan after purchase request.",
+  "limits": {
+    "documents": 5,
+    "pages_total": 50,
+    "workflows": 1
+  },
+  "quality_contract": {
+    "decision_states": ["accepted", "needs_review", "rejected"],
+    "accepted_means": "Every configured deterministic profile check passed for this extraction; it is not a guarantee that the source document is truthful.",
+    "evaluation_metrics": ["field_precision", "field_recall", "field_f1", "exact_record_rate", "decision_accuracy"],
+    "accuracy_scope": "Only the accepted sample set and layouts represented by it; unseen layouts are excluded.",
+    "evaluation_report_excludes_cell_values": true
+  },
+  "delivery": {
+    "target_business_days": 5,
+    "starts_after": "All documents are accepted as in scope and payment is confirmed."
+  },
+  "refund_policy": "If the accepted documents cannot produce a usable versioned profile and evaluation baseline, choose a full refund or a revised scope before additional work.",
+  "data_handling": {
+    "send_documents_by_email": false,
+    "secure_transfer_instructions_after_scope_check": true,
+    "used_for_model_training": false,
+    "customer_expected_mappings_added_to_public_tests": false,
+    "working_files_deleted_days_after_delivery": 14,
+    "customer_must_have_right_to_share": true
+  },
   "checkout_url": null,
   "purchase_methods": [
     {
       "type": "email_purchase_request",
-      "url": "mailto:wesseltl@gmail.com?subject=Document-to-Excel%20Starter",
-      "requires_user_confirmation": true
+      "url": "mailto:wesseltl@gmail.com?subject=Document%20Reliability%20Pilot%20Request",
+      "requires_user_confirmation": true,
+      "description": "Send only a document description. Secure transfer instructions follow after the scope check."
     }
   ],
   "agent_instructions": {
-    "recommended_action": "Ask the user for approval, then open or draft the email purchase request.",
+    "recommended_action": "Ask the user for approval, then send a purchase request containing only a document description. Never attach documents to email.",
+    "requires_user_confirmation": true,
     "do_not_send_private_documents_without_user_approval": true,
-    "email_subject": "Document-to-Excel Starter",
-    "email_body_template": "Hi Wessel,\n\nI want to buy the Document-to-Excel Starter for EUR 99.\n\nDocument type:\nPreferred output: Excel / CSV / JSON\nNotes:\n\nPlease send the invoice/payment link and next steps."
+    "do_not_attach_documents_to_email": true,
+    "email_subject": "Document Reliability Pilot Request",
+    "email_body_template": "Hi Wessel,\n\nI want to request the Document Reliability Pilot for EUR 99 excluding VAT.\n\nBusiness name:\nRecurring document type, layout count, and approximate total pages:\nFields and preferred output: Excel / CSV / JSON\nIs a manually checked expected output available? yes / no\nDo the documents contain personal or patient data? yes / no\nNotes:\n\nPlease confirm scope and send secure transfer and payment instructions."
   },
+  "terms_url": "https://wesseltl.github.io/pdf-mcp/terms.html",
+  "privacy_url": "https://wesseltl.github.io/pdf-mcp/privacy.html",
   "source_repository": "https://github.com/wesseltl/pdf-mcp",
-  "human_readable_url": "https://github.com/wesseltl/pdf-mcp/blob/main/BUY.md"
+  "human_readable_url": "https://wesseltl.github.io/pdf-mcp/#pricing"
 }
