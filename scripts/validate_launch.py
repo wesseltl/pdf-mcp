@@ -14,6 +14,10 @@ PUBLIC_FILES = (
     ROOT / "BETA_TERMS.md",
     ROOT / "COMMERCIAL_TERMS.md",
     ROOT / "PRIVACY.md",
+    ROOT / "PROFILE_FORMAT.md",
+    ROOT / "EVALUATION.md",
+    ROOT / "profile.schema.json",
+    ROOT / "extraction-result.schema.json",
     BETA_PATH,
     ROOT / "docs" / "index.html",
     ROOT / "docs" / "beta-terms.html",
@@ -58,6 +62,19 @@ def validate_offer(path: Path, offer: dict) -> list[str]:
         errors.append(f"{label}: included and excluded scope must both be present")
     if not offer.get("refund_policy"):
         errors.append(f"{label}: refund policy is required")
+
+    if offer.get("offer_id") == "document-to-excel-pilot":
+        quality = offer.get("quality_contract", {})
+        if quality.get("decision_states") != ["accepted", "needs_review", "rejected"]:
+            errors.append(f"{label}: reliability decision states changed")
+        required_metrics = {
+            "field_precision", "field_recall", "field_f1", "exact_record_rate",
+            "decision_accuracy",
+        }
+        if set(quality.get("evaluation_metrics", [])) != required_metrics:
+            errors.append(f"{label}: reliability evaluation metrics changed")
+        if quality.get("evaluation_report_excludes_cell_values") is not True:
+            errors.append(f"{label}: evaluation reports must exclude cell values")
 
     handling = offer.get("data_handling", {})
     if handling.get("send_documents_by_email") is not False:
@@ -125,6 +142,8 @@ def validate_beta_offer(path: Path, offer: dict) -> list[str]:
     service = offer.get("service", {})
     if service.get("url") is not None:
         errors.append(f"{label}: service URL must stay null until deployment is verified")
+    if service.get("deployment_status") != "pending":
+        errors.append(f"{label}: hosted service must remain deployment_status pending")
     if service.get("authentication") != "individual_beta_api_key":
         errors.append(f"{label}: individual beta API-key authentication is required")
     if service.get("public_client_license") != "MIT":

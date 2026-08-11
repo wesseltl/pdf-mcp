@@ -95,6 +95,30 @@ class TestOfferMetadata(unittest.TestCase):
         serialized = json.dumps(self.offers)
         self.assertNotIn("buy.stripe.com/test_", serialized)
 
+    def test_reliability_pilot_has_a_machine_readable_quality_contract(self):
+        pilot = next(
+            offer for offer in self.offers
+            if offer["offer_id"] == "document-to-excel-pilot"
+        )
+        quality = pilot["quality_contract"]
+        self.assertEqual(
+            quality["decision_states"], ["accepted", "needs_review", "rejected"]
+        )
+        self.assertEqual(
+            set(quality["evaluation_metrics"]),
+            {
+                "field_precision",
+                "field_recall",
+                "field_f1",
+                "exact_record_rate",
+                "decision_accuracy",
+            },
+        )
+        self.assertTrue(quality["evaluation_report_excludes_cell_values"])
+        self.assertFalse(
+            pilot["data_handling"]["customer_expected_mappings_added_to_public_tests"]
+        )
+
     def test_free_hosted_beta_has_a_separate_safe_contract(self):
         beta = self.beta_offer
         self.assertEqual(beta["offer_id"], "pdf-mcp-hosted-free-beta")
@@ -144,6 +168,10 @@ class TestOfferMetadata(unittest.TestCase):
     def test_public_terms_privacy_and_sample_files_exist(self):
         required = [
             "COMMERCIAL_TERMS.md",
+            "PROFILE_FORMAT.md",
+            "EVALUATION.md",
+            "profile.schema.json",
+            "extraction-result.schema.json",
             "BETA_TERMS.md",
             "PRIVACY.md",
             "beta/free-hosted-beta.json",

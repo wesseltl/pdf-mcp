@@ -15,7 +15,7 @@
     "billing": "free_beta",
     "display": "Free during the beta"
   },
-  "summary": "An authenticated hosted extraction beta that lets agents process redacted or non-sensitive born-digital PDF and DOCX documents while privacy-safe operational usage is measured.",
+  "summary": "Apply for an invitation-based hosted extraction beta for redacted or non-sensitive born-digital PDF and DOCX documents with privacy-safe operational measurement.",
   "included": [
     "25 hosted extraction operations per calendar month",
     "Text, structured-table, and CSV extraction",
@@ -36,6 +36,7 @@
     "pdf_pages_per_operation": 50
   },
   "service": {
+    "deployment_status": "pending",
     "url": null,
     "authentication": "individual_beta_api_key",
     "public_client_license": "MIT",
@@ -70,7 +71,7 @@
       "type": "email_beta_request",
       "url": "mailto:wesseltl@gmail.com?subject=pdf-mcp%20Free%20Agent%20Beta",
       "requires_user_confirmation": true,
-      "description": "Request an individual beta key and endpoint. Send no documents or document contents by email."
+      "description": "Apply for individual beta access. Invitations begin after endpoint deployment. Send no documents or document contents by email."
     }
   ],
   "agent_instructions": {
@@ -80,7 +81,7 @@
     "do_not_upload_without_user_approval": true,
     "only_redacted_or_non_sensitive_documents": true,
     "email_subject": "pdf-mcp Free Agent Beta",
-    "email_body_template": "Hi Wessel,\n\nI want to request access to the free pdf-mcp agent beta.\n\nBusiness or project name:\nExpected document type: PDF / DOCX\nExpected monthly operations:\nMCP client:\n\nI understand that selected documents are uploaded for processing, temporary uploads are deleted when the request completes, and bounded operational usage is measured. I will use only redacted or non-sensitive documents.\n\nPlease send the endpoint, API key, and setup instructions."
+    "email_body_template": "Hi Wessel,\n\nI want to apply for access to the free pdf-mcp agent beta.\n\nBusiness or project name:\nExpected document type: PDF / DOCX\nExpected monthly operations:\nMCP client:\n\nI understand that invitations begin after endpoint deployment. Once invited, selected documents are uploaded for processing, temporary uploads are deleted when the request completes, and bounded operational usage is measured. I will use only redacted or non-sensitive documents.\n\nPlease add me to the beta access list and send setup instructions when an invitation is available."
   },
   "terms_url": "https://wesseltl.github.io/pdf-mcp/beta-terms.html",
   "privacy_url": "https://wesseltl.github.io/pdf-mcp/privacy.html",

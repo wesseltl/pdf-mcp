@@ -44,7 +44,9 @@ function updateOfferLinks(id, offer) {
 
   document.querySelectorAll(`[data-offer-status="${id}"]`).forEach((status) => {
     if (offer.offer_kind === "hosted_software_beta") {
-      status.textContent = "Access requests are open. Send no documents or document contents by email.";
+      status.textContent = offer.service?.url
+        ? "Invitation requests are open. Send no documents or document contents by email."
+        : "Applications are open. Invitations begin after endpoint deployment. Send no documents by email.";
     } else {
       status.textContent = checkoutUrl
         ? "Live Stripe checkout. Scope is confirmed before fulfillment."

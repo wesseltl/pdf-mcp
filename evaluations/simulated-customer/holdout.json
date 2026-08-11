@@ -1,0 +1,121 @@
+{
+  "evaluation_schema_version": "1.0",
+  "evidence_label": "simulated_fictional_customer",
+  "profile": "profile.json",
+  "minimums": {
+    "field_precision": 1.0,
+    "field_recall": 1.0,
+    "field_f1": 1.0,
+    "exact_record_rate": 1.0,
+    "decision_accuracy": 1.0
+  },
+  "cases": [
+    {
+      "id": "holdout-01-punctuation-aliases",
+      "document": "fixtures/holdout-01-punctuation-aliases.pdf",
+      "expected_decision": "accepted",
+      "expected_records": [
+        {
+          "sample_id": "NS-2001",
+          "analyte": "Sulfate",
+          "result": "31",
+          "unit": "mg/L"
+        },
+        {
+          "sample_id": "NS-2001",
+          "analyte": "Fluoride",
+          "result": "0.72",
+          "unit": "mg/L"
+        }
+      ]
+    },
+    {
+      "id": "holdout-02-docx-aliases",
+      "document": "fixtures/holdout-02-docx-aliases.docx",
+      "expected_decision": "accepted",
+      "expected_records": [
+        {
+          "sample_id": "NS-2002",
+          "analyte": "Copper",
+          "result": "0.08",
+          "unit": "mg/L"
+        },
+        {
+          "sample_id": "NS-2002",
+          "analyte": "Zinc",
+          "result": "0.15",
+          "unit": "mg/L"
+        }
+      ]
+    },
+    {
+      "id": "holdout-03-repeated-header",
+      "document": "fixtures/holdout-03-repeated-header.pdf",
+      "expected_decision": "accepted",
+      "expected_records": [
+        {
+          "sample_id": "NS-2003",
+          "analyte": "pH",
+          "result": "6.95",
+          "unit": "pH units"
+        },
+        {
+          "sample_id": "NS-2003",
+          "analyte": "Turbidity",
+          "result": "0.35",
+          "unit": "NTU"
+        },
+        {
+          "sample_id": "NS-2004",
+          "analyte": "Chloride",
+          "result": "76",
+          "unit": "mg/L"
+        },
+        {
+          "sample_id": "NS-2004",
+          "analyte": "Nitrate",
+          "result": "1.8",
+          "unit": "mg/L"
+        }
+      ]
+    },
+    {
+      "id": "holdout-04-blank-unit",
+      "document": "fixtures/holdout-04-blank-unit.pdf",
+      "expected_decision": "needs_review",
+      "expected_records": [
+        {
+          "sample_id": "NS-2005",
+          "analyte": "Conductivity",
+          "result": "390",
+          "unit": null
+        }
+      ]
+    },
+    {
+      "id": "holdout-05-duplicate-key",
+      "document": "fixtures/holdout-05-duplicate-key.pdf",
+      "expected_decision": "needs_review",
+      "expected_records": [
+        {
+          "sample_id": "NS-2006",
+          "analyte": "Iron",
+          "result": "0.10",
+          "unit": "mg/L"
+        },
+        {
+          "sample_id": "NS-2006",
+          "analyte": "Iron",
+          "result": "0.10",
+          "unit": "mg/L"
+        }
+      ]
+    },
+    {
+      "id": "holdout-06-text-only",
+      "document": "fixtures/holdout-06-text-only.pdf",
+      "expected_decision": "rejected",
+      "expected_records": []
+    }
+  ]
+}

@@ -1,0 +1,22 @@
+include BETA_TERMS.md
+include BUY.md
+include COMMERCIAL_TERMS.md
+include EVALUATION.md
+include LICENSE
+include PRIVACY.md
+include PROFILE_FORMAT.md
+include README.md
+include RELEASING.md
+include SECURITY.md
+include STRIPE.md
+include extraction-result.schema.json
+include profile.schema.json
+include server.json
+include evaluations/sample-invoice.json
+recursive-include beta *.json
+recursive-include docs *
+recursive-include evaluations/simulated-customer *.docx *.json *.md *.pdf
+recursive-include examples *.pdf
+recursive-include offers *.json
+recursive-include scripts *.py
+recursive-include tests *.md *.py

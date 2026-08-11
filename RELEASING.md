@@ -20,6 +20,9 @@ In the PyPI project settings for `pdf-agent-mcp`, add a trusted publisher:
    ```bash
    python -m pip install -e ".[test]"
    python -m unittest discover -s tests
+   evaluate-document-profile evaluations/sample-invoice.json
+   evaluate-document-profile evaluations/simulated-customer/development.json
+   evaluate-document-profile evaluations/simulated-customer/holdout.json
    ```
 
 3. Build and check the distributions:
@@ -41,8 +44,9 @@ In the PyPI project settings for `pdf-agent-mcp`, add a trusted publisher:
 6. Create and push a version tag:
 
    ```bash
-   git tag v0.2.0
-   git push origin v0.2.0
+   VERSION=$(python -c 'import pdf_mcp; print(pdf_mcp.__version__)')
+   git tag "v$VERSION"
+   git push origin "v$VERSION"
    ```
 
 The `Publish` workflow uploads the package to PyPI and, after that succeeds, publishes the matching

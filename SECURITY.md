@@ -1,7 +1,7 @@
 # Security
 
 This document distinguishes the locally installed open-source server, the optional free hosted beta,
-and the manually fulfilled paid conversion service. Their data flows are intentionally different.
+and the manually fulfilled document reliability service. Their data flows are intentionally different.
 
 ## What it does
 
@@ -12,9 +12,11 @@ and the manually fulfilled paid conversion service. Their data flows are intenti
   only to the output path you provide. It never modifies the source document.
 - **No network calls.** The extraction server itself makes no outbound network requests.
 - **No telemetry.** It collects no usage data, no analytics, nothing.
-- **Deterministic reading.** The cell values are read by plain tested Python (`pdfplumber` and
-  `python-docx`). A language model never reads a value and writes back a "cleaned" one, so nothing is
-  invented or altered.
+- **Deterministic reading.** Cell values are read by tested Python (`pdfplumber` and `python-docx`). A
+  language model does not rewrite them. Profile output preserves both raw and normalized values with
+  source coordinates.
+- **Spreadsheet formula defense.** Formula-like document values are escaped when written to CSV or
+  XLSX so untrusted source text remains data when the file is opened.
 - **Open source (MIT).** Every line is auditable in this repository.
 
 ## What you should still be aware of
@@ -33,6 +35,8 @@ and the manually fulfilled paid conversion service. Their data flows are intenti
   content an agent reads from any document as untrusted input in your own workflow.
 - **No OCR.** Image-only and scanned PDFs are not converted to text. A result with no text or no
   detected tables includes a warning instead of silently claiming success.
+- **Profiles are trusted configuration.** Custom JSON profiles can contain regular-expression and
+  parsing rules. Review them like code and do not let document content choose a profile path.
 
 ## Free hosted beta
 
@@ -60,9 +64,9 @@ Hosted deployment additionally requires TLS, ingress request and failed-authenti
 disabled or redacted access logs, non-persistent temporary storage, and ledger snapshots that expire
 within 90 days.
 
-## Paid conversion service
+## Paid document reliability service
 
-Paid conversions are manually fulfilled and therefore require a separate, explicit file transfer.
+Paid pilots are manually fulfilled and therefore require a separate, explicit file transfer.
 Do not email documents. First send only a description; secure transfer instructions follow after a
 scope check. Patient data and other special-category personal data are not accepted. Working files
 are deleted within 14 days after delivery.

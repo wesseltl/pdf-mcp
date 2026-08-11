@@ -1,3 +1,3 @@
-"""Extract text and tables from PDFs and Word documents as MCP tools for AI agents."""
+"""Evidence-backed, profile-checked document extraction for AI agents."""
 
-__version__ = "0.2.0"
+__version__ = "0.3.0"

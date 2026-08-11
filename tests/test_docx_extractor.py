@@ -63,6 +63,10 @@ class TestDocxExtractor(unittest.TestCase):
         self.assertEqual(table["rows"][2], ["Glucose", "5.1", "mmol/L"])
         self.assertEqual(table["column_count"], 3)
         self.assertFalse(table["has_merged_cells"])
+        self.assertEqual(
+            table["cell_provenance"][2][1],
+            {"table_index": 0, "row": 2, "column": 1},
+        )
 
     def test_extract_docx_tables_flags_merged_cells(self):
         path = os.path.join(tempfile.mkdtemp(), "merged.docx")

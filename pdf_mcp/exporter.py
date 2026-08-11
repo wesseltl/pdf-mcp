@@ -11,6 +11,7 @@ from openpyxl import Workbook
 from openpyxl.styles import Font, PatternFill
 
 from pdf_mcp import docx_extractor, extractor
+from pdf_mcp.output_safety import spreadsheet_safe
 
 
 def _source_type(path: str) -> str:
@@ -92,7 +93,7 @@ def _write_xlsx(result: dict, output_path: str) -> None:
     header_font = Font(bold=True)
 
     for row in _review_rows(result["tables"]):
-        review.append(row)
+        review.append([spreadsheet_safe(value) for value in row])
     for warning in result.get("warnings", []):
         review.append(["document warning", warning])
     for cell in review[1]:
@@ -112,7 +113,7 @@ def _write_xlsx(result: dict, output_path: str) -> None:
         sheet.append(["warnings", _warning_text(table)])
         sheet.append([])
         for row in table.get("rows", []):
-            sheet.append(row)
+            sheet.append([spreadsheet_safe(value) for value in row])
         for cell in sheet[1]:
             cell.font = header_font
     wb.save(output_path)
@@ -131,7 +132,10 @@ def _write_csv(result: dict, output_path: str) -> None:
             writer.writerow(["looks_clean", table.get("looks_clean")])
             writer.writerow(["warnings", _warning_text(table)])
             writer.writerow([])
-            writer.writerows(table.get("rows", []))
+            writer.writerows(
+                [spreadsheet_safe(value) for value in row]
+                for row in table.get("rows", [])
+            )
             writer.writerow([])
 
 

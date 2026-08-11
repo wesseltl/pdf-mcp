@@ -4,8 +4,8 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "pdf-agent-mcp"
-version = "0.2.0"
-description = "An MCP server that lets AI agents extract text and tables from PDFs and Word documents."
+version = "0.3.0"
+description = "Evidence-backed, profile-checked table extraction from PDF and Word documents for AI agents."
 readme = "README.md"
 requires-python = ">=3.10"
 license = "MIT"
@@ -31,6 +31,11 @@ Repository = "https://github.com/wesseltl/pdf-mcp"
 pdf-agent-mcp = "pdf_mcp.server:main"
 pdf-agent-cloud-mcp = "pdf_mcp.cloud_server:main"
 export-document-tables = "pdf_mcp.cli:main"
+extract-document-with-profile = "pdf_mcp.profile_cli:extract_main"
+evaluate-document-profile = "pdf_mcp.profile_cli:evaluate_main"
 
-[tool.setuptools]
-packages = ["pdf_mcp"]
+[tool.setuptools.packages.find]
+include = ["pdf_mcp*"]
+
+[tool.setuptools.package-data]
+"pdf_mcp.profile_templates" = ["*.json"]

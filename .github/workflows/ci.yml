@@ -34,3 +34,9 @@ jobs:
 
       - name: Run tests
         run: python -m unittest discover -s tests
+
+      - name: Run profile reliability gate
+        run: |
+          evaluate-document-profile evaluations/sample-invoice.json
+          evaluate-document-profile evaluations/simulated-customer/development.json
+          evaluate-document-profile evaluations/simulated-customer/holdout.json

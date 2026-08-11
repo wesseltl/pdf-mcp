@@ -24,6 +24,12 @@ class TestLaunchValidation(unittest.TestCase):
         errors = validate_launch.validate_beta_offer(validate_launch.BETA_PATH, beta)
         self.assertTrue(any("must stay null" in error for error in errors))
 
+    def test_beta_must_publish_pending_deployment_state(self):
+        beta = validate_launch.load_offer(validate_launch.BETA_PATH)
+        del beta["service"]["deployment_status"]
+        errors = validate_launch.validate_beta_offer(validate_launch.BETA_PATH, beta)
+        self.assertTrue(any("deployment_status pending" in error for error in errors))
+
     def test_beta_measurement_contract_cannot_silently_expand(self):
         beta = validate_launch.load_offer(validate_launch.BETA_PATH)
         beta["data_handling"]["operational_metrics"].append("source_filename")

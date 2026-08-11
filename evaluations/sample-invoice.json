@@ -1,0 +1,22 @@
+{
+  "evaluation_schema_version": "1.0",
+  "evidence_label": "synthetic_regression",
+  "profile": "invoice-lines-v1",
+  "minimums": {
+    "field_f1": 1.0,
+    "exact_record_rate": 1.0,
+    "decision_accuracy": 1.0
+  },
+  "cases": [
+    {
+      "id": "synthetic-invoice",
+      "document": "../examples/invoice.pdf",
+      "expected_decision": "accepted",
+      "expected_records": [
+        {"item": "Widget", "quantity": "3", "unit_price": "12.50"},
+        {"item": "Gadget", "quantity": "1", "unit_price": "40.00"},
+        {"item": "Bolt", "quantity": "10", "unit_price": "0.25"}
+      ]
+    }
+  ]
+}

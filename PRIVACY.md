@@ -2,8 +2,8 @@
 
 Effective date: 11 August 2026
 
-This notice distinguishes the local open-source tool, optional free hosted beta, and paid
-document-conversion beta.
+This notice distinguishes the local open-source tool, optional free hosted beta, and paid document
+reliability beta.
 
 ## Local open-source tool
 
@@ -48,17 +48,18 @@ The beta may process:
 - Business contact details supplied in a purchase request.
 - Document descriptions used to decide whether a request is in scope.
 - Source documents supplied through separately provided secure-transfer instructions.
-- Converted output, review notes, correspondence, and transaction identifiers.
+- Profile and evaluation output, checked expected mappings, review notes, correspondence, and
+  transaction identifiers.
 
 The information is used only to assess requests, perform and deliver the service, provide support,
-prevent misuse, and meet accounting or legal obligations. Documents are not used for advertising,
-model training, or public test data.
+prevent misuse, and meet accounting or legal obligations. Documents and expected mappings are not
+used for advertising, model training, or public test data.
 
 ## Sensitive information
 
 Do not email source documents. Do not submit patient data, health data, government identifiers,
 payment-card details, passwords, or other special-category personal data. Redact personal or
-confidential information that is not required for the conversion. The customer must have the right
+confidential information that is not required for the pilot. The customer must have the right
 to share every submitted document.
 
 ## Service providers and retention

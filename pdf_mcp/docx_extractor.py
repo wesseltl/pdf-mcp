@@ -36,12 +36,21 @@ def extract_docx_tables(path: str) -> dict:
     tables = []
     for i, table in enumerate(doc.tables):
         rows = []
+        cell_provenance = []
         has_merged_cells = False
-        for row in table.rows:
+        for row_index, row in enumerate(table.rows):
             cells = list(row.cells)
             if len({id(cell._tc) for cell in cells}) < len(cells):
                 has_merged_cells = True
             rows.append([cell.text.strip() for cell in cells])
+            cell_provenance.append([
+                {
+                    "table_index": i,
+                    "row": row_index,
+                    "column": column_index,
+                }
+                for column_index in range(len(cells))
+            ])
         assessment = _assess(rows)
         if has_merged_cells:
             assessment["warnings"] = list(assessment.get("warnings", [])) + [
@@ -51,6 +60,7 @@ def extract_docx_tables(path: str) -> dict:
         tables.append({
             "index": i,
             "rows": rows,
+            "cell_provenance": cell_provenance,
             "n_rows": len(rows),
             "has_merged_cells": has_merged_cells,
             **assessment,

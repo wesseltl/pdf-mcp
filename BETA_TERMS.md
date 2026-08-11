@@ -13,6 +13,10 @@ agent-driven document extraction. Access is provided through an individual API k
 limited, changed, suspended, or ended during the beta. There is no production availability or
 support SLA.
 
+Applications may open before the hosted endpoint is deployed. An application does not guarantee
+access or an invitation date. File uploads become available only after the applicant receives a
+verified endpoint, an individual key, and setup instructions.
+
 API keys must not be shared, published, embedded in public repositories, or used to bypass the
 published allowance. The default allowance is 25 operations per calendar month.
 

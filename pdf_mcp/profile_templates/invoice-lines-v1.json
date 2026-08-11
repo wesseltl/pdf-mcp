@@ -1,0 +1,38 @@
+{
+  "profile_schema_version": "1.0",
+  "id": "invoice-lines-v1",
+  "version": "1.0.0",
+  "description": "Basic line-item rows from born-digital invoices with explicit quantity and price columns.",
+  "table": {
+    "header_search_rows": 3,
+    "minimum_header_match": 1.0,
+    "allow_extra_columns": true,
+    "min_records": 1,
+    "unique_by": [],
+    "columns": [
+      {
+        "name": "item",
+        "aliases": ["Item", "Description", "Product", "Service"],
+        "type": "string",
+        "required": true,
+        "allow_blank": false
+      },
+      {
+        "name": "quantity",
+        "aliases": ["Qty", "Quantity"],
+        "type": "decimal",
+        "required": true,
+        "allow_blank": false,
+        "minimum": "0"
+      },
+      {
+        "name": "unit_price",
+        "aliases": ["Price", "Unit Price", "Rate"],
+        "type": "decimal",
+        "required": true,
+        "allow_blank": false,
+        "minimum": "0"
+      }
+    ]
+  }
+}

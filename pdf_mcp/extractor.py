@@ -1,8 +1,8 @@
-"""extractor.py — pull text and tables out of PDFs reliably.
+"""Pull text, table rows, and source coordinates out of born-digital PDFs.
 
 Agents can't read a PDF: they get a pasted blob where columns collapse and tables turn to mush. This
-uses pdfplumber to extract the text and the actual table structure, so an agent gets clean rows
-instead of guessing. Deterministic extraction; the model never invents a cell.
+uses pdfplumber to extract parser-detected rows rather than asking a model to generate cell values.
+Raw extraction is not an accuracy guarantee; profile checks provide the stricter workflow contract.
 """
 from __future__ import annotations
 
@@ -86,6 +86,44 @@ def _assess(rows: list[list]) -> dict:
             "empty_ratio": empty_ratio, "warnings": warnings}
 
 
+def _bbox(value) -> list[float] | None:
+    """Return a stable, JSON-safe PDF bounding box."""
+    if value is None:
+        return None
+    return [round(float(coordinate), 3) for coordinate in value]
+
+
+def _table_result(table, page_number: int, table_index: int) -> dict:
+    """Extract one table together with cell-level source coordinates."""
+    rows = [
+        [("" if cell is None else str(cell).strip()) for cell in row]
+        for row in table.extract()
+    ]
+    cell_provenance = []
+    for row_index, row in enumerate(rows):
+        source_cells = table.rows[row_index].cells if row_index < len(table.rows) else []
+        cell_provenance.append([
+            {
+                "page": page_number,
+                "table_index": table_index,
+                "row": row_index,
+                "column": column_index,
+                "bbox": _bbox(source_cells[column_index])
+                if column_index < len(source_cells) else None,
+            }
+            for column_index in range(len(row))
+        ])
+    return {
+        "page": page_number,
+        "index": table_index,
+        "bbox": _bbox(table.bbox),
+        "rows": rows,
+        "cell_provenance": cell_provenance,
+        "n_rows": len(rows),
+        **_assess(rows),
+    }
+
+
 def _stitch_multipage(tables: list[dict]) -> list[dict]:
     """Join tables that continue across page breaks.
 
@@ -107,11 +145,19 @@ def _stitch_multipage(tables: list[dict]) -> list[dict]:
             merged.append({**t, "merged_from_pages": [t["page"]]})
             continue
         rows = t["rows"]
+        cell_provenance = t.get("cell_provenance", [])
         # drop a repeated header on the continuation page
         if rows and rows[0] == prev["rows"][0]:
             rows = rows[1:]
+            cell_provenance = cell_provenance[1:]
         new_rows = prev["rows"] + rows
+        new_provenance = prev.get("cell_provenance", []) + cell_provenance
+        bboxes_by_page = prev.get(
+            "bboxes_by_page", [{"page": prev["page"], "bbox": prev.get("bbox")}]
+        ) + [{"page": t["page"], "bbox": t.get("bbox")}]
         prev.update(rows=new_rows, n_rows=len(new_rows),
+                    cell_provenance=new_provenance,
+                    bbox=None, bboxes_by_page=bboxes_by_page,
                     merged_from_pages=prev["merged_from_pages"] + [t["page"]], **_assess(new_rows))
         prev["warnings"] = list(prev.get("warnings", [])) + [
             f"merged across pages {prev['merged_from_pages']} (continuation guessed from matching columns)"]
@@ -133,9 +179,8 @@ def extract_tables(path: str, page: int | None = None, merge_multipage: bool = F
     with pdfplumber.open(_check_path(path)) as pdf:
         pages = _select_pages(pdf, page)
         for p in pages:
-            for tbl in p.extract_tables():
-                clean = [[("" if c is None else str(c).strip()) for c in row] for row in tbl]
-                out.append({"page": p.page_number, "rows": clean, "n_rows": len(clean), **_assess(clean)})
+            for table_index, table in enumerate(p.find_tables()):
+                out.append(_table_result(table, p.page_number, table_index))
     if merge_multipage:
         out = _stitch_multipage(out)
     warnings = [] if out else [_NO_TABLES_WARNING]

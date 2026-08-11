@@ -9,6 +9,7 @@ from unittest import mock
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from pdf_mcp import cli, exporter
+from pdf_mcp.output_safety import spreadsheet_safe
 
 
 def make_pdf(path):
@@ -42,7 +43,21 @@ def make_text_only_pdf(path):
     doc.build([Paragraph("A document without tables", getSampleStyleSheet()["BodyText"])])
 
 
+def make_formula_pdf(path):
+    from reportlab.lib import colors
+    from reportlab.lib.pagesizes import A4
+    from reportlab.platypus import SimpleDocTemplate, Table, TableStyle
+    doc = SimpleDocTemplate(path, pagesize=A4)
+    table = Table([["Item", "Qty"], [" =2+3", "1"]])
+    table.setStyle(TableStyle([("GRID", (0, 0), (-1, -1), 0.5, colors.black)]))
+    doc.build([table])
+
+
 class TestExporter(unittest.TestCase):
+    def test_spreadsheet_safety_handles_leading_whitespace_and_control_characters(self):
+        self.assertEqual(spreadsheet_safe("  =2+3"), "'  =2+3")
+        self.assertEqual(spreadsheet_safe("safe\x00text"), "safe\\x00text")
+
     def test_export_pdf_to_xlsx(self):
         from openpyxl import load_workbook
         tmp = tempfile.mkdtemp()
@@ -103,6 +118,22 @@ class TestExporter(unittest.TestCase):
         review_rows = list(load_workbook(output_path)["Review"].values)
         self.assertEqual(review_rows[1][0], "document warning")
         self.assertIn("no tables detected", review_rows[1][1])
+
+    def test_spreadsheet_exports_escape_formula_like_document_cells(self):
+        from openpyxl import load_workbook
+        tmp = tempfile.mkdtemp()
+        input_path = os.path.join(tmp, "formula.pdf")
+        xlsx_path = os.path.join(tmp, "formula.xlsx")
+        csv_path = os.path.join(tmp, "formula.csv")
+        make_formula_pdf(input_path)
+
+        exporter.export_document_tables(input_path, xlsx_path)
+        exporter.export_document_tables(input_path, csv_path)
+
+        self.assertEqual(load_workbook(xlsx_path, data_only=False)["Table 1"]["A7"].value,
+                         "'=2+3")
+        with open(csv_path, encoding="utf-8") as output:
+            self.assertIn("'=2+3", output.read())
 
     def test_export_rejects_unsupported_input(self):
         with self.assertRaises(ValueError):

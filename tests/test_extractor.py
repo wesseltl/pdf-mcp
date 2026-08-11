@@ -91,10 +91,19 @@ class TestExtractor(unittest.TestCase):
     def test_extract_tables(self):
         r = extractor.extract_tables(self.path)
         self.assertEqual(r["n_tables"], 1)
-        rows = r["tables"][0]["rows"]
+        table = r["tables"][0]
+        rows = table["rows"]
         self.assertEqual(rows[0], ["Item", "Qty", "Price"])
         self.assertEqual(rows[1], ["Widget", "3", "12.50"])
         self.assertEqual(len(rows), 4)
+        self.assertEqual(table["index"], 0)
+        self.assertEqual(len(table["bbox"]), 4)
+        evidence = table["cell_provenance"][1][0]
+        self.assertEqual(
+            (evidence["page"], evidence["table_index"], evidence["row"], evidence["column"]),
+            (1, 0, 1, 0),
+        )
+        self.assertEqual(len(evidence["bbox"]), 4)
 
     def test_table_to_csv(self):
         csv = extractor.table_to_csv(self.path)
@@ -141,14 +150,19 @@ class TestExtractor(unittest.TestCase):
     def test_stitch_multipage_merges_and_drops_repeated_header(self):
         from pdf_mcp.extractor import _stitch_multipage
         page1 = {"page": 1, "rows": [["Item", "Qty"], ["Widget", "3"]], "column_count": 2,
+                 "cell_provenance": [[{"page": 1}], [{"page": 1}]],
                  "warnings": [], "looks_clean": True}
         page2 = {"page": 2, "rows": [["Item", "Qty"], ["Bolt", "10"]], "column_count": 2,
+                 "cell_provenance": [[{"page": 2}], [{"page": 2}]],
                  "warnings": [], "looks_clean": True}
         merged = _stitch_multipage([page1, page2])
         self.assertEqual(len(merged), 1)
         self.assertEqual(merged[0]["merged_from_pages"], [1, 2])
         self.assertEqual(merged[0]["rows"],
                          [["Item", "Qty"], ["Widget", "3"], ["Bolt", "10"]])
+        self.assertEqual([row[0]["page"] for row in merged[0]["cell_provenance"]], [1, 1, 2])
+        self.assertIsNone(merged[0]["bbox"])
+        self.assertEqual([item["page"] for item in merged[0]["bboxes_by_page"]], [1, 2])
         self.assertFalse(merged[0]["looks_clean"])
 
     def test_stitch_multipage_merges_without_repeated_header(self):

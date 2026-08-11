@@ -1,0 +1,36 @@
+{
+  "profile_schema_version": "1.0",
+  "id": "lab-coa-v1",
+  "version": "1.0.0",
+  "description": "Result rows from born-digital lab reports and certificates of analysis.",
+  "table": {
+    "header_search_rows": 3,
+    "minimum_header_match": 0.66,
+    "allow_extra_columns": true,
+    "min_records": 1,
+    "unique_by": [],
+    "columns": [
+      {
+        "name": "analyte",
+        "aliases": ["Analyte", "Test", "Parameter", "Compound"],
+        "type": "string",
+        "required": true,
+        "allow_blank": false
+      },
+      {
+        "name": "result",
+        "aliases": ["Result", "Value", "Measured value"],
+        "type": "string",
+        "required": true,
+        "allow_blank": false
+      },
+      {
+        "name": "unit",
+        "aliases": ["Unit", "Units", "UOM"],
+        "type": "string",
+        "required": false,
+        "allow_blank": true
+      }
+    ]
+  }
+}
