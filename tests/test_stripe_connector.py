@@ -5,6 +5,7 @@ import os
 import tempfile
 import unittest
 from pathlib import Path
+from unittest import mock
 
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -64,6 +65,12 @@ class TestStripeConnector(unittest.TestCase):
         with open(path, encoding="utf-8") as f:
             unchanged = json.load(f)
         self.assertIsNone(unchanged["checkout_url"])
+
+    def test_live_requires_write(self):
+        with mock.patch("sys.argv", ["create_stripe_payment_links.py", "--live"]):
+            with self.assertRaises(SystemExit) as raised:
+                stripe_connector.main()
+        self.assertIn("--write", str(raised.exception))
 
 
 if __name__ == "__main__":

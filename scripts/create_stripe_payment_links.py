@@ -129,6 +129,10 @@ def main() -> int:
     parser.add_argument("--write", action="store_true", help="Write checkout URLs back to offer JSON.")
     parser.add_argument("--force", action="store_true", help="Create a new link even if checkout_url exists.")
     args = parser.parse_args()
+    if args.live and not args.write:
+        raise SystemExit(
+            "--live creates real Stripe objects; pass --write too so checkout URLs are saved."
+        )
 
     results = [
         process_offer(path, live=args.live, write=args.write, force=args.force)
