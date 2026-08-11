@@ -18,5 +18,6 @@ recursive-include docs *
 recursive-include evaluations/simulated-customer *.docx *.json *.md *.pdf
 recursive-include examples *.pdf
 recursive-include offers *.json
+recursive-include pdf_mcp/web_ui *.css *.html *.js
 recursive-include scripts *.py
 recursive-include tests *.md *.py

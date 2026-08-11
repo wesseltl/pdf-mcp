@@ -34,6 +34,13 @@ In the PyPI project settings for `pdf-agent-mcp`, add a trusted publisher:
    python -m twine check dist/*
    ```
 
+   Build and smoke-test the standalone app on the current platform:
+
+   ```bash
+   python -m pip install -e ".[desktop-build]"
+   python scripts/build_desktop_app.py
+   ```
+
 4. Run the paid-beta metadata and launch checks:
 
    ```bash
@@ -49,6 +56,7 @@ In the PyPI project settings for `pdf-agent-mcp`, add a trusted publisher:
    git push origin "v$VERSION"
    ```
 
-The `Publish` workflow uploads the package to PyPI and, after that succeeds, publishes the matching
-metadata to the MCP Registry. The `Pages` workflow deploys the commercial site from `docs/` on every
-push to `main`.
+The `Publish` workflow builds and smoke-tests standalone browser apps on Windows, macOS, and Linux,
+then creates a GitHub release with those archives and the Python distributions. Independently, it
+uploads the package to PyPI and, after that succeeds, publishes matching metadata to the MCP
+Registry. The `Pages` workflow deploys the public site from `docs/` on every push to `main`.

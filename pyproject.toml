@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "pdf-agent-mcp"
-version = "0.3.0"
+version = "0.4.0"
 description = "Evidence-backed, profile-checked table extraction from PDF and Word documents for AI agents."
 readme = "README.md"
 requires-python = ">=3.10"
@@ -18,6 +18,7 @@ mcp = ["fastmcp>=2.0"]
 cloud = ["fastmcp>=2.0", "httpx>=0.27"]
 test = ["reportlab>=4", "httpx>=0.27"]
 commerce = ["stripe>=15"]
+desktop-build = ["pyinstaller>=6.0"]
 
 [project.urls]
 Homepage = "https://github.com/wesseltl/pdf-mcp"
@@ -28,6 +29,7 @@ Repository = "https://github.com/wesseltl/pdf-mcp"
 "Agent offers" = "https://github.com/wesseltl/pdf-mcp/tree/main/offers"
 
 [project.scripts]
+pdf-mcp-app = "pdf_mcp.web_app:main"
 pdf-agent-mcp = "pdf_mcp.server:main"
 pdf-agent-cloud-mcp = "pdf_mcp.cloud_server:main"
 export-document-tables = "pdf_mcp.cli:main"
@@ -39,3 +41,4 @@ include = ["pdf_mcp*"]
 
 [tool.setuptools.package-data]
 "pdf_mcp.profile_templates" = ["*.json"]
+"pdf_mcp.web_ui" = ["*.html", "*.css", "*.js"]

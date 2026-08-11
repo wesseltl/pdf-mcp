@@ -19,6 +19,22 @@ and the manually fulfilled document reliability service. Their data flows are in
   XLSX so untrusted source text remains data when the file is opened.
 - **Open source (MIT).** Every line is auditable in this repository.
 
+## Simple local browser app
+
+`pdf-mcp-app` is a local interface around the same exporter. It binds only to the loopback address
+(`127.0.0.1`), rejects non-local hosts and origins, and requires a random per-process session token
+for conversion, download, and shutdown requests. It does not expose a LAN or internet service.
+
+Selected documents are copied to a private temporary directory for one conversion and deleted when
+that conversion finishes or fails. Prepared output files are held in process memory for up to 30
+minutes, with at most five downloads and 100 MB retained, and are removed when the app stops. Uploads
+are limited to 25 MB, PDFs to 100 pages, and individual outputs to 50 MB. The interface sets a
+restrictive Content Security Policy, permits no cross-origin access, and renders extracted cell
+values as text rather than HTML.
+
+The app opens the system browser and includes user-initiated links to this GitHub repository. The
+conversion process itself makes no outbound request and sends no telemetry.
+
 ## What you should still be aware of
 
 - **File access scope.** By default the server can read supported document paths and write explicit

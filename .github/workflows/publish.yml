@@ -48,8 +48,68 @@ jobs:
           name: python-package-distributions
           path: dist/
 
+  desktop-app:
+    name: Desktop app (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest, macos-latest]
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v7
+
+      - name: Set up Python
+        uses: actions/setup-python@v7
+        with:
+          python-version: "3.12"
+          cache: pip
+
+      - name: Install desktop build dependencies
+        run: python -m pip install -e ".[desktop-build]"
+
+      - name: Build and smoke-test desktop app
+        run: python scripts/build_desktop_app.py
+
+      - name: Upload desktop app
+        uses: actions/upload-artifact@v7
+        with:
+          name: desktop-app-${{ runner.os }}-${{ runner.arch }}
+          path: dist/pdf-mcp-app-*.zip
+
+  github-release:
+    name: Publish GitHub release
+    if: startsWith(github.ref, 'refs/tags/')
+    needs: [build, desktop-app]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+
+    steps:
+      - name: Download release artifacts
+        uses: actions/download-artifact@v8
+        with:
+          pattern: "*-distributions"
+          path: release/
+          merge-multiple: true
+
+      - name: Download desktop apps
+        uses: actions/download-artifact@v8
+        with:
+          pattern: desktop-app-*
+          path: release/
+          merge-multiple: true
+
+      - name: Create GitHub release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh release create "$GITHUB_REF_NAME" release/* --verify-tag --generate-notes --title "pdf-mcp $GITHUB_REF_NAME"
+
   publish:
     name: Publish to PyPI
+    if: startsWith(github.ref, 'refs/tags/')
     needs: build
     runs-on: ubuntu-latest
     environment: pypi
@@ -68,6 +128,7 @@ jobs:
 
   publish-mcp-registry:
     name: Publish to MCP Registry
+    if: startsWith(github.ref, 'refs/tags/')
     needs: publish
     runs-on: ubuntu-latest
     permissions:

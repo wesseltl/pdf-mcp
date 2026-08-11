@@ -30,13 +30,32 @@ def _output_type(path: str) -> str:
     raise ValueError(f"unsupported output file type: {ext}")
 
 
-def _extract_tables(path: str, merge_multipage: bool) -> dict:
+def extract_document_tables(
+    path: str,
+    merge_multipage: bool = True,
+    source_name: str | None = None,
+) -> dict:
+    """Extract document tables without writing an output file.
+
+    ``source_name`` changes only the human-readable source label included in exports. The input is
+    still read exclusively from ``path``. This is useful for temporary-upload interfaces that
+    should show the original filename rather than an internal temporary path.
+    """
     kind = _source_type(path)
     if kind == "pdf":
         result = extractor.extract_tables(path, merge_multipage=merge_multipage)
     else:
         result = docx_extractor.extract_docx_tables(path)
-    return {"source": os.path.realpath(path), "source_type": kind, **result}
+    return {
+        "source": source_name if source_name is not None else os.path.realpath(path),
+        "source_type": kind,
+        **result,
+    }
+
+
+def _extract_tables(path: str, merge_multipage: bool) -> dict:
+    """Backward-compatible internal alias for older callers."""
+    return extract_document_tables(path, merge_multipage=merge_multipage)
 
 
 def _location(table: dict) -> str:
@@ -145,9 +164,8 @@ def _write_json(result: dict, output_path: str) -> None:
         f.write("\n")
 
 
-def export_document_tables(input_path: str, output_path: str, merge_multipage: bool = True) -> dict:
-    """Extract tables from a PDF or .docx and write them to .xlsx, .csv, or .json."""
-    result = _extract_tables(input_path, merge_multipage=merge_multipage)
+def write_document_tables(result: dict, output_path: str) -> dict:
+    """Write a previously extracted result to .xlsx, .csv, or .json."""
     resolved_output = extractor._check_path(output_path)
     os.makedirs(os.path.dirname(resolved_output) or ".", exist_ok=True)
     kind = _output_type(resolved_output)
@@ -158,11 +176,17 @@ def export_document_tables(input_path: str, output_path: str, merge_multipage: b
     else:
         _write_json(result, resolved_output)
     return {
-        "input": result["source"],
+        "input": result.get("source"),
         "output": resolved_output,
         "output_type": kind,
-        "source_type": result["source_type"],
-        "n_tables": result["n_tables"],
+        "source_type": result.get("source_type"),
+        "n_tables": result.get("n_tables", len(result.get("tables", []))),
         "tables_needing_review": sum(1 for t in result["tables"] if not t.get("looks_clean")),
         "warnings": result.get("warnings", []),
     }
+
+
+def export_document_tables(input_path: str, output_path: str, merge_multipage: bool = True) -> dict:
+    """Extract tables from a PDF or .docx and write them to .xlsx, .csv, or .json."""
+    result = extract_document_tables(input_path, merge_multipage=merge_multipage)
+    return write_document_tables(result, output_path)
