@@ -61,7 +61,7 @@ will still publish successfully.
    ```
 
 The `Publish` workflow builds and smoke-tests standalone browser apps on Windows, macOS, and Linux,
-then creates a prerelease GitHub release with those archives and the Python distributions. When
+then creates a GitHub release with those archives and the Python distributions. When
 `PYPI_PUBLISH_ENABLED=true`, it also uploads the package to PyPI and, after that succeeds, publishes
 matching metadata to the MCP Registry. The `Pages` workflow deploys the public site from `docs/` on
 every push to `main`.
