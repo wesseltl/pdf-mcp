@@ -11,16 +11,20 @@
 Smart Lab Index discovers supported files, connects names and relationships, preserves why every
 fact is believed, and reports contradictions without editing the source.
 
-The modular foundation is now available through a deterministic local CLI. It works without AI,
-cloud services, telemetry, or network access. Start with the four-file synthetic example in
+The modular product includes a local operator GUI and deterministic CLI. It works without AI, cloud
+services, telemetry, or network access. Start with the four-file synthetic example in
 [SMART_LAB_INDEX.md](SMART_LAB_INDEX.md).
 
 ```bash
 python -m venv .venv
 .venv/bin/python -m pip install -e .
-.venv/bin/smart-lab-index index examples/smart_lab_index/sample_lab \
+.venv/bin/smart-lab-index-app examples/smart_lab_index/sample_lab \
   --database .smart-lab-index-demo.db --no-egress
 ```
+
+The browser opens the Overview workspace. Select **Index now** to populate Equipment, Locations,
+People, Responsibilities, Documents, Review queue, Sources, and Modules. The app binds only to
+loopback and serves bundled assets.
 
 ## Document ingestion compatibility
 

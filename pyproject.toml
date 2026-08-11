@@ -30,6 +30,7 @@ Repository = "https://github.com/wesseltl/pdf-mcp"
 
 [project.scripts]
 smart-lab-index = "smart_lab_index.cli:main"
+smart-lab-index-app = "smart_lab_index.web_app:main"
 pdf-mcp-app = "pdf_mcp.web_app:main"
 pdf-agent-mcp = "pdf_mcp.server:main"
 pdf-agent-cloud-mcp = "pdf_mcp.cloud_server:main"
@@ -43,3 +44,4 @@ include = ["pdf_mcp*", "smart_lab_index*"]
 [tool.setuptools.package-data]
 "pdf_mcp.profile_templates" = ["*.json"]
 "pdf_mcp.web_ui" = ["*.html", "*.css", "*.js"]
+"smart_lab_index.web_ui" = ["*.html", "*.css", "*.js"]

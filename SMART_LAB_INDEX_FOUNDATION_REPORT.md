@@ -6,6 +6,10 @@ Branch: `agent/smart-lab-index-foundation`
 
 Foundation/Core API version: `0.1.0`
 
+Post-foundation update: Smart Lab Index `0.2.0` adds the local capability-aware operator GUI. The
+foundation findings remain the record for the `0.1.0` iteration; the validation and limitations
+sections include the current post-update state.
+
 ## Existing Architecture
 
 The repository started as `pdf-agent-mcp` 0.4.0. It provided deterministic PDF and DOCX table/text
@@ -205,20 +209,25 @@ knowledge store. Schema version 1 is not yet a production migration history.
 
 Validation completed on 2026-08-11:
 
-- Full repository suite: 146 tests passed in 10.136 seconds.
-- Focused Smart Lab suite: 41 tests passed in 2.699 seconds.
+- Full repository suite: 151 tests passed in 14.781 seconds.
+- Focused Smart Lab suite: 46 tests passed in 6.028 seconds.
 - Ruff: all new Smart Lab code/tests and touched cloud bridge files passed.
 - Existing sample, simulated development, and simulated holdout evaluation gates passed with 1.0
   field precision/recall/F1, exact-record rate, and decision accuracy.
 - Wheel and source distribution built successfully; `twine check` passed for both.
 - A wheel installed into a separate environment and its `smart-lab-index` entry point completed the
   no-egress synthetic run from outside the source checkout.
+- The compatibility distribution wheel containing the Smart Lab Index `0.2.0` GUI installed into a
+  separate environment, served all bundled assets, and completed the synthetic no-egress index
+  through `smart-lab-index-app` from outside the checkout.
 
-Coverage includes module registration/disable/dependencies, policy blocking before initialization,
-event failure isolation, private state modes, multiple source instances, checksummed incremental
-discovery, symlink/special-file handling, all parser contracts, parser replacement, conflict
-provenance, changed/deleted/restored generations, failed-change rollback, processing invalidation,
-explicit-ID separation, read-only facades, and no socket attempts by built-ins.
+Coverage includes the loopback GUI session/origin/CSP controls and full GUI-triggered incremental
+indexing with provenance. It also covers module registration, disable, dependencies, policy blocking
+before initialization, event failure isolation, private state modes, multiple source instances,
+checksummed incremental discovery, symlink/special-file handling, all parser contracts, parser
+replacement, conflict provenance, changed/deleted/restored generations, failed-change rollback,
+processing invalidation, explicit-ID separation, read-only facades, and no socket attempts by
+built-ins.
 The synthetic Office generator is also checked for byte-identical output across different folders.
 
 ## Demonstration
@@ -258,8 +267,9 @@ smart-lab-index status
 ## Current Limitations
 
 - This is a modular foundation, not a production release for confidential laboratory data.
-- There is no Smart Lab Index graphical UI, authentication, access control, or source-permission
-  enforcement. Permission metadata is retained but not applied to queries.
+- The graphical UI is a local single-user operator workspace. It does not provide multi-user
+  authentication, access control, editable review decisions, or source-permission enforcement.
+  Permission metadata is retained but not applied to queries.
 - Only the filesystem connector and one broad general-lab domain pack exist.
 - Extraction rules cover configured table shapes and a narrow deterministic text relation; they are
   not general document understanding.

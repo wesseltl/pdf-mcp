@@ -29,4 +29,5 @@ recursive-include examples/smart_lab_index *.docx *.md *.xlsx
 recursive-include offers *.json
 recursive-include pdf_mcp/web_ui *.css *.html *.js
 recursive-include scripts *.py
+recursive-include smart_lab_index/web_ui *.css *.html *.js
 recursive-include tests *.md *.py

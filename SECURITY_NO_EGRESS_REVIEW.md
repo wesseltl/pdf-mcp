@@ -29,6 +29,10 @@ addressed the critical connector/provenance findings identified during integrati
   failures use bounded generic details, and configuration snapshots redact secret-like fields.
 - Source generations and transactional extractor processing preserve the last successful assertions
   when a changed source fails. Modules receive narrow read-only repository facades.
+- Smart Lab Index `0.2.0` adds a loopback-only operator GUI with a random browser-session token,
+  same-origin checks on mutations, no-store responses, a restrictive CSP, bundled assets, bounded
+  request bodies, and no external links or runtime asset requests. SQLite connections remain local
+  to the request or background index thread.
 - Parsers receive read-only streams and failures are isolated per record. Current parser hardening
   does not yet provide subprocess, timeout, memory, or expanded-archive limits.
 
@@ -39,11 +43,11 @@ The remaining findings, especially hostile-parser resource isolation, dependency
 distribution, complete log redaction, packaged-artifact testing, at-rest encryption, and OS-level
 network denial, remain open. Application policy is not a sandbox for malicious in-process plugins.
 
-Post-implementation validation on 2026-08-11 passed all 146 repository tests, including 41 focused
-Smart Lab tests. A complete built-in no-egress indexing run was executed with socket connection calls
-intercepted and made zero attempts. This supports controlled synthetic evaluation; it is not a claim
-that the process contains malicious code or is ready for hostile documents and confidential shared
-laboratory roots.
+Post-implementation validation on 2026-08-11 passed all 151 repository tests, including 46 focused
+Smart Lab tests and five real-HTTP GUI tests. A complete built-in no-egress indexing run was executed
+with socket connection calls intercepted and made zero attempts. This supports controlled synthetic
+evaluation; it is not a claim that the process contains malicious code or is ready for hostile
+documents and confidential shared laboratory roots.
 
 This review covers every current executable path declared in `pyproject.toml:31-37`, their shared
 runtime components, the static website, operational scripts, build/release automation, and every

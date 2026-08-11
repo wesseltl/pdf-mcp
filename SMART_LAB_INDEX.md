@@ -8,13 +8,23 @@ source files.
 The first foundation is deterministic. It does not require AI, a cloud service, telemetry, a vector
 database, or a network connection.
 
-## Try the synthetic example
+## Try the graphical app
 
 From the repository root:
 
 ```bash
 python -m venv .venv
 .venv/bin/python -m pip install -e .
+.venv/bin/smart-lab-index-app examples/smart_lab_index/sample_lab \
+  --database .smart-lab-index-demo.db --source-id lab-alpha --no-egress
+```
+
+The browser opens locally. Select **Index now**, then open the Review queue to inspect the deliberate
+location conflict and its exact spreadsheet/Word evidence.
+
+For the equivalent CLI flow:
+
+```bash
 .venv/bin/smart-lab-index index examples/smart_lab_index/sample_lab \
   --database .smart-lab-index-demo.db --source-id lab-alpha --no-egress
 .venv/bin/smart-lab-index inspect --database .smart-lab-index-demo.db
@@ -41,6 +51,7 @@ inside the indexed source root.
 
 | Command | Purpose |
 |---|---|
+| `smart-lab-index-app ROOT` | Open the local graphical operator workspace |
 | `index ROOT` | Recursively discover and incrementally index supported files |
 | `status` | Show source, document, entity, assertion, issue, and latest-run counts |
 | `inspect` | Return entities, assertions, provenance, and issues as JSON |
@@ -54,7 +65,7 @@ are checked before modules start.
 Smart Lab Index is one deployable modular monolith:
 
 ```text
-CLI / future capability-aware UI
+CLI / local capability-aware UI
               |
               v
 Smart Lab Core
@@ -168,14 +179,27 @@ now shared with normalized parser modules, while the new `smart_lab_index` packa
 product foundation. Existing PDF/DOCX extraction commands and MCP tools remain intact during the
 transition.
 
+## Graphical interface
+
+The local GUI exposes Overview, Equipment, Locations, People, Organizations, Responsibilities,
+Documents, Review queue, Issues, Sources, and Modules. Navigation is generated from enabled module
+categories and stored data. Evidence rows open a detail dialog showing source path, structural
+locator, confidence, module, and issue evidence.
+
+The app accepts one configured source root at startup, performs indexing in a background thread, and
+uses thread-local SQLite connections for responsive reads. All API routes containing index data
+require a random browser-session token. Mutating routes additionally require a same-origin request.
+Assets are bundled and the Content Security Policy permits only same-origin resources.
+
 ## Current limitations
 
-- There is no Smart Lab Index browser UI yet; the current interface is the local JSON CLI.
+- The GUI source root is selected at startup; a packaged native folder picker is not implemented.
 - Only a filesystem connector and one general laboratory domain pack are implemented.
 - Deterministic rules cover the synthetic MVP columns and a narrow `located_in` text form; they are
   not a general natural-language understanding system.
-- Search, review workflows, source-authority projection, configurable terminology, authentication,
-  and source-permission enforcement are not implemented yet.
+- The GUI provides local filtering and an issue review queue, but review decisions, source-authority
+  projection, configurable terminology, authentication, and source-permission enforcement are not
+  implemented yet.
 - Local inference, embeddings, semantic search, OCR, and vendor connectors are intentionally absent.
 - Connector byte limits and per-record isolation exist, but parser subprocess/time/memory and
   expanded-archive limits still need hardening for hostile content.
