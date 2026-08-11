@@ -318,6 +318,88 @@ h3 {
   line-height: 1.4;
 }
 
+.download-band {
+  scroll-margin-top: 24px;
+  padding: 64px 24px;
+  background: var(--surface);
+  border-bottom: 1px solid var(--line);
+}
+
+.download-layout {
+  display: grid;
+  grid-template-columns: minmax(0, 0.85fr) minmax(480px, 1.15fr);
+  gap: 72px;
+  align-items: center;
+}
+
+.download-copy h2 {
+  max-width: 520px;
+  margin-bottom: 16px;
+  font-size: 36px;
+}
+
+.download-copy > p:last-child {
+  max-width: 540px;
+  margin-bottom: 0;
+  color: var(--muted);
+}
+
+.download-options {
+  border-top: 1px solid #b9c3be;
+}
+
+.download-option {
+  display: flex;
+  gap: 20px;
+  align-items: center;
+  justify-content: space-between;
+  min-height: 76px;
+  padding: 14px 0;
+  border-bottom: 1px solid #b9c3be;
+  text-decoration: none;
+}
+
+.download-option > span:first-child {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.download-option strong {
+  font-size: 17px;
+  line-height: 1.35;
+}
+
+.download-option small {
+  color: var(--muted);
+  font-size: 13px;
+  line-height: 1.4;
+}
+
+.download-command {
+  flex: 0 0 auto;
+  color: var(--teal-dark);
+  font-size: 13px;
+  font-weight: 720;
+}
+
+.download-option:hover strong,
+.download-option:hover .download-command {
+  color: var(--teal);
+}
+
+.download-option:focus-visible {
+  outline: 3px solid rgba(8, 123, 108, 0.32);
+  outline-offset: 3px;
+}
+
+.download-note {
+  margin: 14px 0 0;
+  color: var(--muted);
+  font-size: 13px;
+  line-height: 1.5;
+}
+
 .section {
   padding: 96px 24px;
 }
@@ -993,6 +1075,15 @@ footer a:hover {
 }
 
 @media (max-width: 1020px) {
+  .download-layout {
+    grid-template-columns: 1fr;
+    gap: 34px;
+  }
+
+  .download-copy {
+    max-width: 720px;
+  }
+
   .product-layout,
   .evidence-layout {
     grid-template-columns: 1fr;
@@ -1093,7 +1184,7 @@ footer a:hover {
     gap: 18px;
   }
 
-  .site-header nav a:nth-child(1),
+  .site-header nav a:nth-child(2),
   .site-header nav a:nth-child(3),
   .header-link {
     display: none;
@@ -1178,6 +1269,18 @@ footer a:hover {
 
   .proof-strip div:nth-child(4) {
     border-bottom: 0;
+  }
+
+  .download-band {
+    padding: 56px 18px;
+  }
+
+  .download-copy h2 {
+    font-size: 32px;
+  }
+
+  .download-option {
+    min-height: 72px;
   }
 
   .section,

@@ -33,8 +33,8 @@ Website: [simple conversion, local tools, and the free hosted agent beta](https:
 This is the easiest way to use pdf-mcp. It requires no Python, terminal, MCP client, or agent
 configuration after downloading the app.
 
-1. Open the [latest release](https://github.com/wesseltl/pdf-mcp/releases/latest).
-2. Download the `pdf-mcp-app` ZIP for Windows, macOS, or Linux.
+1. Open the [v0.4.0 release](https://github.com/wesseltl/pdf-mcp/releases/tag/v0.4.0).
+2. Download the `pdf-mcp-app` ZIP for 64-bit Windows, an Apple silicon Mac, or 64-bit Linux.
 3. Unzip it and open `pdf-mcp-app`.
 4. Your browser opens. Drop in a PDF or Word document, choose Excel, CSV, or JSON, and select
    **Convert document**.
