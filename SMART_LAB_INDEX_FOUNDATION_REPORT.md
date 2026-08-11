@@ -10,9 +10,11 @@ Post-foundation updates add the local capability-aware operator GUI in Smart Lab
 native folder selection, source switching, isolated picker workspaces, and standalone desktop
 packaging in `0.3.0`. Version `0.4.0` adds a zero-dependency browser folder navigator, exact-origin
 enforcement, checksummed archives, certificate-driven platform signing/notarization hooks, and a
-public request-only beta page built around actual product output. The foundation findings remain the
-record for the `0.1.0` iteration; the validation and limitations sections include the current
-post-update state.
+public request-only beta page built around actual product output. Version `0.5.0` adds bounded source
+preflight, progress and cancellation, parser resource budgets, broader deterministic extraction,
+server-side local search, extraction-coverage reporting, calibration issues, and auditable issue
+review. The foundation findings remain the record for the `0.1.0` iteration; the validation and
+limitations sections include the current post-update state.
 
 ## Existing Architecture
 
@@ -101,28 +103,38 @@ assertions committed.
 `connector.filesystem` performs recursive read-only discovery, SHA-256 change detection, conservative
 deletion inference, per-path failure isolation, permission metadata capture, and bounded immutable
 content snapshots. It rejects non-regular files, symlinks, root escapes, source-ID rebinding, and a
-Core database inside the source root.
+Core database inside the source root. A metadata-only preflight applies configurable file-count,
+aggregate-byte, per-file, and exclusion limits before hashing. Runs report phase/count/byte progress
+and may be cancelled between files without inferring deletions from an incomplete scan.
 
 ### Parsers
 
 PDF, DOCX, XLSX, CSV, and TXT modules return text blocks, tables, metadata, warnings, and structural
 provenance. Parser selection is capability-based and priority-aware; ambiguous equal-priority matches
-fail explicitly. One parser or document failure does not abort other records.
+fail explicitly. Byte, page, text, block, row, cell, Office-entry, and expanded-archive budgets reject
+oversized inputs. One parser or document failure does not abort other records.
 
 ### Extractors, Resolvers, And Issues
 
-The first deterministic extractors support configured spreadsheet structures and narrow rule-based
-text relationships. Resolution runs exact identifier, alias, then normalized-name providers. A
-candidate with a distinct explicit identifier cannot be merged by a later name resolver.
+The deterministic extractors detect headers within the first ten table rows and support common asset,
+location, person, organization, responsibility, serial/model/status, calibration, and maintenance
+columns plus narrow rule-based text relationships. Per-document coverage and unmapped-table warnings
+are retained. Resolution runs exact identifier, alias, then normalized-name providers. A candidate
+with a distinct explicit identifier cannot be merged by a later name resolver.
 
 `issue.conflicting_location` compares active assertions, preserves both observations, and emits an
-evidence-backed issue. Issue creation never overwrites an assertion.
+evidence-backed issue. `issue.calibration_due` identifies invalid and overdue calibration dates.
+`issue.missing_responsibility` is installed but disabled until an operator confirms the indexed scope
+is authoritative enough for absence to be meaningful. Conflict review confirms selected evidence,
+rejects alternatives without deleting them, and records a review decision plus audit event. Materially
+new evidence reopens the issue.
 
 ### AI And Search Modules
 
-Inference, embedding, and search are reserved module categories, but no provider is installed. Core
-has no Ollama, cloud model, embedding vendor, vector database, or semantic-search dependency. Basic
-indexing works with those categories absent.
+Inference, embedding, and pluggable search remain reserved module categories; no AI or embedding
+provider is installed. The initial Core query service provides bounded local lexical and entity
+search across the complete SQLite index. Core has no Ollama, cloud model, embedding vendor, vector
+database, or semantic-search dependency. Basic indexing and search work with those categories absent.
 
 ### UI Capability Model
 
@@ -135,23 +147,26 @@ remains available for automation and diagnostics.
 
 ## Modules Implemented
 
-All default modules are enabled and healthy in the synthetic composition.
+Fifteen modules are installed. Fourteen are enabled and healthy in the synthetic composition;
+`issue.missing_responsibility` is deliberately disabled by default.
 
 | ID | Purpose | Version | Dependencies | Default status |
 |---|---|---:|---|---|
-| `connector.filesystem` | Read-only incremental source discovery | `0.1.0` | None | Enabled / healthy |
-| `parser.pdf` | Born-digital PDF text/table normalization | `0.1.0` | None | Enabled / healthy |
-| `parser.docx` | Word paragraph/table normalization | `0.1.0` | None | Enabled / healthy |
-| `parser.xlsx` | Workbook sheet/cell normalization | `0.1.0` | None | Enabled / healthy |
-| `parser.csv` | Delimited row/cell normalization | `0.1.0` | None | Enabled / healthy |
-| `parser.txt` | Plain-text block normalization | `0.1.0` | None | Enabled / healthy |
-| `domain.general_lab` | Broad synthetic lab terminology and rules | `0.1.0` | None | Enabled / healthy |
-| `extractor.structured` | Configured table entity/relationship candidates | `0.1.0` | `domain.extraction_rules >= 1.0.0` | Enabled / healthy |
+| `connector.filesystem` | Bounded read-only incremental source discovery | `0.2.0` | None | Enabled / healthy |
+| `parser.pdf` | Born-digital PDF text/table normalization | `0.2.0` | None | Enabled / healthy |
+| `parser.docx` | Word paragraph/table normalization | `0.2.0` | None | Enabled / healthy |
+| `parser.xlsx` | Workbook sheet/cell normalization | `0.2.0` | None | Enabled / healthy |
+| `parser.csv` | Delimited row/cell normalization | `0.2.0` | None | Enabled / healthy |
+| `parser.txt` | Plain-text block normalization | `0.2.0` | None | Enabled / healthy |
+| `domain.general_lab` | Broad synthetic lab terminology and rules | `0.2.0` | None | Enabled / healthy |
+| `extractor.structured` | Header-aware table entities and relationships | `0.2.0` | `domain.extraction_rules >= 1.0.0` | Enabled / healthy |
 | `extractor.rules` | Configured text relationship candidates | `0.1.0` | `domain.extraction_rules >= 1.0.0` | Enabled / healthy |
 | `resolver.identifier` | Exact identifier resolution | `0.1.0` | None | Enabled / healthy |
 | `resolver.alias` | Unique alias resolution | `0.1.0` | None | Enabled / healthy |
 | `resolver.normalized_name` | Unique normalized-name resolution | `0.1.0` | None | Enabled / healthy |
 | `issue.conflicting_location` | Detect incompatible active locations | `0.1.0` | None | Enabled / healthy |
+| `issue.calibration_due` | Detect invalid and overdue calibration dates | `0.1.0` | None | Enabled / healthy |
+| `issue.missing_responsibility` | Detect assets without responsibility evidence | `0.1.0` | None | Disabled by default |
 
 ## Reused Functionality
 
@@ -177,7 +192,7 @@ configuration, not forks.
 
 ## Security
 
-All 13 built-in manifests declare network access `NONE`, no credentials, no telemetry, no automatic
+All 15 built-in manifests declare network access `NONE`, no credentials, no telemetry, no automatic
 downloads, no subprocesses, and no source writes. Only the filesystem connector declares source
 file reads; parsers receive streams. The registry rejects source-writing modules in every mode and
 blocks non-loopback network access, telemetry, and automatic downloads when
@@ -190,16 +205,19 @@ socket connection calls during a full built-in indexing run observed zero attemp
 Filesystem reads use root confinement, regular-file checks, no-follow opens where available,
 device/inode verification, a 100 MiB read bound, immutable snapshots, and checksum revalidation.
 State is rejected inside a source root. State directories use mode `0700`; SQLite database/WAL/SHM
-files use `0600`; database hardlinks are rejected.
+files use `0600`; database hardlinks are rejected. POSIX owner, group, mode, and effective-process
+access are retained as inventory metadata; rich Windows/Active Directory/network-share ACLs are not
+captured or enforced.
 
-This is application policy, not a hostile-code sandbox. Parser CPU/time/memory/expanded-archive
-limits, dependency pinning/offline bundles, application-level encryption, packaged socket-level
-tests, and OS firewall/service-account controls remain release gates for confidential lab data.
+This is application policy, not a hostile-code sandbox. Structural parser limits now include Office
+expanded-archive budgets, but process-level CPU/memory/wall-clock isolation, dependency pinning/offline
+bundles, application-level encryption, packaged socket-level tests, and OS firewall/service-account
+controls remain release gates for confidential lab data.
 See [SECURITY_NO_EGRESS_REVIEW.md](SECURITY_NO_EGRESS_REVIEW.md).
 
 ## Database
 
-Core owns one local SQLite database with schema version 1. Modules cannot access its connection.
+Core owns one local SQLite database with schema version 2. Modules cannot access its connection.
 Tables cover migrations, module state, index runs, source bindings, source generations, document
 generations, entities, aliases, assertions, document-processing ledger entries, issues, review
 decisions, and audit events.
@@ -209,41 +227,37 @@ status, and structural provenance. Original observations remain queryable after 
 deletion. SQLite is sufficient for this graph-shaped first iteration; no Neo4j, cloud database, or
 per-module database was introduced.
 
-No migration from an older product database was required because the baseline had no durable
-knowledge store. Schema version 1 is not yet a production migration history.
+Schema version 2 has a tested forward migration from version 1 and adds per-document extraction counts
+and warnings. This is not yet a mature production migration history.
 
 ## Tests
 
 Validation completed on 2026-08-11:
 
-- Full repository suite: 174 tests passed in 16.253 seconds.
-- Focused Smart Lab suite: 68 tests passed in 8.181 seconds.
+- Full repository suite: 183 tests passed in 17.808 seconds.
+- Focused Smart Lab suite: 77 tests passed in 9.530 seconds.
 - Ruff: all new Smart Lab code/tests and touched cloud bridge files passed.
 - Existing sample, simulated development, and simulated holdout evaluation gates passed with 1.0
   field precision/recall/F1, exact-record rate, and decision accuracy.
 - Wheel and source distribution built successfully; `twine check` passed for both.
-- A wheel installed into a separate environment and its `smart-lab-index` entry point completed the
-  no-egress synthetic run from outside the source checkout.
-- The compatibility distribution wheel containing the Smart Lab Index `0.2.0` GUI installed into a
-  separate environment, served all bundled assets, and completed the synthetic no-egress index
-  through `smart-lab-index-app` from outside the checkout.
-- The Smart Lab Index `0.4.0` Linux standalone executable completed both the packaged synthetic
-  no-egress smoke test and the no-argument browser-folder selection flow with 4 sources, 4 documents,
-  4 entities, 3 assertions, and 1 open issue. Its generated SHA-256 manifest verified. The release
-  workflow builds the equivalent artifact on Windows and macOS.
-- The `0.4.0` folder navigator completed desktop and 390-pixel mobile browser checks without console
-  errors or horizontal overflow. Startup selection and cancelled source changes completed on the
-  same loopback port and restored the indexed workspace.
+- The Smart Lab Index `0.5.0` Linux standalone executable completed its packaged synthetic no-egress
+  smoke test with 4 sources, 4 documents, 4 entities, 3 assertions, and 1 open issue. Its generated
+  SHA-256 manifest verified. The release workflow builds equivalent artifacts on Windows and macOS.
+- The `0.5.0` GUI completed fresh desktop and 390-pixel mobile browser checks with HTTP 200, no
+  console/page errors, no mobile horizontal overflow, eight bounded search results for the synthetic
+  asset, a visible top-of-dialog review form, and a successfully persisted review decision.
 
 Coverage includes the loopback GUI session/exact-origin/CSP controls, authenticated source switching,
 native and browser picker path validation, same-port session rotation, isolated picker workspaces,
 release checksum/signing helpers, and full
-GUI-triggered incremental indexing with provenance. It also covers module registration, disable,
+GUI-triggered incremental indexing with provenance, progress, cancellation, search, and review. It
+also covers bounded source preflight/exclusions, module registration, disable,
 dependencies, policy blocking before initialization, event failure isolation, private state modes,
 multiple source instances, checksummed incremental discovery, symlink/special-file handling, all
-parser contracts, parser replacement, conflict provenance, changed/deleted/restored generations,
-failed-change rollback, processing invalidation, explicit-ID separation, read-only facades, and no
-socket attempts by built-ins.
+parser contracts and resource budgets, parser replacement, realistic title-row extraction,
+calibration and responsibility issue configuration, conflict provenance and review reopening,
+changed/deleted/restored generations, failed-change rollback, processing invalidation, explicit-ID
+separation, bounded projections, read-only facades, and no socket attempts by built-ins.
 The synthetic Office generator is also checked for byte-identical output across different folders.
 
 ## Demonstration
@@ -257,6 +271,8 @@ python -m venv .venv
   --database .smart-lab-index-demo.db --source-id lab-alpha --no-egress
 .venv/bin/smart-lab-index inspect --database .smart-lab-index-demo.db
 .venv/bin/smart-lab-index modules examples/smart_lab_index/sample_lab --no-egress
+.venv/bin/smart-lab-index-app examples/smart_lab_index/sample_lab \
+  --database .smart-lab-index-demo.db --source-id lab-alpha --no-egress
 ```
 
 The first index run reports 4 new/parsed documents, 4 entities, 3 assertions, 1 issue, and no
@@ -270,8 +286,9 @@ Freezer-001 located_in Room A-102
   SOPs/SOP_freezers.docx / paragraph 2
 ```
 
-It also shows one `CONFLICTING_LOCATION` issue referencing both assertion IDs. Running the same
-`index` command again reports 4 unchanged documents and parses 0 documents.
+It also shows one `CONFLICTING_LOCATION` issue referencing both assertion IDs. The GUI can search the
+entire local index, display extraction coverage, and confirm either location with a required audit
+note. Running the same `index` command again reports 4 unchanged documents and parses 0 documents.
 
 For another folder, omit `--source-id` to derive a stable ID from the canonical root:
 
@@ -284,28 +301,28 @@ smart-lab-index status
 
 - This is a modular foundation, not a production release for confidential laboratory data.
 - The graphical UI is a local single-user operator workspace. It does not provide multi-user
-  authentication, access control, editable review decisions, or source-permission enforcement.
-  Permission metadata is retained but not applied to queries.
+  authentication, role-based access control, review-decision reversal, or source-permission
+  enforcement. Permission metadata is retained but not applied to queries.
 - Standalone archives are ZIP applications, not native installers. They remain unsigned until real
   publisher credentials are configured; SHA-256 manifests are generated for verification.
 - Only the filesystem connector and one broad general-lab domain pack exist.
-- Extraction rules cover configured table shapes and a narrow deterministic text relation; they are
-  not general document understanding.
-- Search, review workflows, source-authority projection, configurable terminology, export modules,
-  local inference, embeddings, semantic search, OCR, and vendor connectors are absent.
-- Parsers run in-process without CPU/time/memory/page/expanded-archive limits. Do not index hostile
-  or untrusted document trees yet.
+- Deterministic extraction recognizes common table headers and a narrow text relation; it is not
+  general document understanding and still requires site-specific mapping validation.
+- Source-authority projection, configurable terminology, export modules, local inference, embeddings,
+  semantic search, OCR, and vendor connectors are absent.
+- Parsers enforce structural/resource budgets but run in-process without OS-enforced CPU, memory, or
+  wall-clock isolation. Do not index hostile or unapproved document trees.
 - SQLite content is owner-restricted but plaintext. Use encrypted storage and a dedicated OS account
   for controlled evaluation.
-- The distribution still has the compatibility identity `pdf-agent-mcp` 0.4.0. Do not publish this
-  branch as that already-released version; select and validate a Smart Lab Index release identity.
+- The distribution still has the compatibility identity `pdf-agent-mcp` `0.5.0`; select and validate
+  a distinct Smart Lab Index release identity before publishing this branch.
 - Dynamic third-party installation is intentionally absent. Built-in module boundaries are ready;
   a plugin marketplace is not.
 
 ## Next Iteration
 
-Implement **production ingestion-boundary hardening**: execute each parser in a bounded local worker
-with strict byte/page/row/cell/expanded-archive, CPU, memory, timeout, temporary-file, and output
-limits; preserve bounded parser-failure issues; and verify the packaged artifact under socket-denied
-no-egress tests. This is the single highest-value next step because confidential lab pilots should
-not begin until malformed or hostile source documents cannot exhaust or escape the indexing process.
+Implement **process-isolated parsing**: execute each parser in a bounded local worker with enforced
+CPU, memory, wall-clock, temporary-file, and serialized-output limits, preserve bounded parser-failure
+issues, and verify the packaged artifact under socket-denied no-egress tests. This is the single
+highest-value next step before expanding controlled pilots to untrusted or broadly writable document
+trees.

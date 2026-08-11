@@ -6,7 +6,7 @@ import hashlib
 import json
 import re
 from abc import ABC, abstractmethod
-from collections.abc import Mapping
+from collections.abc import Callable, Mapping
 from contextlib import AbstractContextManager
 from dataclasses import dataclass, field
 from enum import Enum
@@ -189,6 +189,8 @@ class EntityRepository(Protocol):
 class IssueRepository(EntityRepository, Protocol):
     def get_entity(self, entity_id: str) -> EntityRecord | None: ...
 
+    def list_entities(self, entity_type: str | None = None) -> list[EntityRecord]: ...
+
     def list_active_assertions(self, predicate: str | None = None) -> list[AssertionRecord]: ...
 
 
@@ -237,6 +239,9 @@ class ConnectorModule(SmartLabModule, ABC):
         self,
         source: SourceDefinition,
         previous: Mapping[str, SourceRecord],
+        *,
+        progress: Callable[[Mapping[str, Any]], None] | None = None,
+        should_cancel: Callable[[], bool] | None = None,
     ) -> DiscoveryBatch:
         raise NotImplementedError
 

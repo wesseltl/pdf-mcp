@@ -45,21 +45,31 @@ addressed the critical connector/provenance findings identified during integrati
   hooks may contact configured timestamp and Apple notarization services during artifact creation;
   they are not included in or called by the runtime application. Every desktop archive receives a
   SHA-256 manifest.
-- Parsers receive read-only streams and failures are isolated per record. Current parser hardening
-  does not yet provide subprocess, timeout, memory, or expanded-archive limits.
+- Smart Lab Index `0.5.0` removes implicit indexing after folder selection, adds metadata-only source
+  preflight with file-count/aggregate-byte/per-file/exclusion limits, exposes progress and cooperative
+  cancellation, and never infers deletions from cancelled scans. The filesystem connector records
+  POSIX ownership/mode/effective-process access but explicitly does not claim rich ACL capture or
+  enforcement.
+- Smart Lab Index parsers receive read-only streams, isolate failures per record, and enforce byte,
+  page, text, block, row, cell, Office-entry, and expanded-archive budgets. They still run in-process
+  without OS-enforced CPU, memory, wall-clock, or socket isolation.
+- Bounded local search, extraction-coverage reporting, calibration rules, and auditable conflict
+  review operate only against the local SQLite store and add no external runtime dependency.
 
 Accordingly, `NE-001` through `NE-004` are remediated for the explicitly registered Smart Lab Index
 runtime path, and the connector now enforces the first source-root boundary. The retained legacy
 browser/export commands remain compatibility surfaces with their separately documented behavior.
-The remaining findings, especially hostile-parser resource isolation, dependency locking/offline
+The remaining findings, especially process-level hostile-parser isolation, dependency locking/offline
 distribution, complete log redaction, packaged-artifact testing, at-rest encryption, and OS-level
 network denial, remain open. Application policy is not a sandbox for malicious in-process plugins.
 
-Post-implementation validation on 2026-08-11 passed all 174 repository tests, including 68 focused
-Smart Lab tests, eight real-HTTP GUI tests, and picker/restart-loop tests. A complete built-in
+Post-implementation validation on 2026-08-11 passed all 183 repository tests, including 77 focused
+Smart Lab tests, real-HTTP GUI tests, and picker/restart-loop tests. A complete built-in
 no-egress indexing run was executed with socket connection calls intercepted and made zero attempts.
-This supports controlled synthetic evaluation; it is not a claim that the process contains malicious
-code or is ready for hostile documents and confidential shared laboratory roots.
+Fresh desktop and 390-pixel browser automation also completed search and review without console/page
+errors or horizontal overflow. This supports controlled synthetic or explicitly approved internal
+evaluation; it is not a claim that the process can contain malicious code or enforce access to a
+confidential shared laboratory root.
 
 This review covers every current executable path declared in `pyproject.toml:31-37`, their shared
 runtime components, the static website, operational scripts, build/release automation, and every

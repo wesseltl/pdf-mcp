@@ -47,6 +47,7 @@ class IndexRunStatus(str, Enum):
     RUNNING = "RUNNING"
     COMPLETED = "COMPLETED"
     COMPLETED_WITH_ERRORS = "COMPLETED_WITH_ERRORS"
+    CANCELLED = "CANCELLED"
     FAILED = "FAILED"
 
 
@@ -183,6 +184,11 @@ class DiscoveryBatch:
     sources: tuple[DiscoveredSource, ...] = ()
     failures: tuple[DiscoveryFailure, ...] = ()
     complete: bool = True
+    metadata: Mapping[str, Any] = field(default_factory=dict)
+
+
+class OperationCancelled(RuntimeError):
+    """Raised at a cooperative boundary when an operator cancels a run."""
 
 
 @dataclass(frozen=True)

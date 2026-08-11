@@ -30,7 +30,7 @@ class StructuredExtractor(ExtractorModule):
     manifest = ModuleManifest(
         module_id="extractor.structured",
         name="Structured Table Extractor",
-        version="0.1.0",
+        version="0.2.0",
         module_type=ModuleType.ENTITY_EXTRACTOR,
         description="Applies configured semantic column rules to normalized tables.",
         dependencies=(
@@ -63,24 +63,17 @@ class StructuredExtractor(ExtractorModule):
         for table in document.tables:
             if len(table.rows) < 2:
                 continue
-            headers = [_normalize_header(value) for value in table.rows[0]]
+            matched_table = False
             for rule in self.rules:
-                required_any = {
-                    _normalize_header(value)
-                    for value in rule.get("match_headers_any", ())
-                }
-                if required_any and required_any.isdisjoint(headers):
+                match = _find_header(table.rows, rule)
+                if match is None:
                     continue
-                required_all = {
-                    _normalize_header(value)
-                    for value in rule.get("match_headers_all", ())
-                }
-                if not required_all.issubset(headers):
-                    continue
-                field_indexes = _field_indexes(headers, rule.get("fields", {}))
-                if not all(field_indexes.get(field) is not None for field in rule["match_all"]):
-                    continue
-                for row_offset, row in enumerate(table.rows[1:], start=1):
+                matched_table = True
+                header_index, field_indexes = match
+                for row_index, row in enumerate(
+                    table.rows[header_index + 1 :],
+                    start=header_index + 1,
+                ):
                     references: dict[str, EntityReference] = {}
                     for specification in rule.get("entities", []):
                         reference = _entity_reference(row, field_indexes, specification)
@@ -91,13 +84,13 @@ class StructuredExtractor(ExtractorModule):
                             document.source_external_id,
                             table.index,
                             table.name,
-                            row_offset + 1,
+                            row_index + 1,
                             field_indexes.get(
                                 specification.get("name_field")
                                 or specification.get("identifier_field")
                             ),
                             table.cell_provenance,
-                            row_offset,
+                            row_index,
                         )
                         subtype = _field_value(
                             row,
@@ -106,7 +99,7 @@ class StructuredExtractor(ExtractorModule):
                         entities.append(EntityCandidate(
                             reference=reference,
                             subtype=subtype.upper().replace(" ", "_") if subtype else None,
-                            aliases=(),
+                            aliases=_aliases(row, field_indexes, specification),
                             provenance=source,
                             confidence=1.0,
                             extraction_method="structured_columns",
@@ -144,7 +137,7 @@ class StructuredExtractor(ExtractorModule):
                                 document.source_external_id,
                                 table.index,
                                 table.name,
-                                row_offset + 1,
+                                row_index + 1,
                                 field_indexes.get(
                                     relationship.get(
                                         "evidence_field",
@@ -152,13 +145,44 @@ class StructuredExtractor(ExtractorModule):
                                     )
                                 ),
                                 table.cell_provenance,
-                                row_offset,
+                                row_index,
                             ),
                             confidence=1.0,
                             extraction_method="structured_columns",
                             module_id=self.manifest.module_id,
                             module_version=self.manifest.version,
                         ))
+                    for literal in rule.get("literals", []):
+                        subject = references.get(literal["subject_ref"])
+                        value = _field_value(row, field_indexes.get(literal["field"]))
+                        if subject is None or value is None:
+                            if not literal.get("optional", True):
+                                warnings.append(
+                                    f"{rule['rule_id']} skipped a literal with missing values"
+                                )
+                            continue
+                        assertions.append(AssertionCandidate(
+                            subject=subject,
+                            predicate=literal["predicate"],
+                            literal=value,
+                            provenance=_row_provenance(
+                                document.source_external_id,
+                                table.index,
+                                table.name,
+                                row_index + 1,
+                                field_indexes.get(literal["field"]),
+                                table.cell_provenance,
+                                row_index,
+                            ),
+                            confidence=1.0,
+                            extraction_method="structured_columns",
+                            module_id=self.manifest.module_id,
+                            module_version=self.manifest.version,
+                        ))
+            if not matched_table:
+                warnings.append(
+                    f"{table.name or f'Table {table.index + 1}'} did not match a configured table rule"
+                )
         return ExtractionResult(
             entities=tuple(entities),
             assertions=tuple(assertions),
@@ -184,6 +208,47 @@ def _field_indexes(
         )
         for field, aliases in fields.items()
     }
+
+
+def _find_header(
+    rows: Sequence[Sequence[str]],
+    rule: Mapping[str, Any],
+) -> tuple[int, dict[str, int | None]] | None:
+    required_any = {
+        _normalize_header(value) for value in rule.get("match_headers_any", ())
+    }
+    required_all = {
+        _normalize_header(value) for value in rule.get("match_headers_all", ())
+    }
+    matches: list[tuple[int, int, dict[str, int | None]]] = []
+    for row_index, row in enumerate(rows[:10]):
+        headers = [_normalize_header(value) for value in row]
+        if required_any and required_any.isdisjoint(headers):
+            continue
+        if not required_all.issubset(headers):
+            continue
+        indexes = _field_indexes(headers, rule.get("fields", {}))
+        if not all(indexes.get(field) is not None for field in rule["match_all"]):
+            continue
+        score = sum(index is not None for index in indexes.values())
+        matches.append((score, -row_index, indexes))
+    if not matches:
+        return None
+    _score, negative_index, indexes = max(matches, key=lambda item: (item[0], item[1]))
+    return -negative_index, indexes
+
+
+def _aliases(
+    row: Sequence[str],
+    fields: Mapping[str, int | None],
+    specification: Mapping[str, Any],
+) -> tuple[str, ...]:
+    values = {
+        value
+        for field in specification.get("alias_fields", ())
+        if (value := _field_value(row, fields.get(field))) is not None
+    }
+    return tuple(sorted(values))
 
 
 def _field_value(row: Sequence[str], index: int | None) -> str | None:

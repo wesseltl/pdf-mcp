@@ -18,7 +18,7 @@ class GeneralLabDomain(DomainModule):
     manifest = ModuleManifest(
         module_id="domain.general_lab",
         name="General Laboratory Domain",
-        version="0.1.0",
+        version="0.2.0",
         module_type=ModuleType.DOMAIN,
         description="Broad laboratory terminology and deterministic extraction configuration.",
         capabilities=(
@@ -34,11 +34,17 @@ class GeneralLabDomain(DomainModule):
         return (
             {
                 "rule_id": "general-lab-locations-v1",
-                "match_headers_any": ["location_id", "location_name", "room_id"],
+                "match_headers_any": [
+                    "location_id", "location_name", "room_id", "room_number",
+                    "room_name", "site_id", "building_id",
+                ],
                 "match_all": ["location"],
                 "fields": {
-                    "location": ["location_id", "location", "location_name", "room_id"],
-                    "name": ["name", "location_name"],
+                    "location": [
+                        "location_id", "location", "location_name", "room_id",
+                        "room_number", "room_name", "site_id", "building_id",
+                    ],
+                    "name": ["name", "location_name", "room_name", "site_name", "building_name"],
                     "subtype": ["subtype", "location_type", "type"],
                     "parent": ["parent", "parent_location", "parent_id"],
                 },
@@ -50,6 +56,7 @@ class GeneralLabDomain(DomainModule):
                         "identifier_field": "location",
                         "fallback_name_field": "location",
                         "subtype_field": "subtype",
+                        "alias_fields": ["name"],
                     },
                     {
                         "ref": "parent",
@@ -76,13 +83,40 @@ class GeneralLabDomain(DomainModule):
                     "instrument_id",
                     "asset",
                     "equipment",
+                    "asset_tag",
+                    "inventory_number",
+                    "inventory_no",
+                    "equipment_number",
+                    "equipment_no",
+                    "instrument_number",
+                    "instrument_no",
+                    "device_id",
+                    "tag_number",
                 ],
                 "match_all": ["asset"],
                 "fields": {
-                    "asset": ["asset_id", "asset", "equipment_id", "equipment", "instrument_id"],
+                    "asset": [
+                        "asset_id", "asset", "asset_tag", "inventory_number", "inventory_no",
+                        "equipment_id", "equipment", "equipment_number", "equipment_no",
+                        "instrument_id", "instrument_number", "instrument_no", "device_id",
+                        "tag_number",
+                    ],
                     "name": ["name", "asset_name", "equipment_name", "instrument_name"],
                     "subtype": ["subtype", "asset_type", "equipment_type", "category", "type"],
-                    "location": ["location", "location_id", "room"],
+                    "location": [
+                        "location", "location_id", "room", "room_number", "room_name",
+                        "storage_location",
+                    ],
+                    "serial_number": ["serial_number", "serial_no", "serial", "s_n"],
+                    "manufacturer": ["manufacturer", "make", "vendor"],
+                    "model": ["model", "model_number", "model_no"],
+                    "status": ["status", "state", "equipment_status"],
+                    "calibration_due": [
+                        "calibration_due", "next_calibration", "next_calibration_date",
+                    ],
+                    "maintenance_due": [
+                        "maintenance_due", "service_due", "next_service", "next_maintenance",
+                    ],
                 },
                 "entities": [
                     {
@@ -92,6 +126,7 @@ class GeneralLabDomain(DomainModule):
                         "identifier_field": "asset",
                         "fallback_name_field": "asset",
                         "subtype_field": "subtype",
+                        "alias_fields": ["name"],
                     },
                     {
                         "ref": "location",
@@ -109,6 +144,14 @@ class GeneralLabDomain(DomainModule):
                         "optional": True,
                     }
                 ],
+                "literals": [
+                    {"subject_ref": "asset", "predicate": "serial_number", "field": "serial_number"},
+                    {"subject_ref": "asset", "predicate": "manufacturer", "field": "manufacturer"},
+                    {"subject_ref": "asset", "predicate": "model", "field": "model"},
+                    {"subject_ref": "asset", "predicate": "status", "field": "status"},
+                    {"subject_ref": "asset", "predicate": "calibration_due", "field": "calibration_due"},
+                    {"subject_ref": "asset", "predicate": "maintenance_due", "field": "maintenance_due"},
+                ],
             },
             {
                 "rule_id": "general-lab-responsibilities-v1",
@@ -123,7 +166,10 @@ class GeneralLabDomain(DomainModule):
                 "fields": {
                     "person": ["person", "responsible_person", "owner", "responsible"],
                     "person_id": ["person_id", "user_id"],
-                    "asset": ["asset_id", "asset", "equipment_id", "equipment", "instrument_id"],
+                    "asset": [
+                        "asset_id", "asset", "asset_tag", "equipment_id", "equipment",
+                        "equipment_number", "instrument_id", "instrument_number", "device_id",
+                    ],
                     "relationship": ["relationship", "predicate", "role"],
                 },
                 "entities": [
@@ -155,6 +201,48 @@ class GeneralLabDomain(DomainModule):
                         },
                         "object_ref": "asset",
                     }
+                ],
+            },
+            {
+                "rule_id": "general-lab-people-v1",
+                "match_headers_any": [
+                    "person", "person_name", "employee", "employee_name", "email",
+                ],
+                "match_all": ["person"],
+                "fields": {
+                    "person": ["person", "person_name", "name", "employee", "employee_name"],
+                    "person_id": ["person_id", "employee_id", "user_id", "email"],
+                    "email": ["email", "email_address"],
+                    "title": ["title", "job_title", "role"],
+                    "unit": ["department", "department_name", "unit", "team", "group"],
+                },
+                "entities": [
+                    {
+                        "ref": "person",
+                        "type": "PERSON",
+                        "name_field": "person",
+                        "identifier_field": "person_id",
+                        "alias_fields": ["email"],
+                    },
+                    {
+                        "ref": "unit",
+                        "type": "ORGANIZATIONAL_UNIT",
+                        "name_field": "unit",
+                        "identifier_field": "unit",
+                        "optional": True,
+                    },
+                ],
+                "relationships": [
+                    {
+                        "subject_ref": "person",
+                        "predicate": "member_of",
+                        "object_ref": "unit",
+                        "optional": True,
+                    }
+                ],
+                "literals": [
+                    {"subject_ref": "person", "predicate": "email", "field": "email"},
+                    {"subject_ref": "person", "predicate": "job_title", "field": "title"},
                 ],
             },
         )

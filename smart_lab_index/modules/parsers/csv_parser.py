@@ -19,6 +19,8 @@ from smart_lab_index.modules.parsers.common import (
     DocumentParseError,
     assess_table,
     provenance,
+    read_utf8_text,
+    require_table_budget,
     source_extension,
 )
 
@@ -27,7 +29,7 @@ class CsvParser(ParserModule):
     manifest = ModuleManifest(
         module_id="parser.csv",
         name="CSV Parser",
-        version="0.1.0",
+        version="0.2.0",
         module_type=ModuleType.PARSER,
         description="Parses UTF-8 delimited streams into normalized table rows.",
         capabilities=(ModuleCapability("parser.document", "1.0.0"),),
@@ -40,16 +42,20 @@ class CsvParser(ParserModule):
 
     def parse(self, source: DocumentSource, content: BinaryIO) -> DocumentContent:
         try:
-            content.seek(0)
-            text = content.read().decode("utf-8-sig")
+            text = read_utf8_text(content, "CSV document")
             try:
                 dialect = csv.Sniffer().sniff(text[:8192], delimiters=",;\t|")
             except csv.Error:
                 dialect = csv.excel
-            rows = tuple(tuple(cell.strip() for cell in row) for row in csv.reader(
-                io.StringIO(text, newline=""), dialect
-            ))
-        except (UnicodeDecodeError, csv.Error) as exc:
+            materialized = []
+            cell_count = 0
+            for row in csv.reader(io.StringIO(text, newline=""), dialect):
+                normalized = tuple(cell.strip() for cell in row)
+                materialized.append(normalized)
+                cell_count += len(normalized)
+                require_table_budget(len(materialized), cell_count, "CSV document")
+            rows = tuple(materialized)
+        except csv.Error as exc:
             raise DocumentParseError(f"CSV parsing failed: {exc}") from exc
         references = tuple(
             tuple(

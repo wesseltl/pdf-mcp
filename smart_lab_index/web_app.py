@@ -9,14 +9,18 @@ import logging
 import secrets
 import threading
 import webbrowser
-from collections.abc import Iterable, Sequence
+from collections.abc import Iterable, Mapping, Sequence
 from datetime import datetime, timezone
 from importlib import resources
 from pathlib import Path
 from typing import Any
-from urllib.parse import urlparse
+from urllib.parse import parse_qs, urlparse
 
-from smart_lab_index.application import KnowledgeQueryService, build_application
+from smart_lab_index.application import (
+    IssueReviewService,
+    KnowledgeQueryService,
+    build_application,
+)
 from smart_lab_index.core.config import RuntimePolicy
 from smart_lab_index.core.storage import KnowledgeStore
 from smart_lab_index.folder_browser import choose_source_folder_in_browser
@@ -29,6 +33,10 @@ from smart_lab_index.local_web import (
     LoopbackHandler,
     LoopbackHTTPServer,
     bind_loopback_server,
+)
+from smart_lab_index.modules.connectors.filesystem import (
+    DEFAULT_MAX_FILES,
+    DEFAULT_MAX_TOTAL_BYTES,
 )
 
 LOGGER = logging.getLogger(__name__)
@@ -59,7 +67,11 @@ class WebAppState:
         source_id: str | None,
         policy: RuntimePolicy,
         disabled_module_ids: Iterable[str] = (),
+        enabled_module_ids: Iterable[str] = (),
         allow_source_change: bool = False,
+        max_files: int = DEFAULT_MAX_FILES,
+        max_total_bytes: int = DEFAULT_MAX_TOTAL_BYTES,
+        exclude_patterns: Iterable[str] = (),
     ) -> None:
         if str(database) == ":memory:":
             raise ValueError("the graphical app requires a durable database path")
@@ -69,8 +81,13 @@ class WebAppState:
         self.source_id = source_id
         self.policy = policy
         self.disabled_module_ids = tuple(disabled_module_ids)
+        self.enabled_module_ids = tuple(enabled_module_ids)
         self.allow_source_change = allow_source_change
+        self.max_files = max_files
+        self.max_total_bytes = max_total_bytes
+        self.exclude_patterns = tuple(exclude_patterns)
         self._lock = threading.Lock()
+        self._cancel_event = threading.Event()
         self._index_thread: threading.Thread | None = None
         self._source_change_requested = False
         self._operation: dict[str, Any] = {
@@ -79,6 +96,8 @@ class WebAppState:
             "completed_at": None,
             "result": None,
             "error": None,
+            "cancel_requested": False,
+            "progress": None,
         }
         with self._application() as application:
             self.source_id = application.source.source_id
@@ -91,6 +110,10 @@ class WebAppState:
             source_id=self.source_id,
             policy=self.policy,
             disabled_module_ids=self.disabled_module_ids,
+            enabled_module_ids=self.enabled_module_ids,
+            max_files=self.max_files,
+            max_total_bytes=self.max_total_bytes,
+            exclude_patterns=self.exclude_patterns,
         )
 
     def snapshot(self) -> dict[str, Any]:
@@ -104,10 +127,31 @@ class WebAppState:
                     "root": self.root,
                     "no_egress": self.policy.no_egress,
                     "can_change_source": self.allow_source_change,
+                    "limits": {
+                        "max_files": self.max_files,
+                        "max_total_bytes": self.max_total_bytes,
+                        "exclude_patterns": list(self.exclude_patterns),
+                    },
                 },
                 modules=modules,
                 operation=operation,
             )
+
+    def search(self, query: str, *, limit: int = 50) -> dict[str, Any]:
+        with KnowledgeStore(self.database) as store:
+            return KnowledgeQueryService(store).search(query, limit=limit)
+
+    def review_issue(self, payload: dict[str, Any]) -> dict[str, Any]:
+        with self._lock:
+            if self._operation["state"] == "INDEXING":
+                raise RuntimeError("wait for the active index run to finish")
+            with KnowledgeStore(self.database) as store:
+                return IssueReviewService(store).review(
+                    issue_id=payload.get("issue_id"),
+                    decision=payload.get("decision"),
+                    reason=payload.get("reason"),
+                    assertion_id=payload.get("assertion_id"),
+                )
 
     def start_index(self) -> bool:
         with self._lock:
@@ -119,7 +163,14 @@ class WebAppState:
                 "completed_at": None,
                 "result": None,
                 "error": None,
+                "cancel_requested": False,
+                "progress": {
+                    "phase": "STARTING",
+                    "current": 0,
+                    "total": None,
+                },
             }
+            self._cancel_event.clear()
             self._index_thread = threading.Thread(
                 target=self._run_index,
                 name="smart-lab-index-job",
@@ -139,7 +190,11 @@ class WebAppState:
                 )
                 if connector_error:
                     raise RuntimeError("filesystem connector could not start")
-                result = application.indexing.run(application.source).to_dict()
+                result = application.indexing.run(
+                    application.source,
+                    progress=self._update_progress,
+                    should_cancel=self._cancel_event.is_set,
+                ).to_dict()
                 if application.startup_errors:
                     result["startup_errors"] = dict(application.startup_errors)
                 modules = application.registry.snapshot()
@@ -155,7 +210,21 @@ class WebAppState:
                 "completed_at": _now(),
                 "result": result,
                 "error": error,
+                "cancel_requested": self._cancel_event.is_set(),
+                "progress": self._operation.get("progress"),
             }
+
+    def _update_progress(self, value: Mapping[str, Any]) -> None:
+        with self._lock:
+            self._operation["progress"] = dict(value)
+
+    def request_cancel(self) -> bool:
+        with self._lock:
+            if self._operation["state"] != "INDEXING":
+                return False
+            self._operation["cancel_requested"] = True
+            self._cancel_event.set()
+            return True
 
     def is_indexing(self) -> bool:
         with self._lock:
@@ -223,6 +292,23 @@ class SmartLabHandler(LoopbackHandler):
                 LOGGER.error("Smart Lab state read failed (%s)", type(exc).__name__)
                 self._send_json(500, {"error": "The index state could not be read."})
             return
+        if parsed.path == "/api/search":
+            if not self._valid_session():
+                self._send_json(
+                    403, {"error": "This browser session is not authorized."}
+                )
+                return
+            parameters = parse_qs(parsed.query, keep_blank_values=True)
+            query = parameters.get("q", [""])[0]
+            try:
+                limit = int(parameters.get("limit", ["50"])[0])
+                self._send_json(200, self.app_state.search(query, limit=limit))
+            except (TypeError, ValueError):
+                self._send_json(400, {"error": "Enter at least two search characters."})
+            except Exception as exc:  # noqa: BLE001 - bounded local API error
+                LOGGER.error("Smart Lab search failed (%s)", type(exc).__name__)
+                self._send_json(500, {"error": "Search could not be completed."})
+            return
         self._send_json(404, {"error": "Not found."})
 
     def do_POST(self) -> None:
@@ -241,6 +327,27 @@ class SmartLabHandler(LoopbackHandler):
                 self._send_json(409, {"error": "An index run is already active."})
                 return
             self._send_json(202, {"started": True})
+            return
+        if parsed.path == "/api/cancel-index":
+            if not self.app_state.request_cancel():
+                self._send_json(409, {"error": "No index run is active."})
+                return
+            self._send_json(202, {"cancel_requested": True})
+            return
+        if parsed.path == "/api/review-issue":
+            payload = self._read_json_body()
+            if payload is None:
+                self._send_json(400, {"error": "A JSON review request is required."})
+                return
+            try:
+                issue = self.app_state.review_issue(payload)
+            except (TypeError, ValueError) as exc:
+                self._send_json(400, {"error": str(exc)})
+                return
+            except RuntimeError as exc:
+                self._send_json(409, {"error": str(exc)})
+                return
+            self._send_json(200, {"issue": issue})
             return
         if parsed.path == "/api/change-source":
             if not self.app_state.allow_source_change:
@@ -276,7 +383,11 @@ def create_server(
     source_id: str | None = None,
     policy: RuntimePolicy | None = None,
     disabled_module_ids: Iterable[str] = (),
+    enabled_module_ids: Iterable[str] = (),
     allow_source_change: bool = False,
+    max_files: int = DEFAULT_MAX_FILES,
+    max_total_bytes: int = DEFAULT_MAX_TOTAL_BYTES,
+    exclude_patterns: Iterable[str] = (),
     port: int = DEFAULT_PORT,
 ) -> tuple[LoopbackHTTPServer, WebAppState]:
     """Create a session-protected server bound only to loopback."""
@@ -288,7 +399,11 @@ def create_server(
         source_id=source_id,
         policy=policy or RuntimePolicy.from_env(),
         disabled_module_ids=disabled_module_ids,
+        enabled_module_ids=enabled_module_ids,
         allow_source_change=allow_source_change,
+        max_files=max_files,
+        max_total_bytes=max_total_bytes,
+        exclude_patterns=exclude_patterns,
     )
     handler = type(
         "ConfiguredSmartLabHandler",
@@ -328,10 +443,18 @@ def main(argv: Sequence[str] | None = None) -> int:
     parser.add_argument("--database")
     parser.add_argument("--source-id")
     parser.add_argument("--disable", action="append", default=[], metavar="MODULE_ID")
+    parser.add_argument("--enable", action="append", default=[], metavar="MODULE_ID")
     parser.add_argument("--no-egress", action="store_true")
     parser.add_argument("--port", type=int, default=DEFAULT_PORT)
     parser.add_argument("--no-browser", action="store_true")
     parser.add_argument("--index-on-start", action="store_true")
+    parser.add_argument("--max-files", type=int, default=DEFAULT_MAX_FILES)
+    parser.add_argument(
+        "--max-total-gb",
+        type=float,
+        default=DEFAULT_MAX_TOTAL_BYTES / (1024**3),
+    )
+    parser.add_argument("--exclude", action="append", default=[], metavar="GLOB")
     args = parser.parse_args(argv)
 
     picker_supported = folder_picker_available()
@@ -366,7 +489,10 @@ def main(argv: Sequence[str] | None = None) -> int:
     database: str | Path = args.database or DEFAULT_DATABASE
     if managed_database:
         database = _desktop_database(root)
-    index_on_start = args.index_on_start or selected_at_start
+    if args.max_total_gb <= 0:
+        print("smart-lab-index-app: --max-total-gb must be positive")
+        return 2
+    index_on_start = args.index_on_start
     recovery: tuple[str | Path, str | Path, str | None] | None = None
 
     while True:
@@ -377,7 +503,11 @@ def main(argv: Sequence[str] | None = None) -> int:
                 source_id=source_id,
                 policy=policy,
                 disabled_module_ids=args.disable,
+                enabled_module_ids=args.enable,
                 allow_source_change=True,
+                max_files=args.max_files,
+                max_total_bytes=int(args.max_total_gb * 1024**3),
+                exclude_patterns=args.exclude,
                 port=requested_port,
             )
         except (OSError, RuntimeError, ValueError) as exc:
@@ -417,6 +547,8 @@ def main(argv: Sequence[str] | None = None) -> int:
             print("\nStopping Smart Lab Index.")
         finally:
             server.server_close()
+            if interrupted:
+                state.request_cancel()
             state.wait_for_index()
 
         if interrupted or not state.source_change_requested:
@@ -448,7 +580,7 @@ def main(argv: Sequence[str] | None = None) -> int:
                 source_id = None
                 if managed_database:
                     database = _desktop_database(selected)
-            index_on_start = True
+            index_on_start = False
         else:
             root = state.root
             index_on_start = False

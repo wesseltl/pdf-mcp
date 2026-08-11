@@ -12,6 +12,10 @@ from smart_lab_index.application import build_application
 from smart_lab_index.core.config import RuntimePolicy
 from smart_lab_index.core.domain import IndexRunStatus
 from smart_lab_index.core.storage import KnowledgeStore
+from smart_lab_index.modules.connectors.filesystem import (
+    DEFAULT_MAX_FILES,
+    DEFAULT_MAX_TOTAL_BYTES,
+)
 
 
 def _parser() -> argparse.ArgumentParser:
@@ -26,6 +30,26 @@ def _parser() -> argparse.ArgumentParser:
     index.add_argument("--database", default="~/.smart-lab-index/index.db")
     index.add_argument("--source-id")
     index.add_argument("--disable", action="append", default=[], metavar="MODULE_ID")
+    index.add_argument("--enable", action="append", default=[], metavar="MODULE_ID")
+    index.add_argument(
+        "--max-files",
+        type=int,
+        default=DEFAULT_MAX_FILES,
+        help=f"stop before indexing more than this many files (default: {DEFAULT_MAX_FILES})",
+    )
+    index.add_argument(
+        "--max-total-gb",
+        type=float,
+        default=DEFAULT_MAX_TOTAL_BYTES / (1024**3),
+        help="stop before indexing a larger source scope (default: 25 GiB)",
+    )
+    index.add_argument(
+        "--exclude",
+        action="append",
+        default=[],
+        metavar="GLOB",
+        help="exclude a relative path or filename glob; may be repeated",
+    )
     index.add_argument(
         "--no-egress",
         action="store_true",
@@ -42,6 +66,7 @@ def _parser() -> argparse.ArgumentParser:
     modules.add_argument("root", help="folder used to validate the filesystem connector")
     modules.add_argument("--source-id")
     modules.add_argument("--disable", action="append", default=[], metavar="MODULE_ID")
+    modules.add_argument("--enable", action="append", default=[], metavar="MODULE_ID")
     modules.add_argument("--no-egress", action="store_true")
     return parser
 
@@ -66,6 +91,7 @@ def main(argv: list[str] | None = None) -> int:
                 source_id=args.source_id,
                 policy=_policy(args.no_egress),
                 disabled_module_ids=args.disable,
+                enabled_module_ids=args.enable,
             ) as application:
                 _print_json({
                     "startup_errors": application.startup_errors,
@@ -90,6 +116,10 @@ def _index(args: argparse.Namespace) -> int:
         source_id=args.source_id,
         policy=_policy(args.no_egress),
         disabled_module_ids=args.disable,
+        enabled_module_ids=args.enable,
+        max_files=args.max_files,
+        max_total_bytes=_gib_to_bytes(args.max_total_gb),
+        exclude_patterns=args.exclude,
     ) as application:
         connector_error = application.startup_errors.get(application.connector_module_id)
         if connector_error:
@@ -105,6 +135,12 @@ def _index(args: argparse.Namespace) -> int:
 def _policy(force_no_egress: bool) -> RuntimePolicy:
     environment_policy = RuntimePolicy.from_env()
     return RuntimePolicy(no_egress=force_no_egress or environment_policy.no_egress)
+
+
+def _gib_to_bytes(value: float) -> int:
+    if value <= 0:
+        raise ValueError("--max-total-gb must be positive")
+    return int(value * 1024**3)
 
 
 def _existing_store(database: str) -> KnowledgeStore:

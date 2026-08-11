@@ -7,6 +7,7 @@ import tempfile
 import unittest
 from collections.abc import Callable
 from pathlib import Path
+from unittest import mock
 
 from docx import Document
 from openpyxl import Workbook
@@ -237,6 +238,28 @@ class TestSmartLabParserContracts(unittest.TestCase):
                 recovered = parser.parse(source, valid_factory())
                 self.assert_document_contract(parser, source, recovered)
                 self.assertTrue(recovered.text_blocks or recovered.tables)
+
+    def test_parser_resource_budgets_reject_excessive_inputs(self) -> None:
+        with (
+            mock.patch("smart_lab_index.modules.parsers.common.MAX_TEXT_CHARS", 8),
+            self.assertRaisesRegex(DocumentParseError, "text limit"),
+        ):
+            TextParser().parse(make_source(".txt"), io.BytesIO(b"more than eight characters"))
+
+        with (
+            mock.patch("smart_lab_index.modules.parsers.common.MAX_TABLE_ROWS", 1),
+            self.assertRaisesRegex(DocumentParseError, "row limit"),
+        ):
+            CsvParser().parse(make_source(".csv"), make_csv())
+
+        with (
+            mock.patch(
+                "smart_lab_index.modules.parsers.common.MAX_OFFICE_EXPANDED_BYTES",
+                16,
+            ),
+            self.assertRaisesRegex(DocumentParseError, "expanded archive limit"),
+        ):
+            DocxParser().parse(make_source(".docx"), make_docx())
 
     def test_synthetic_fixture_generation_is_byte_deterministic(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:

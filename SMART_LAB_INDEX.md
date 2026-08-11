@@ -18,8 +18,9 @@ python -m venv .venv
 .venv/bin/smart-lab-index-app
 ```
 
-Choose a folder in the system dialog. The browser opens locally, enables no-egress mode, and starts
-indexing. **Change folder** returns to the system chooser without requiring a terminal. Picker-created
+Choose a folder in the system dialog. The browser opens locally and enables no-egress mode. Confirm
+the selected path and use **Index now**; folder selection never starts a recursive scan by itself.
+**Change folder** returns to the system chooser without requiring a terminal. Picker-created
 workspaces use separate local databases so unrelated laboratory folders are not silently combined.
 If the operating system has no folder-dialog helper, the app opens its own secured local folder
 navigator instead.
@@ -36,7 +37,8 @@ To open the included demonstration without a picker:
 ```
 
 Open the Review queue to inspect the deliberate location conflict and its exact spreadsheet/Word
-evidence.
+evidence. Select the authoritative location or dismiss the issue with a required review note. Use
+Search to find names, identifiers, document text, assertions, issues, and source paths.
 
 For the equivalent CLI flow:
 
@@ -74,8 +76,11 @@ root.
 | `inspect` | Return entities, assertions, provenance, and issues as JSON |
 | `modules ROOT` | Show installed/enabled state, health, versions, dependencies, configuration, and security declarations |
 
-Use repeatable `--disable MODULE_ID` options to assemble a smaller built-in profile. Dependencies
-are checked before modules start.
+Use repeatable `--disable MODULE_ID` and `--enable MODULE_ID` options to assemble a built-in profile.
+`issue.missing_responsibility` is installed but disabled by default because absence is only meaningful
+after the operator confirms that responsibility sources are complete. Dependencies are checked before
+modules start. Source runs also accept `--max-files`, `--max-total-gb`, and repeatable `--exclude GLOB`
+scope controls.
 
 ## Architecture
 
@@ -133,23 +138,23 @@ the last successful knowledge active.
 
 ## Built-in modules
 
-All first-iteration modules are version `0.1.0`.
-
 | Module | Purpose | Dependencies | Network | Files |
 |---|---|---|---|---|
-| `connector.filesystem` | Recursive, incremental, read-only discovery | None | None | Read source root |
-| `parser.pdf` | Normalized PDF text and tables | None | None | None; receives a stream |
-| `parser.docx` | Normalized Word paragraphs and tables | None | None | None; receives a stream |
-| `parser.xlsx` | Normalized workbook sheets and cells | None | None | None; receives a stream |
-| `parser.csv` | Normalized CSV rows and cells | None | None | None; receives a stream |
-| `parser.txt` | Normalized plain-text blocks | None | None | None; receives a stream |
-| `domain.general_lab` | Broad terminology and data-driven deterministic rules | None | None | None |
-| `extractor.structured` | Configured spreadsheet entity/relationship extraction | `domain.extraction_rules >= 1.0.0` | None | None |
+| `connector.filesystem` `0.2.0` | Bounded, incremental, read-only discovery | None | None | Read source root |
+| `parser.pdf` `0.2.0` | Normalized bounded PDF text and tables | None | None | None; receives a stream |
+| `parser.docx` `0.2.0` | Normalized bounded Word paragraphs and tables | None | None | None; receives a stream |
+| `parser.xlsx` `0.2.0` | Normalized bounded workbook sheets and cells | None | None | None; receives a stream |
+| `parser.csv` `0.2.0` | Normalized bounded CSV rows and cells | None | None | None; receives a stream |
+| `parser.txt` `0.2.0` | Normalized bounded plain-text blocks | None | None | None; receives a stream |
+| `domain.general_lab` `0.2.0` | Broad terminology and data-driven deterministic rules | None | None | None |
+| `extractor.structured` `0.2.0` | Header-aware table entities, properties, and relationships | `domain.extraction_rules >= 1.0.0` | None | None |
 | `extractor.rules` | Configured text relationship extraction | `domain.extraction_rules >= 1.0.0` | None | None |
 | `resolver.identifier` | Exact identifier resolution | None | None | None |
 | `resolver.alias` | Unique alias resolution | None | None | None |
 | `resolver.normalized_name` | Unique normalized-name resolution | None | None | None |
 | `issue.conflicting_location` | Multiple active locations for one subject | None | None | None |
+| `issue.calibration_due` | Invalid and overdue calibration dates | None | None | None |
+| `issue.missing_responsibility` | Assets without responsibility evidence; disabled by default | None | None | None |
 
 Built-ins are registered explicitly in the composition root. There is no runtime module marketplace,
 dynamic third-party code loader, microservice fleet, or hidden module-to-module import graph.
@@ -164,9 +169,14 @@ Symlink files and root escapes are rejected. Individual inaccessible or malforme
 bounded failures while remaining records continue. Core infers deletion only when the connector says
 the scan completed, and it excludes paths that failed during that scan.
 
-The connector accepts regular files only, opens with no-follow protection where the operating system
+Before hashing, the connector inventories eligible metadata and fails closed if the configured scope
+exceeds 10,000 files or 25 GiB by default. Operators can lower or explicitly raise those limits and
+exclude path/filename globs. The connector accepts regular files only, opens with no-follow protection where the operating system
 supports it, verifies the opened device/inode, reads a bounded immutable snapshot, and checks that the
 snapshot matches the discovered SHA-256 before parsing. The default limit is 100 MiB per file.
+POSIX runs record owner, group, mode, and effective process access. This is inventory metadata, not
+source ACL enforcement; Windows, Active Directory, SharePoint, and rich network-share ACLs are not
+resolved by this connector.
 
 ## No-egress mode
 
@@ -198,10 +208,17 @@ transition.
 
 ## Graphical interface
 
-The local GUI exposes Overview, Equipment, Locations, People, Organizations, Responsibilities,
+The local GUI exposes Overview, Search, Equipment, Locations, People, Organizations, Responsibilities,
 Documents, Review queue, Issues, Sources, and Modules. Navigation is generated from enabled module
 categories and stored data. Evidence rows open a detail dialog showing source path, structural
-locator, confidence, module, and issue evidence.
+locator, confidence, module, and issue evidence. Search is server-side and bounded, so it covers the
+whole SQLite index even when large list views return only their first 500 rows. Conflict review keeps
+all original assertions, marks the selected evidence confirmed and alternatives rejected, records a
+review decision and audit event, and reopens when materially new assertion evidence appears.
+
+Indexing has explicit preflight, discovery, processing, and finalization phases. The GUI shows counts,
+bytes, and the current path, and cancellation stops cooperatively at the next file boundary. A
+cancelled partial run never infers deletions or runs issue finalization.
 
 The app accepts an explicit source root or opens a folder chooser. A source change performs a
 controlled same-port restart, rotates the browser-session token, and reloads only after the new
@@ -221,18 +238,20 @@ contents.
 - Standalone artifacts are ZIP applications rather than native OS installers. Builds are unsigned
   unless publisher signing credentials are configured; every archive includes a SHA-256 manifest.
 - Only a filesystem connector and one general laboratory domain pack are implemented.
-- Deterministic rules cover the synthetic MVP columns and a narrow `located_in` text form; they are
-  not a general natural-language understanding system.
-- The GUI provides local filtering and an issue review queue, but review decisions, source-authority
-  projection, configurable terminology, authentication, and source-permission enforcement are not
-  implemented yet.
+- Deterministic rules recognize common equipment, room, people, responsibility, serial/model/status,
+  calibration, and maintenance headers plus a narrow `located_in` text form. They are not general
+  natural-language understanding and customer mappings still require configuration work.
+- The GUI is a local single-user operator workspace. Source-authority projection, configurable
+  terminology, multi-user authentication, and source-permission enforcement are not implemented.
 - Local inference, embeddings, semantic search, OCR, and vendor connectors are intentionally absent.
-- Connector byte limits and per-record isolation exist, but parser subprocess/time/memory and
-  expanded-archive limits still need hardening for hostile content.
+- Parsers enforce byte, page, text, row, cell, Office-entry, and expanded-archive limits, but still
+  run in-process without an OS-enforced CPU, memory, or wall-clock sandbox. Do not use hostile or
+  unapproved document roots.
 - Core creates private state (`0700` directory, `0600` SQLite files), but index content is not
   application-encrypted; deployments should use encrypted local storage and a dedicated OS account.
-- SQLite schema version 1 is an initial foundation, not a production migration history.
-- The repository distribution is still named `pdf-agent-mcp` at version `0.4.0` to preserve the
+- SQLite schema version 2 includes one tested forward migration but is not yet a mature production
+  migration history.
+- The repository distribution is still named `pdf-agent-mcp` at version `0.5.0` to preserve the
   existing compatibility product. A distinct Smart Lab Index release identity and version must be
   chosen before publishing this branch.
 

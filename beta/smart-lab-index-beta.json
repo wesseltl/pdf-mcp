@@ -3,7 +3,7 @@
   "offer_id": "smart-lab-index-request-beta",
   "offer_kind": "local_software_beta",
   "product": "Smart Lab Index",
-  "version": "0.4.0",
+  "version": "0.5.0",
   "status": "accepting_beta_requests",
   "access": {
     "type": "request_only",
@@ -23,6 +23,10 @@
     "equipment, location, person, document, and responsibility indexing",
     "assertion-level provenance",
     "conflicting location detection",
+    "local search across entities, assertions, documents, issues, and sources",
+    "auditable issue confirmation and dismissal",
+    "bounded source preflight with progress and cancellation",
+    "overdue calibration date detection",
     "incremental re-indexing",
     "local no-egress operation without telemetry"
   ],
@@ -30,6 +34,7 @@
     "filesystem sources only",
     "no OCR",
     "no multi-user access enforcement",
+    "POSIX owner/group metadata only; no Windows or SharePoint ACL enforcement",
     "no source write-back",
     "not approved for hostile documents or regulated production use",
     "desktop artifacts are unsigned until publisher credentials are configured"

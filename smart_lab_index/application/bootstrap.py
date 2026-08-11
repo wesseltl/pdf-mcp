@@ -12,10 +12,18 @@ from smart_lab_index.core.domain import SourceDefinition
 from smart_lab_index.core.events import EventBus
 from smart_lab_index.core.modules import ModuleRegistry
 from smart_lab_index.core.storage import KnowledgeStore
-from smart_lab_index.modules.connectors.filesystem import FilesystemConnector
+from smart_lab_index.modules.connectors.filesystem import (
+    DEFAULT_MAX_FILES,
+    DEFAULT_MAX_TOTAL_BYTES,
+    FilesystemConnector,
+)
 from smart_lab_index.modules.domains import GeneralLabDomain
 from smart_lab_index.modules.extractors import RuleBasedExtractor, StructuredExtractor
-from smart_lab_index.modules.issue_rules import ConflictingLocationRule
+from smart_lab_index.modules.issue_rules import (
+    CalibrationDueRule,
+    ConflictingLocationRule,
+    MissingResponsibilityRule,
+)
 from smart_lab_index.modules.parsers import (
     CsvParser,
     DocxParser,
@@ -60,6 +68,10 @@ def build_application(
     source_id: str | None = None,
     policy: RuntimePolicy | None = None,
     disabled_module_ids: Iterable[str] = (),
+    enabled_module_ids: Iterable[str] = (),
+    max_files: int = DEFAULT_MAX_FILES,
+    max_total_bytes: int = DEFAULT_MAX_TOTAL_BYTES,
+    exclude_patterns: Iterable[str] = (),
 ) -> SmartLabApplication:
     """Register built-ins explicitly; no dynamic imports or hidden plugin loading."""
     _validate_state_path(root, database)
@@ -67,7 +79,13 @@ def build_application(
     registry = ModuleRegistry(policy=policy or RuntimePolicy.from_env(), events=events)
     domain = GeneralLabDomain()
     connector = FilesystemConnector()
-    source = connector.source(root, source_id=source_id)
+    source = connector.source(
+        root,
+        source_id=source_id,
+        max_files=max_files,
+        max_total_bytes=max_total_bytes,
+        exclude_patterns=tuple(exclude_patterns),
+    )
     modules = (
         domain,
         connector,
@@ -82,10 +100,18 @@ def build_application(
         AliasResolver(),
         NormalizedNameResolver(),
         ConflictingLocationRule(),
+        MissingResponsibilityRule(),
+        CalibrationDueRule(),
     )
     disabled = set(disabled_module_ids)
+    enabled_overrides = set(enabled_module_ids)
+    default_disabled = {"issue.missing_responsibility"}
     for module in modules:
-        registry.register(module, enabled=module.manifest.module_id not in disabled)
+        module_id = module.manifest.module_id
+        enabled = module_id not in disabled and (
+            module_id not in default_disabled or module_id in enabled_overrides
+        )
+        registry.register(module, enabled=enabled)
     startup_errors = registry.start_all()
     store = KnowledgeStore(database)
     store.sync_modules(registry.snapshot())

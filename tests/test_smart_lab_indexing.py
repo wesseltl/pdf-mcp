@@ -298,6 +298,21 @@ class SmartLabIndexingTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "outside the read-only source root"):
             build_application(self.root, database=self.root / "index.db")
 
+    def test_operator_cancellation_finishes_run_without_deletion_inference(self):
+        (self.root / "document.txt").write_text("content", encoding="utf-8")
+        progress = []
+        with build_application(self.root, database=self.database) as application:
+            result = application.indexing.run(
+                application.source,
+                progress=progress.append,
+                should_cancel=lambda: True,
+            )
+
+            self.assertEqual(result.status, IndexRunStatus.CANCELLED)
+            self.assertEqual(application.store.summary()["latest_run"]["status"], "CANCELLED")
+            self.assertEqual(application.store.list_sources(), [])
+        self.assertEqual(progress[-1]["phase"], "CANCELLED")
+
     def test_optional_extractor_failure_does_not_stop_remaining_modules(self):
         (self.root / "observation.txt").write_text(
             "Freezer-001 located in Room A-101.",
@@ -367,6 +382,88 @@ class SmartLabIndexingTests(unittest.TestCase):
             assets = application.store.list_entities(EntityType.ASSET)
 
         self.assertEqual({item.identifier for item in assets}, {"ASSET-001", "ASSET-002"})
+
+    def test_realistic_register_headers_properties_and_leading_title_rows(self):
+        workbook = Workbook()
+        sheet = workbook.active
+        sheet.title = "Equipment Register"
+        sheet.append(["Lab Alpha Equipment Register"])
+        sheet.append([])
+        sheet.append([
+            "Inventory No",
+            "Equipment Name",
+            "Equipment Type",
+            "Room Number",
+            "Serial No",
+            "Make",
+            "Model No",
+            "Equipment Status",
+            "Next Calibration Date",
+            "Service Due",
+        ])
+        sheet.append([
+            "INV-001",
+            "Cold storage unit",
+            "Freezer",
+            "Room A-101",
+            "SN-100",
+            "Example Instruments",
+            "FZ-2",
+            "Active",
+            "2000-01-01",
+            "2030-06-30",
+        ])
+        workbook.save(self.root / "equipment-register.xlsx")
+        workbook.close()
+
+        with build_application(self.root, database=self.database) as application:
+            result = application.indexing.run(application.source)
+            assets = application.store.list_entities(EntityType.ASSET)
+            assertions = application.store.list_active_assertions()
+            documents = application.store.list_documents(active_only=True)
+            issues = application.store.list_issues(status="OPEN")
+
+        self.assertEqual(result.status, IndexRunStatus.COMPLETED)
+        self.assertEqual([(asset.identifier, asset.canonical_name) for asset in assets], [
+            ("INV-001", "Cold storage unit")
+        ])
+        literals = {
+            assertion.predicate: assertion.literal
+            for assertion in assertions
+            if assertion.literal is not None
+        }
+        self.assertEqual(literals["serial_number"], "SN-100")
+        self.assertEqual(literals["manufacturer"], "Example Instruments")
+        self.assertEqual(literals["model"], "FZ-2")
+        self.assertEqual(literals["status"], "Active")
+        calibration = next(
+            assertion for assertion in assertions if assertion.predicate == "calibration_due"
+        )
+        self.assertEqual(calibration.provenance["locator"]["cell"], "I4")
+        self.assertGreaterEqual(documents[0]["extracted_assertion_count"], 7)
+        self.assertEqual([issue["code"] for issue in issues], ["OVERDUE_CALIBRATION"])
+
+    def test_missing_responsibility_rule_requires_explicit_enablement(self):
+        self._write_equipment("Room A-101")
+
+        with build_application(self.root, database=self.database) as application:
+            application.indexing.run(application.source)
+            self.assertNotIn(
+                "MISSING_RESPONSIBILITY",
+                {issue["code"] for issue in application.store.list_issues(status="OPEN")},
+            )
+
+        second_database = self.database.with_name("responsibility-enabled.db")
+        with build_application(
+            self.root,
+            database=second_database,
+            enabled_module_ids=("issue.missing_responsibility",),
+        ) as application:
+            application.indexing.run(application.source)
+            self.assertIn(
+                "MISSING_RESPONSIBILITY",
+                {issue["code"] for issue in application.store.list_issues(status="OPEN")},
+            )
 
     def test_resolver_failure_rolls_back_partial_extractor_writes(self):
         self._write_equipment("Room A-101")

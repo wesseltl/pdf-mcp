@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+from collections.abc import Callable, Mapping
 from dataclasses import dataclass
 from typing import Any
 
@@ -18,6 +19,7 @@ from smart_lab_index.core.domain import (
     EntityReference,
     ExtractionResult,
     IndexRunStatus,
+    OperationCancelled,
     Provenance,
     SourceDefinition,
     SourceRecord,
@@ -120,6 +122,13 @@ class _IssueReadRepository(IssueRepository):
     def get_entity(self, entity_id: str) -> EntityRecord | None:
         return self.__store.get_entity(entity_id)
 
+    def list_entities(self, entity_type: str | None = None) -> list[EntityRecord]:
+        from smart_lab_index.core.domain import EntityType
+
+        return self.__store.list_entities(
+            None if entity_type is None else EntityType(entity_type)
+        )
+
     def list_active_assertions(
         self,
         predicate: str | None = None,
@@ -142,7 +151,13 @@ class IndexingService:
         self._entity_reader = _EntityReadRepository(store)
         self._issue_reader = _IssueReadRepository(store)
 
-    def run(self, source: SourceDefinition) -> IndexRunResult:
+    def run(
+        self,
+        source: SourceDefinition,
+        *,
+        progress: Callable[[Mapping[str, Any]], None] | None = None,
+        should_cancel: Callable[[], bool] | None = None,
+    ) -> IndexRunResult:
         connector = self.registry.get(source.connector_module_id)
         if not isinstance(connector, ConnectorModule):
             raise TypeError(f"{source.connector_module_id} is not a connector module")
@@ -177,6 +192,7 @@ class IndexingService:
         }
         processing_context_hash = _processing_context_hash(snapshot)
         try:
+            _check_cancelled(should_cancel)
             previous = self.store.source_records(source.source_id)
             batch = self._discover(
                 connector,
@@ -184,7 +200,11 @@ class IndexingService:
                 previous,
                 stats,
                 errors,
+                progress,
+                should_cancel,
             )
+            stats["planned_files"] = int(batch.metadata.get("planned_files", 0))
+            stats["planned_bytes"] = int(batch.metadata.get("planned_bytes", 0))
             seen_ids = {item.record.external_id for item in batch.sources}
             failed_ids = {failure.external_id for failure in batch.failures}
 
@@ -210,7 +230,14 @@ class IndexingService:
                     stats=stats,
                 )
 
-            for discovered in batch.sources:
+            _report(
+                progress,
+                phase="PROCESSING",
+                current=0,
+                total=len(batch.sources),
+            )
+            for position, discovered in enumerate(batch.sources, start=1):
+                _check_cancelled(should_cancel)
                 stats["discovered"] += 1
                 stats[discovered.change.value.casefold()] += 1
                 source_record_id, _ = self.store.upsert_source(
@@ -260,7 +287,16 @@ class IndexingService:
                     configuration_hashes=configuration_hashes,
                     processing_context_hash=processing_context_hash,
                 )
+                stats["processed_files"] += 1
+                _report(
+                    progress,
+                    phase="PROCESSING",
+                    current=position,
+                    total=len(batch.sources),
+                    path=discovered.record.external_id,
+                )
 
+            _check_cancelled(should_cancel)
             if batch.complete:
                 deleted_ids = sorted(set(previous) - seen_ids - failed_ids)
                 for external_id in deleted_ids:
@@ -281,6 +317,7 @@ class IndexingService:
                         stats,
                     )
 
+            _report(progress, phase="FINALIZING", current=0, total=1)
             self._evaluate_issues(run_id, stats, errors)
             status = (
                 IndexRunStatus.COMPLETED_WITH_ERRORS
@@ -301,6 +338,23 @@ class IndexingService:
                 stats,
             )
             return IndexRunResult(run_id, status, stats, tuple(errors))
+        except OperationCancelled:
+            status = IndexRunStatus.CANCELLED
+            self.store.finish_index_run(
+                run_id,
+                status=status,
+                stats=stats,
+                error="cancelled by operator",
+            )
+            self._emit(
+                Event(
+                    EventType.INDEX_RUN_COMPLETED,
+                    {"index_run_id": run_id, "status": status.value, "stats": stats},
+                ),
+                stats,
+            )
+            _report(progress, phase="CANCELLED", current=0, total=0)
+            return IndexRunResult(run_id, status, stats, tuple(errors))
         except Exception as exc:
             errors.append(f"index run failed: {type(exc).__name__}")
             self.store.finish_index_run(
@@ -318,11 +372,20 @@ class IndexingService:
         previous: dict[str, SourceRecord],
         stats: dict[str, int],
         errors: list[str],
+        progress: Callable[[Mapping[str, Any]], None] | None,
+        should_cancel: Callable[[], bool] | None,
     ) -> DiscoveryBatch:
         try:
-            batch = connector.discover(source, previous)
+            batch = connector.discover(
+                source,
+                previous,
+                progress=progress,
+                should_cancel=should_cancel,
+            )
             _validate_discovery_batch(batch, source)
             return batch
+        except OperationCancelled:
+            raise
         except Exception as exc:  # noqa: BLE001 - connector boundary
             stats["module_failures"] += 1
             detail = f"{connector.manifest.module_id}: {type(exc).__name__}: discovery failed"
@@ -589,6 +652,9 @@ class IndexingService:
                     configuration_hash=configuration_hash,
                     processing_context_hash=processing_context_hash,
                     index_run_id=run_id,
+                    entity_count=len(result.entities),
+                    assertion_count=len(result.assertions),
+                    warnings=result.warnings,
                 )
             stats["entities"] += created_entities
             stats["assertions"] += created_assertions
@@ -893,7 +959,23 @@ def _empty_stats() -> dict[str, int]:
         "issues": 0,
         "module_failures": 0,
         "hook_failures": 0,
+        "planned_files": 0,
+        "planned_bytes": 0,
+        "processed_files": 0,
     }
+
+
+def _check_cancelled(should_cancel: Callable[[], bool] | None) -> None:
+    if should_cancel is not None and should_cancel():
+        raise OperationCancelled("index run cancelled by operator")
+
+
+def _report(
+    progress: Callable[[Mapping[str, Any]], None] | None,
+    **value: Any,
+) -> None:
+    if progress is not None:
+        progress(value)
 
 
 def _reference_key(reference: EntityReference) -> tuple[Any, ...]:

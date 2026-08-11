@@ -9,7 +9,7 @@ from dataclasses import replace
 from pathlib import Path
 from unittest import mock
 
-from smart_lab_index.core.domain import DiscoveryChange
+from smart_lab_index.core.domain import DiscoveryChange, OperationCancelled
 from smart_lab_index.modules.connectors.filesystem import FilesystemConnector
 
 
@@ -224,6 +224,74 @@ class FilesystemConnectorTests(unittest.TestCase):
         self.assertEqual(batch.sources, ())
         self.assertEqual(batch.failures[0].external_id, "stream.txt")
         self.assertIn("not a regular file", batch.failures[0].error)
+
+    def test_scope_limit_fails_closed_before_file_content_is_read(self) -> None:
+        for index in range(3):
+            (self.root / f"document-{index}.txt").write_bytes(b"content")
+        opened = mock.Mock(wraps=open)
+        connector = FilesystemConnector(open_file=opened)
+        definition = connector.source(self.root, max_files=2)
+
+        batch = connector.discover(definition, {})
+
+        self.assertFalse(batch.complete)
+        self.assertFalse(batch.sources)
+        self.assertTrue(batch.metadata["blocked"])
+        self.assertEqual(batch.metadata["planned_files"], 3)
+        self.assertIn("file count", batch.failures[0].error)
+        opened.assert_not_called()
+
+    def test_file_changed_after_preflight_is_isolated_before_hashing(self) -> None:
+        source = self.root / "document.txt"
+        source.write_bytes(b"first")
+        changed = False
+
+        def mutate_then_open(path, mode):
+            nonlocal changed
+            if not changed:
+                changed = True
+                source.write_bytes(b"replacement content")
+            return open(path, mode)
+
+        connector = FilesystemConnector(open_file=mutate_then_open)
+        definition = connector.source(self.root)
+
+        batch = connector.discover(definition, {})
+
+        self.assertTrue(batch.complete)
+        self.assertEqual(batch.sources, ())
+        self.assertEqual(batch.failures[0].external_id, "document.txt")
+        self.assertIn("changed after preflight", batch.failures[0].error)
+
+    def test_exclusions_progress_and_cooperative_cancellation(self) -> None:
+        (self.root / "keep.txt").write_bytes(b"keep")
+        (self.root / "ignore.txt").write_bytes(b"ignore")
+        connector = FilesystemConnector()
+        definition = connector.source(
+            self.root,
+            exclude_patterns=("ignore.*",),
+        )
+        progress = []
+
+        batch = connector.discover(definition, {}, progress=progress.append)
+
+        self.assertEqual([item.record.external_id for item in batch.sources], ["keep.txt"])
+        self.assertEqual({item["phase"] for item in progress}, {"PREFLIGHT", "DISCOVERY"})
+        with self.assertRaises(OperationCancelled):
+            connector.discover(definition, {}, should_cancel=lambda: True)
+
+    @unittest.skipUnless(os.name == "posix", "POSIX ownership test")
+    def test_permission_metadata_identifies_owner_group_and_access_model(self) -> None:
+        (self.root / "document.txt").write_bytes(b"content")
+        connector = FilesystemConnector()
+        definition = connector.source(self.root)
+
+        permissions = connector.discover(definition, {}).sources[0].record.permission_metadata
+
+        self.assertEqual(permissions["permission_model"], "POSIX_MODE")
+        self.assertIn("name", permissions["owner"])
+        self.assertIn("name", permissions["group"])
+        self.assertFalse(permissions["acl_captured"])
 
 
 if __name__ == "__main__":

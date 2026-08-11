@@ -11,6 +11,7 @@ from collections.abc import Callable, Iterator, Mapping
 from contextlib import contextmanager
 from dataclasses import dataclass
 from datetime import datetime, timezone
+from fnmatch import fnmatch
 from pathlib import Path
 from typing import BinaryIO, ClassVar
 
@@ -19,6 +20,7 @@ from smart_lab_index.core.domain import (
     DiscoveryBatch,
     DiscoveryChange,
     DiscoveryFailure,
+    OperationCancelled,
     SourceDefinition,
     SourceRecord,
 )
@@ -36,6 +38,8 @@ from smart_lab_index.core.modules import (
 
 DEFAULT_EXTENSIONS = (".csv", ".docx", ".pdf", ".txt", ".xlsx")
 DEFAULT_MAX_FILE_BYTES = 100 * 1024 * 1024
+DEFAULT_MAX_FILES = 10_000
+DEFAULT_MAX_TOTAL_BYTES = 25 * 1024 * 1024 * 1024
 _CONTENT_TYPES = {
     ".csv": "text/csv",
     ".docx": "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
@@ -49,7 +53,7 @@ class FilesystemConnector(ConnectorModule):
     manifest = ModuleManifest(
         module_id="connector.filesystem",
         name="Filesystem Connector",
-        version="0.1.0",
+        version="0.2.0",
         module_type=ModuleType.CONNECTOR,
         description="Recursively discovers local files without modifying source content.",
         capabilities=(ModuleCapability("connector.source_records", "1.0.0"),),
@@ -69,6 +73,12 @@ class FilesystemConnector(ConnectorModule):
             },
             "include_hidden": {"type": "boolean"},
             "max_file_bytes": {"type": "integer"},
+            "max_files": {"type": "integer"},
+            "max_total_bytes": {"type": "integer"},
+            "exclude_patterns": {
+                "type": "array",
+                "items": {"type": "string"},
+            },
         },
     }
 
@@ -90,6 +100,9 @@ class FilesystemConnector(ConnectorModule):
         include_extensions: tuple[str, ...] = DEFAULT_EXTENSIONS,
         include_hidden: bool = False,
         max_file_bytes: int = DEFAULT_MAX_FILE_BYTES,
+        max_files: int = DEFAULT_MAX_FILES,
+        max_total_bytes: int = DEFAULT_MAX_TOTAL_BYTES,
+        exclude_patterns: tuple[str, ...] = (),
     ) -> SourceDefinition:
         resolved_root = Path(root).expanduser().resolve()
         identifier = source_id or (
@@ -106,6 +119,9 @@ class FilesystemConnector(ConnectorModule):
                 })),
                 "include_hidden": include_hidden,
                 "max_file_bytes": max_file_bytes,
+                "max_files": max_files,
+                "max_total_bytes": max_total_bytes,
+                "exclude_patterns": tuple(exclude_patterns),
             },
         )
         self.validate_source(definition)
@@ -127,11 +143,17 @@ class FilesystemConnector(ConnectorModule):
         self,
         definition: SourceDefinition,
         previous: Mapping[str, SourceRecord],
+        *,
+        progress: Callable[[Mapping[str, object]], None] | None = None,
+        should_cancel: Callable[[], bool] | None = None,
     ) -> DiscoveryBatch:
         settings = _settings(definition, self.manifest.module_id)
         sources: list[DiscoveredSource] = []
         failures: list[DiscoveryFailure] = []
         complete = True
+        candidates: list[_Candidate] = []
+        planned_files = 0
+        planned_bytes = 0
         try:
             self._stat_file(settings.root)
         except OSError as exc:
@@ -152,15 +174,20 @@ class FilesystemConnector(ConnectorModule):
                 _bounded_error(error),
             ))
 
+        _notify(progress, phase="PREFLIGHT", current=0, total=None)
         for directory, directory_names, filenames in os.walk(
             settings.root, topdown=True, onerror=walk_error, followlinks=False
         ):
+            _check_cancelled(should_cancel)
             directory_path = Path(directory)
             retained_directories = []
             for name in sorted(directory_names):
                 if not _include_name(name, settings):
                     continue
                 candidate = directory_path / name
+                relative = _relative_or_dot(candidate, settings.root)
+                if _excluded(relative, name, settings.exclude_patterns):
+                    continue
                 if candidate.is_symlink():
                     complete = False
                     failures.append(DiscoveryFailure(
@@ -178,57 +205,126 @@ class FilesystemConnector(ConnectorModule):
                 if path.suffix.lower() not in settings.include_extensions:
                     continue
                 external_id = _relative_or_dot(path, settings.root)
+                if _excluded(external_id, filename, settings.exclude_patterns):
+                    continue
                 try:
                     if path.is_symlink():
                         raise PermissionError("symbolic-link files are not indexed")
                     resolved = path.resolve(strict=True)
                     _require_inside(resolved, settings.root)
-                    checksum, stat = self._checksum(resolved, settings)
-                    record = SourceRecord(
-                        external_id=external_id,
-                        source_id=definition.source_id,
-                        name=path.name,
+                    stat = self._stat_file(resolved)
+                    _require_regular(stat)
+                    planned_files += 1
+                    planned_bytes += stat.st_size
+                    if planned_files > settings.max_files:
+                        return _scope_limit_batch(
+                            settings,
+                            planned_files,
+                            planned_bytes,
+                            "file count",
+                        )
+                    if planned_bytes > settings.max_total_bytes:
+                        return _scope_limit_batch(
+                            settings,
+                            planned_files,
+                            planned_bytes,
+                            "total size",
+                        )
+                    if stat.st_size > settings.max_file_bytes:
+                        raise OSError(
+                            f"file exceeds connector limit of {settings.max_file_bytes} bytes"
+                        )
+                    candidates.append(_Candidate(external_id, path, resolved, stat))
+                    _notify(
+                        progress,
+                        phase="PREFLIGHT",
+                        current=planned_files,
+                        total=None,
+                        bytes_total=planned_bytes,
                         path=external_id,
-                        content_type=_content_type(path),
-                        modified_at=datetime.fromtimestamp(
-                            stat.st_mtime, timezone.utc
-                        ).isoformat(),
-                        size_bytes=stat.st_size,
-                        checksum=checksum,
-                        change_token=f"{stat.st_mtime_ns}:{stat.st_size}:{checksum}",
-                        content_ref=str(resolved),
-                        metadata={
-                            "extension": path.suffix.lower(),
-                            "device": stat.st_dev,
-                            "inode": stat.st_ino,
-                            "created_at": datetime.fromtimestamp(
-                                stat.st_ctime, timezone.utc
-                            ).isoformat(),
-                        },
-                        permission_metadata={
-                            "mode": oct(stat.st_mode & 0o777),
-                            "uid": getattr(stat, "st_uid", None),
-                            "gid": getattr(stat, "st_gid", None),
-                        },
                     )
-                    prior = previous.get(external_id)
-                    if prior is None:
-                        change = DiscoveryChange.NEW
-                    elif prior.checksum == checksum:
-                        change = DiscoveryChange.UNCHANGED
-                    else:
-                        change = DiscoveryChange.CHANGED
-                    sources.append(DiscoveredSource(change=change, record=record))
+                except OperationCancelled:
+                    raise
                 except (OSError, ValueError) as exc:
                     failures.append(DiscoveryFailure(
                         external_id=external_id,
                         path=str(path),
                         error=_bounded_error(exc),
                     ))
+
+        _notify(
+            progress,
+            phase="DISCOVERY",
+            current=0,
+            total=len(candidates),
+            bytes_total=planned_bytes,
+        )
+        for index, candidate in enumerate(candidates, start=1):
+            _check_cancelled(should_cancel)
+            external_id = candidate.external_id
+            path = candidate.path
+            try:
+                checksum, stat = self._checksum(
+                    candidate.resolved,
+                    settings,
+                    expected_stat=candidate.stat,
+                )
+                record = SourceRecord(
+                    external_id=external_id,
+                    source_id=definition.source_id,
+                    name=path.name,
+                    path=external_id,
+                    content_type=_content_type(path),
+                    modified_at=datetime.fromtimestamp(
+                        stat.st_mtime, timezone.utc
+                    ).isoformat(),
+                    size_bytes=stat.st_size,
+                    checksum=checksum,
+                    change_token=f"{stat.st_mtime_ns}:{stat.st_size}:{checksum}",
+                    content_ref=str(candidate.resolved),
+                    metadata={
+                        "extension": path.suffix.lower(),
+                        "device": stat.st_dev,
+                        "inode": stat.st_ino,
+                        "created_at": datetime.fromtimestamp(
+                            stat.st_ctime, timezone.utc
+                        ).isoformat(),
+                    },
+                    permission_metadata=_permission_metadata(candidate.resolved, stat),
+                )
+                prior = previous.get(external_id)
+                if prior is None:
+                    change = DiscoveryChange.NEW
+                elif prior.checksum == checksum:
+                    change = DiscoveryChange.UNCHANGED
+                else:
+                    change = DiscoveryChange.CHANGED
+                sources.append(DiscoveredSource(change=change, record=record))
+                _notify(
+                    progress,
+                    phase="DISCOVERY",
+                    current=index,
+                    total=len(candidates),
+                    bytes_total=planned_bytes,
+                    path=external_id,
+                )
+            except OperationCancelled:
+                raise
+            except (OSError, ValueError) as exc:
+                failures.append(DiscoveryFailure(
+                    external_id=external_id,
+                    path=str(path),
+                    error=_bounded_error(exc),
+                ))
         return DiscoveryBatch(
             sources=tuple(sources),
             failures=tuple(failures),
             complete=complete,
+            metadata={
+                "planned_files": planned_files,
+                "planned_bytes": planned_bytes,
+                "blocked": False,
+            },
         )
 
     @contextmanager
@@ -271,6 +367,8 @@ class FilesystemConnector(ConnectorModule):
         self,
         path: Path,
         settings: _FilesystemSettings,
+        *,
+        expected_stat: os.stat_result,
     ) -> tuple[str, os.stat_result]:
         digest = hashlib.sha256()
         stream = self._open_file(path, "rb")
@@ -278,6 +376,13 @@ class FilesystemConnector(ConnectorModule):
             opened_stat = _stream_stat(stream, path, self._stat_file)
             _require_regular(opened_stat)
             _require_opened_inside(stream, settings.root)
+            if any((
+                opened_stat.st_dev != expected_stat.st_dev,
+                opened_stat.st_ino != expected_stat.st_ino,
+                opened_stat.st_size != expected_stat.st_size,
+                opened_stat.st_mtime_ns != expected_stat.st_mtime_ns,
+            )):
+                raise OSError("source changed after preflight; retry the index run")
             total = 0
             while chunk := stream.read(1024 * 1024):
                 total += len(chunk)
@@ -289,15 +394,23 @@ class FilesystemConnector(ConnectorModule):
         finally:
             stream.close()
         return digest.hexdigest(), opened_stat
-
-
-
 @dataclass(frozen=True)
 class _FilesystemSettings:
     root: Path
     include_extensions: tuple[str, ...]
     include_hidden: bool
     max_file_bytes: int
+    max_files: int
+    max_total_bytes: int
+    exclude_patterns: tuple[str, ...]
+
+
+@dataclass(frozen=True)
+class _Candidate:
+    external_id: str
+    path: Path
+    resolved: Path
+    stat: os.stat_result
 
 
 def _settings(
@@ -306,7 +419,15 @@ def _settings(
 ) -> _FilesystemSettings:
     if source.connector_module_id != expected_module_id:
         raise ModuleConfigurationError("source uses a different connector module")
-    allowed = {"root", "include_extensions", "include_hidden", "max_file_bytes"}
+    allowed = {
+        "root",
+        "include_extensions",
+        "include_hidden",
+        "max_file_bytes",
+        "max_files",
+        "max_total_bytes",
+        "exclude_patterns",
+    }
     unknown = set(source.configuration) - allowed
     if unknown:
         raise ModuleConfigurationError(
@@ -334,9 +455,120 @@ def _settings(
     maximum = source.configuration.get("max_file_bytes", DEFAULT_MAX_FILE_BYTES)
     if not isinstance(maximum, int) or isinstance(maximum, bool) or maximum <= 0:
         raise ModuleConfigurationError("source configuration.max_file_bytes must be positive")
+    max_files = source.configuration.get("max_files", DEFAULT_MAX_FILES)
+    if not isinstance(max_files, int) or isinstance(max_files, bool) or max_files <= 0:
+        raise ModuleConfigurationError("source configuration.max_files must be positive")
+    max_total = source.configuration.get("max_total_bytes", DEFAULT_MAX_TOTAL_BYTES)
+    if not isinstance(max_total, int) or isinstance(max_total, bool) or max_total <= 0:
+        raise ModuleConfigurationError(
+            "source configuration.max_total_bytes must be positive"
+        )
+    patterns = source.configuration.get("exclude_patterns", ())
+    if not isinstance(patterns, (list, tuple)) or not all(
+        isinstance(value, str) and value.strip() for value in patterns
+    ):
+        raise ModuleConfigurationError(
+            "source configuration.exclude_patterns must be an array of strings"
+        )
+    if len(patterns) > 100:
+        raise ModuleConfigurationError("at most 100 exclusion patterns are allowed")
     if not root.is_dir():
         raise ModuleConfigurationError(f"filesystem root is not a directory: {root}")
-    return _FilesystemSettings(root, extensions, include_hidden, maximum)
+    return _FilesystemSettings(
+        root,
+        extensions,
+        include_hidden,
+        maximum,
+        max_files,
+        max_total,
+        tuple(patterns),
+    )
+
+
+def _excluded(relative: str, name: str, patterns: tuple[str, ...]) -> bool:
+    return any(fnmatch(relative, pattern) or fnmatch(name, pattern) for pattern in patterns)
+
+
+def _check_cancelled(should_cancel: Callable[[], bool] | None) -> None:
+    if should_cancel is not None and should_cancel():
+        raise OperationCancelled("index run cancelled by operator")
+
+
+def _notify(
+    progress: Callable[[Mapping[str, object]], None] | None,
+    **value: object,
+) -> None:
+    if progress is not None:
+        progress(value)
+
+
+def _scope_limit_batch(
+    settings: _FilesystemSettings,
+    planned_files: int,
+    planned_bytes: int,
+    exceeded: str,
+) -> DiscoveryBatch:
+    message = (
+        f"source preflight stopped: {exceeded} exceeds configured scope "
+        f"({planned_files} files, {planned_bytes} bytes; limits are "
+        f"{settings.max_files} files and {settings.max_total_bytes} bytes)"
+    )
+    return DiscoveryBatch(
+        failures=(DiscoveryFailure(".", str(settings.root), message),),
+        complete=False,
+        metadata={
+            "planned_files": planned_files,
+            "planned_bytes": planned_bytes,
+            "blocked": True,
+        },
+    )
+
+
+def _permission_metadata(path: Path, value: os.stat_result) -> dict[str, object]:
+    mode = value.st_mode
+    metadata: dict[str, object] = {
+        "permission_model": "POSIX_MODE" if os.name == "posix" else "BASIC",
+        "mode": oct(mode & 0o777),
+        "effective_access": {
+            "read": os.access(path, os.R_OK),
+            "write": os.access(path, os.W_OK),
+        },
+        "acl_captured": False,
+    }
+    if os.name != "posix":
+        return metadata
+    import grp
+    import pwd
+
+    uid = getattr(value, "st_uid", None)
+    gid = getattr(value, "st_gid", None)
+    try:
+        owner_name = pwd.getpwuid(uid).pw_name if uid is not None else None
+    except KeyError:
+        owner_name = None
+    try:
+        group_name = grp.getgrgid(gid).gr_name if gid is not None else None
+    except KeyError:
+        group_name = None
+    metadata.update({
+        "owner": {
+            "id": uid,
+            "name": owner_name,
+            "read": bool(mode & stat_module.S_IRUSR),
+            "write": bool(mode & stat_module.S_IWUSR),
+        },
+        "group": {
+            "id": gid,
+            "name": group_name,
+            "read": bool(mode & stat_module.S_IRGRP),
+            "write": bool(mode & stat_module.S_IWGRP),
+        },
+        "other": {
+            "read": bool(mode & stat_module.S_IROTH),
+            "write": bool(mode & stat_module.S_IWOTH),
+        },
+    })
+    return metadata
 
 
 def _include_name(name: str, settings: _FilesystemSettings) -> bool:

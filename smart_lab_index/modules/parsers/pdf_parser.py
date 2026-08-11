@@ -21,12 +21,15 @@ from smart_lab_index.core.modules import (
     ParserModule,
 )
 from smart_lab_index.modules.parsers.common import (
+    MAX_PDF_PAGES,
     DocumentParseError,
     assess_table,
     bbox,
     clean_cell,
     json_safe_metadata,
     provenance,
+    require_table_budget,
+    require_text_budget,
     source_extension,
 )
 
@@ -35,7 +38,7 @@ class PdfParser(ParserModule):
     manifest = ModuleManifest(
         module_id="parser.pdf",
         name="PDF Parser",
-        version="0.1.0",
+        version="0.2.0",
         module_type=ModuleType.PARSER,
         description="Extracts text and tables from born-digital PDF streams.",
         capabilities=(ModuleCapability("parser.document", "1.0.0"),),
@@ -50,11 +53,18 @@ class PdfParser(ParserModule):
         try:
             content.seek(0)
             with pdfplumber.open(content) as pdf:
+                if len(pdf.pages) > MAX_PDF_PAGES:
+                    raise DocumentParseError("PDF document exceeds the page limit")
                 blocks = []
                 tables = []
+                text_characters = 0
+                table_rows = 0
+                table_cells = 0
                 for page in pdf.pages:
                     text = (page.extract_text() or "").strip()
                     if text:
+                        text_characters += len(text)
+                        require_text_budget(text_characters, "PDF document")
                         blocks.append(TextBlock(
                             index=len(blocks),
                             kind="page_text",
@@ -70,6 +80,9 @@ class PdfParser(ParserModule):
                             tuple(clean_cell(cell) for cell in row)
                             for row in table.extract()
                         )
+                        table_rows += len(rows)
+                        table_cells += sum(len(row) for row in rows)
+                        require_table_budget(table_rows, table_cells, "PDF document")
                         cell_provenance = []
                         for row_index, row in enumerate(rows):
                             source_cells = (
@@ -104,12 +117,12 @@ class PdfParser(ParserModule):
                 warnings = []
                 if not blocks:
                     warnings.append("no machine-readable PDF text detected")
-                if not tables:
-                    warnings.append("no PDF tables detected")
                 metadata = {
                     "page_count": len(pdf.pages),
                     "document_metadata": json_safe_metadata(pdf.metadata or {}),
                 }
+        except DocumentParseError:
+            raise
         except Exception as exc:
             raise DocumentParseError(f"PDF parsing failed: {exc}") from exc
         return DocumentContent(

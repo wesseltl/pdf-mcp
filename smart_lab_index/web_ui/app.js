@@ -28,6 +28,7 @@ const DETAIL_KEY_ORDER = [
 
 const elements = {
   announcement: document.getElementById("announcement"),
+  cancelIndexButton: document.getElementById("cancel-index-button"),
   changeSourceButton: document.getElementById("change-source-button"),
   desktopNav: document.getElementById("desktop-nav"),
   detailBody: document.getElementById("detail-body"),
@@ -61,6 +62,11 @@ const ui = {
   pollTimer: null,
   requestBusy: false,
   returnFocus: null,
+  searchError: "",
+  searchQuery: "",
+  searchResults: [],
+  searchTimer: null,
+  searching: false,
   state: null,
   stopped: false,
 };
@@ -366,6 +372,30 @@ async function startIndex() {
   }
 }
 
+async function cancelIndex() {
+  if (ui.requestBusy || operationState() !== "INDEXING" || ui.stopped) {
+    return;
+  }
+  ui.requestBusy = true;
+  ui.actionError = "";
+  updateCommandState();
+  try {
+    await apiRequest("/api/cancel-index", { method: "POST" });
+    if (ui.state?.operation) {
+      ui.state.operation.cancel_requested = true;
+    }
+    announce("Index cancellation requested");
+    renderOperationStatus();
+    schedulePoll();
+  } catch (error) {
+    ui.actionError = error instanceof Error ? error.message : "Unable to cancel indexing.";
+    renderApplication();
+  } finally {
+    ui.requestBusy = false;
+    updateCommandState();
+  }
+}
+
 async function changeSource() {
   if (ui.requestBusy || ui.stopped || ui.changingSource) {
     return;
@@ -439,6 +469,9 @@ function updateCommandState() {
   const indexing = operationState() === "INDEXING";
   const disabled = ui.requestBusy || ui.stopped || ui.changingSource;
   elements.indexButton.disabled = disabled || indexing || !ui.state;
+  elements.indexButton.hidden = indexing;
+  elements.cancelIndexButton.hidden = !indexing;
+  elements.cancelIndexButton.disabled = disabled || !indexing || ui.state?.operation?.cancel_requested === true;
   elements.changeSourceButton.disabled = disabled || indexing || !ui.state;
   elements.refreshButton.disabled = disabled || ui.fetching;
   elements.shutdownButton.disabled = disabled;
@@ -456,6 +489,9 @@ function chooseView(viewId) {
   renderNavigation();
   renderViewHeader();
   renderActiveView();
+  if (viewCategory(activeView()) === "search" && elements.filter.value.trim().length >= 2) {
+    scheduleSearch();
+  }
   elements.viewTitle.focus?.({ preventScroll: true });
 }
 
@@ -466,6 +502,9 @@ function viewCategory(view) {
 
   if (combined.includes("overview") || combined.includes("dashboard")) {
     return "overview";
+  }
+  if (combined.includes("search")) {
+    return "search";
   }
   if (view?.predicate || combined.includes("responsib") || combined.includes("relationship") || combined.includes("assertion")) {
     return "responsibilities";
@@ -496,6 +535,7 @@ function navigationIcon(view) {
     issues: "!",
     modules: "◇",
     overview: "▦",
+    search: "⌕",
     responsibilities: "✓",
     sources: "↗",
     unknown: "·",
@@ -581,7 +621,9 @@ function renderViewHeader() {
   const label = scalarText(view?.label, "Index");
   elements.viewTitle.textContent = label;
   elements.viewTitle.tabIndex = -1;
-  elements.filter.placeholder = `Filter ${label.toLocaleLowerCase()}`;
+  elements.filter.placeholder = viewCategory(view) === "search"
+    ? "Search all indexed knowledge"
+    : `Filter ${label.toLocaleLowerCase()}`;
   elements.filter.value = ui.filterByView.get(ui.activeViewId) || "";
   setViewCount(view?.count ?? null);
 }
@@ -608,6 +650,24 @@ function summarizeOperationResult(result) {
   return parts.length ? parts.join(" · ") : "Index state updated";
 }
 
+function progressDetail(operation) {
+  const progress = asObject(operation.progress);
+  if (operation.cancel_requested) {
+    return "Cancelling after the current file";
+  }
+  const phase = humanize(progress.phase || "Indexing");
+  const current = Number(progress.current);
+  const total = Number(progress.total);
+  const count = Number.isFinite(current) && Number.isFinite(total) && total > 0
+    ? `${formatNumber(current)} of ${formatNumber(total)}`
+    : Number.isFinite(current) && current > 0
+      ? formatNumber(current)
+      : "";
+  const bytes = progress.bytes_total ? formatBytes(progress.bytes_total) : "";
+  const path = progress.path ? scalarText(progress.path) : "";
+  return [phase, count, bytes, path].filter(Boolean).join(" · ") || "Starting index run";
+}
+
 function renderOperationStatus() {
   elements.operationStatus.replaceChildren();
 
@@ -625,7 +685,7 @@ function renderOperationStatus() {
       createOperationStrip(
         "indexing",
         "Indexing files",
-        "The index remains available while this run is in progress.",
+        progressDetail(operation),
         "spinner",
         formatDate(operation.started_at),
       ),
@@ -641,12 +701,13 @@ function renderOperationStatus() {
       ),
     );
   } else if (operation.completed_at && operation.result) {
+    const cancelled = String(operation.result.status || "").toUpperCase() === "CANCELLED";
     elements.operationStatus.append(
       createOperationStrip(
-        "success",
-        "Index complete",
+        cancelled ? "warning" : "success",
+        cancelled ? "Index cancelled" : "Index complete",
         summarizeOperationResult(operation.result),
-        "✓",
+        cancelled ? "■" : "✓",
         formatDate(operation.completed_at),
       ),
     );
@@ -659,7 +720,12 @@ function createOperationStrip(tone, title, detail, symbol, time = "") {
   if (symbol === "spinner") {
     icon = node("span", "spinner");
   } else {
-    icon = node("span", `status-badge ${tone === "failed" ? "status-danger" : "status-success"}`, symbol);
+    const badgeTone = tone === "failed"
+      ? "status-danger"
+      : tone === "warning"
+        ? "status-warning"
+        : "status-success";
+    icon = node("span", `status-badge ${badgeTone}`, symbol);
   }
   icon.setAttribute("aria-hidden", "true");
 
@@ -760,6 +826,7 @@ function renderActiveView() {
     modules: renderModules,
     overview: renderOverview,
     responsibilities: renderResponsibilities,
+    search: renderSearch,
     sources: renderSources,
     unknown: renderUnknownView,
   };
@@ -796,6 +863,109 @@ function sectionHeading(title, note = "") {
   return heading;
 }
 
+function scheduleSearch() {
+  if (ui.searchTimer !== null) {
+    window.clearTimeout(ui.searchTimer);
+  }
+  const query = elements.filter.value.trim();
+  if (query.length < 2) {
+    ui.searchQuery = query;
+    ui.searchResults = [];
+    ui.searchError = "";
+    ui.searching = false;
+    renderSearch(activeView());
+    return;
+  }
+  ui.searching = true;
+  ui.searchError = "";
+  renderSearch(activeView());
+  ui.searchTimer = window.setTimeout(() => performSearch(query), 250);
+}
+
+async function performSearch(query) {
+  ui.searchTimer = null;
+  try {
+    const payload = await apiRequest(`/api/search?q=${encodeURIComponent(query)}&limit=50`);
+    if (viewCategory(activeView()) !== "search" || elements.filter.value.trim() !== query) {
+      return;
+    }
+    ui.searchQuery = query;
+    ui.searchResults = asArray(payload?.results);
+    ui.searchError = "";
+  } catch (error) {
+    ui.searchError = error instanceof Error ? error.message : "Search could not be completed.";
+    ui.searchResults = [];
+  } finally {
+    if (viewCategory(activeView()) === "search" && elements.filter.value.trim() === query) {
+      ui.searching = false;
+      renderSearch(activeView());
+    }
+  }
+}
+
+function renderSearch(view) {
+  const query = elements.filter.value.trim();
+  if (query.length < 2) {
+    elements.viewRoot.replaceChildren(
+      emptyState("Search the index", "Enter a name, identifier, location, document, or issue.", "⌕"),
+    );
+    setViewCount(null);
+    return;
+  }
+  if (ui.searching && ui.searchQuery !== query) {
+    const panel = node("div", "state-panel state-panel-loading");
+    const spinner = node("span", "spinner");
+    spinner.setAttribute("aria-hidden", "true");
+    panel.append(spinner, node("strong", "", "Searching index"));
+    elements.viewRoot.replaceChildren(panel);
+    setViewCount(null);
+    return;
+  }
+  if (ui.searchError) {
+    elements.viewRoot.replaceChildren(emptyState("Search failed", ui.searchError, "!"));
+    setViewCount(0);
+    return;
+  }
+  const rows = ui.searchQuery === query ? ui.searchResults : [];
+  setViewCount(rows.length);
+  if (!rows.length) {
+    elements.viewRoot.replaceChildren(
+      emptyState("No search results", "No indexed record matches this query.", "⌕"),
+    );
+    return;
+  }
+  elements.viewRoot.replaceChildren(createTable({
+    caption: scalarText(view?.label, "Search results"),
+    columns: [
+      { label: "Type", value: (row) => statusBadge(row.kind) },
+      { key: "title", label: "Result", className: "primary-cell" },
+      { key: "subtitle", label: "Context" },
+      { key: "snippet", label: "Match", className: "cell-muted" },
+      { key: "source_path", label: "Source", className: "cell-mono" },
+    ],
+    rows,
+    rowLabel: (row) => `Open search result for ${scalarText(row.title, "record")}`,
+    onOpen: openSearchResult,
+  }));
+}
+
+function openSearchResult(result) {
+  if (result.kind === "issue") {
+    const issue = asArray(ui.state?.issues).find(
+      (item) => item.issue_id === result.issue_id,
+    ) || asObject(result.record);
+    if (issue) {
+      openIssueDetails(issue);
+      return;
+    }
+  }
+  openDetails(
+    scalarText(result.title, "Search result"),
+    [humanize(result.kind), result.subtitle].filter(Boolean).join(" · "),
+    result,
+  );
+}
+
 function renderOverview(view) {
   const summary = asObject(ui.state.summary);
   const hasData = Number(summary.documents || 0) > 0
@@ -806,7 +976,7 @@ function renderOverview(view) {
     const panel = emptyState("No indexed data", "The configured source has not been indexed yet.", "▦");
     panel.append(commandButton("Index now", "▶", startIndex));
     elements.viewRoot.replaceChildren(panel);
-    setViewCount(view.count ?? 0);
+    setViewCount(null);
     return;
   }
 
@@ -854,7 +1024,7 @@ function renderOverview(view) {
   container.append(issueSection);
 
   elements.viewRoot.replaceChildren(container);
-  setViewCount(allOpenIssues.length, openIssues.length);
+  setViewCount(null);
 }
 
 function renderRunSummary(run) {
@@ -923,7 +1093,7 @@ function renderEntities(view) {
     (entity) => !entityTypes.length || entityTypes.includes(String(entity.entity_type).toUpperCase()),
   );
   const rows = filteredRows(allRows);
-  setViewCount(allRows.length, rows.length);
+  setViewCount(view.count ?? allRows.length, rows.length);
 
   if (!rows.length) {
     elements.viewRoot.replaceChildren(
@@ -979,7 +1149,7 @@ function responsibilityRows(view) {
 function renderResponsibilities(view) {
   const allRows = responsibilityRows(view);
   const rows = filteredRows(allRows);
-  setViewCount(allRows.length, rows.length);
+  setViewCount(view.count ?? allRows.length, rows.length);
   if (!rows.length) {
     elements.viewRoot.replaceChildren(
       emptyState(
@@ -1028,7 +1198,7 @@ function sourcePair(path, id) {
 function renderDocuments(view) {
   const allRows = asArray(ui.state.documents);
   const rows = filteredRows(allRows);
-  setViewCount(allRows.length, rows.length);
+  setViewCount(view.count ?? allRows.length, rows.length);
   if (!rows.length) {
     elements.viewRoot.replaceChildren(
       emptyState(
@@ -1046,6 +1216,8 @@ function renderDocuments(view) {
       { key: "source_path", label: "Document", className: "primary-cell" },
       { key: "content_type", label: "Content type" },
       { label: "Parser", value: (row) => modulePair(row.parser_module_id, row.parser_version) },
+      { label: "Extracted", value: extractionCoverage },
+      { label: "Warnings", value: extractionWarnings },
       { key: "source_generation", label: "Generation" },
       { label: "Indexed", value: (row) => formatDate(row.created_at) },
     ],
@@ -1057,6 +1229,25 @@ function renderDocuments(view) {
       row,
     ),
   }));
+}
+
+function extractionCoverage(row) {
+  const entities = Number(row.extracted_entity_count || 0);
+  const assertions = Number(row.extracted_assertion_count || 0);
+  return `${formatNumber(entities)} entities · ${formatNumber(assertions)} assertions`;
+}
+
+function extractionWarnings(row) {
+  const parserWarnings = asArray(row.parser_warnings);
+  const extractionWarnings = asArray(row.processing).flatMap(
+    (item) => asArray(item.warnings),
+  );
+  const count = parserWarnings.length + extractionWarnings.length;
+  return node(
+    "span",
+    `status-badge ${count ? "status-warning" : "status-success"}`,
+    count ? `${count} warning${count === 1 ? "" : "s"}` : "Clear",
+  );
 }
 
 function modulePair(moduleId, version) {
@@ -1080,13 +1271,107 @@ function issueTable(rows, caption) {
     ],
     rows,
     rowLabel: (row) => `Open issue details for ${scalarText(row.code, "issue")}`,
-    onOpen: (row) => openDetails(
-      issueLabel(row.code),
-      scalarText(row.entity_name, scalarText(row.issue_id, "Issue evidence")),
-      row,
-      ["severity", "status", "entity_name", "evidence", "assertion_ids", "issue_id", "rule_module_id", "rule_version"],
-    ),
+    onOpen: openIssueDetails,
   });
+}
+
+function openIssueDetails(issue) {
+  openDetails(
+    issueLabel(issue.code),
+    scalarText(issue.entity_name, scalarText(issue.issue_id, "Issue evidence")),
+    issue,
+    ["severity", "status", "entity_name", "evidence", "reviews", "assertion_ids", "issue_id", "rule_module_id", "rule_version"],
+  );
+  if (String(issue.status || "").toUpperCase() !== "OPEN") {
+    return;
+  }
+  const observations = asArray(asObject(issue.evidence).observed_locations);
+
+  const section = node("section", "detail-group review-form");
+  section.append(node("span", "detail-label", "Resolve issue"));
+  const form = document.createElement("form");
+  if (observations.length) {
+    const fieldset = document.createElement("fieldset");
+    fieldset.append(node("legend", "review-legend", "Authoritative location"));
+    observations.forEach((observation, index) => {
+      const item = asObject(observation);
+      const option = node("label", "review-option");
+      const radio = document.createElement("input");
+      radio.type = "radio";
+      radio.name = "assertion_id";
+      radio.value = scalarText(item.assertion_id, "");
+      radio.required = true;
+      const copy = node("span", "inline-pair");
+      copy.append(
+        node("strong", "", scalarText(item.location_name, `Location ${index + 1}`)),
+        node("span", "inline-secondary", locationEvidenceSummary(item)),
+      );
+      option.append(radio, copy);
+      fieldset.append(option);
+    });
+    form.append(fieldset);
+  }
+
+  const reasonLabel = node("label", "review-reason-label", "Review note");
+  const reason = document.createElement("textarea");
+  reason.name = "reason";
+  reason.required = true;
+  reason.maxLength = 1000;
+  reason.rows = 3;
+  reasonLabel.append(reason);
+
+  const error = node("p", "review-error");
+  error.setAttribute("role", "alert");
+  const actions = node("div", "review-actions");
+  if (observations.length) {
+    const confirm = commandButton("Confirm location", "✓", () => {
+      const selected = form.querySelector('input[name="assertion_id"]:checked');
+      if (!form.reportValidity() || !selected) {
+        return;
+      }
+      submitIssueReview(issue, "CONFIRM_ASSERTION", selected.value, reason.value, form, error);
+    });
+    confirm.type = "button";
+    actions.append(confirm);
+  }
+  const dismiss = commandButton("Dismiss issue", "×", () => {
+    if (!reason.reportValidity()) {
+      return;
+    }
+    submitIssueReview(issue, "DISMISS", null, reason.value, form, error);
+  }, "button button-secondary");
+  dismiss.type = "button";
+  actions.append(dismiss);
+  form.append(reasonLabel, error, actions);
+  section.append(form);
+  elements.detailBody.prepend(section);
+}
+
+async function submitIssueReview(issue, decision, assertionId, reason, form, errorElement) {
+  Array.from(form.elements).forEach((control) => {
+    control.disabled = true;
+  });
+  errorElement.textContent = "";
+  try {
+    await apiRequest("/api/review-issue", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        issue_id: issue.issue_id,
+        decision,
+        assertion_id: assertionId,
+        reason,
+      }),
+    });
+    closeDetails();
+    await refreshState({ announceRefresh: false });
+    announce(decision === "DISMISS" ? "Issue dismissed" : "Location confirmed");
+  } catch (error) {
+    errorElement.textContent = error instanceof Error ? error.message : "Review could not be saved.";
+    Array.from(form.elements).forEach((control) => {
+      control.disabled = false;
+    });
+  }
 }
 
 function evidenceSummary(evidence) {
@@ -1131,7 +1416,7 @@ function renderIssues(view) {
     (issue) => !requestedStatus || String(issue.status || "").toUpperCase() === requestedStatus,
   );
   const rows = filteredRows(allRows);
-  setViewCount(allRows.length, rows.length);
+  setViewCount(view.count ?? allRows.length, rows.length);
   if (!rows.length) {
     elements.viewRoot.replaceChildren(
       emptyState(
@@ -1148,7 +1433,7 @@ function renderIssues(view) {
 function renderSources(view) {
   const allRows = asArray(ui.state.sources);
   const rows = filteredRows(allRows);
-  setViewCount(allRows.length, rows.length);
+  setViewCount(view.count ?? allRows.length, rows.length);
   if (!rows.length) {
     elements.viewRoot.replaceChildren(
       emptyState(
@@ -1167,6 +1452,7 @@ function renderSources(view) {
       { key: "content_type", label: "Content type" },
       { label: "Size", value: (row) => formatBytes(row.size_bytes) },
       { label: "Modified", value: (row) => formatDate(row.modified_at) },
+      { label: "Access", value: sourceAccess },
       { key: "source_generation", label: "Generation" },
       { label: "State", value: (row) => statusBadge(row.deleted_at ? "Deleted" : "Active") },
     ],
@@ -1178,6 +1464,20 @@ function renderSources(view) {
       row,
     ),
   }));
+}
+
+function sourceAccess(row) {
+  const permissions = asObject(row.permission_metadata);
+  const owner = asObject(permissions.owner);
+  const group = asObject(permissions.group);
+  const parts = [];
+  if (owner.name || owner.id !== undefined) {
+    parts.push(`Owner ${scalarText(owner.name ?? owner.id)}`);
+  }
+  if (group.name || group.id !== undefined) {
+    parts.push(`Group ${scalarText(group.name ?? group.id)}`);
+  }
+  return parts.length ? parts.join(" · ") : humanize(permissions.permission_model || "Basic");
 }
 
 function normalizedModules() {
@@ -1219,7 +1519,7 @@ function normalizedModules() {
 function renderModules(view) {
   const allRows = normalizedModules();
   const rows = filteredRows(allRows);
-  setViewCount(allRows.length, rows.length);
+  setViewCount(view.count ?? allRows.length, rows.length);
   if (!rows.length) {
     elements.viewRoot.replaceChildren(
       emptyState(
@@ -1433,11 +1733,16 @@ function closeDetails() {
 elements.refreshButton.addEventListener("click", () => refreshState({ announceRefresh: true }));
 elements.changeSourceButton.addEventListener("click", changeSource);
 elements.indexButton.addEventListener("click", startIndex);
+elements.cancelIndexButton.addEventListener("click", cancelIndex);
 elements.shutdownButton.addEventListener("click", stopApplication);
 elements.mobileViewSelect.addEventListener("change", (event) => chooseView(event.target.value));
 elements.filter.addEventListener("input", (event) => {
   ui.filterByView.set(ui.activeViewId, event.target.value);
-  renderActiveView();
+  if (viewCategory(activeView()) === "search") {
+    scheduleSearch();
+  } else {
+    renderActiveView();
+  }
 });
 elements.detailClose.addEventListener("click", closeDetails);
 elements.detailDialog.addEventListener("click", (event) => {

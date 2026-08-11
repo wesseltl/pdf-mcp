@@ -12,6 +12,10 @@ from unittest.mock import Mock, call, patch
 
 from scripts.generate_smart_lab_example import generate
 from smart_lab_index.core.config import RuntimePolicy
+from smart_lab_index.modules.connectors.filesystem import (
+    DEFAULT_MAX_FILES,
+    DEFAULT_MAX_TOTAL_BYTES,
+)
 from smart_lab_index.web_app import create_server, main
 
 
@@ -115,10 +119,14 @@ class SmartLabWebAppTests(unittest.TestCase):
             organizations["entity_types"],
             ["ORGANIZATION", "ORGANIZATIONAL_UNIT"],
         )
-        self.assertEqual(len(payload["modules"]), 13)
-        self.assertTrue(
-            all(module["health"] == "HEALTHY" for module in payload["modules"])
-        )
+        self.assertEqual(len(payload["modules"]), 15)
+        self.assertTrue(all(
+            module["health"] == "HEALTHY" or (
+                module["module_id"] == "issue.missing_responsibility"
+                and module["health"] == "DISABLED"
+            )
+            for module in payload["modules"]
+        ))
         self.assertTrue(
             all(
                 module["security"]["network_access"] == "NONE"
@@ -264,9 +272,90 @@ class SmartLabWebAppTests(unittest.TestCase):
         self.assertEqual(rerun["parsed"], 0)
         self.assertEqual(rerun["assertions"], 0)
 
+    def test_search_and_issue_review_are_local_authenticated_and_durable(self) -> None:
+        status, _headers, _content = self.request(
+            "POST",
+            "/api/index",
+            body=b"",
+            headers=self.api_headers(),
+        )
+        self.assertEqual(status, 202)
+        self.assertTrue(self.state.wait_for_index(timeout=10))
+
+        status, _headers, _content = self.request(
+            "GET",
+            "/api/search?q=Freezer-001",
+        )
+        self.assertEqual(status, 403)
+        status, _headers, content = self.request(
+            "GET",
+            "/api/search?q=Freezer-001",
+            headers=self.api_headers(),
+        )
+        self.assertEqual(status, 200)
+        search = json.loads(content)
+        self.assertIn(
+            ("entity", "Freezer-001"),
+            {(item["kind"], item["title"]) for item in search["results"]},
+        )
+
+        issue = self.state_payload()["issues"][0]
+        selected = next(
+            item["assertion_id"]
+            for item in issue["evidence"]["observed_locations"]
+            if item["location_name"] == "Room A-101"
+        )
+        body = json.dumps({
+            "issue_id": issue["issue_id"],
+            "decision": "CONFIRM_ASSERTION",
+            "assertion_id": selected,
+            "reason": "Verified against the controlled equipment register.",
+        }).encode("utf-8")
+        headers = self.api_headers()
+        headers["Content-Type"] = "application/json"
+        status, _headers, content = self.request(
+            "POST",
+            "/api/review-issue",
+            body=body,
+            headers=headers,
+        )
+        self.assertEqual(status, 200)
+        self.assertEqual(json.loads(content)["issue"]["status"], "RESOLVED")
+
+        status, _headers, content = self.request(
+            "POST",
+            "/api/review-issue",
+            body=body,
+            headers=headers,
+        )
+        self.assertEqual(status, 409)
+        self.assertIn("only open issues", json.loads(content)["error"])
+
+        payload = self.state_payload()
+        self.assertEqual(payload["summary"]["open_issues"], 0)
+        reviewed = next(item for item in payload["issues"] if item["issue_id"] == issue["issue_id"])
+        self.assertEqual(reviewed["status"], "RESOLVED")
+        self.assertEqual(reviewed["reviews"][0]["decision"], "CONFIRM_ASSERTION")
+        selected_status = next(
+            assertion["status"]
+            for assertion in payload["assertions"]
+            if assertion["assertion_id"] == selected
+        )
+        self.assertEqual(selected_status, "CONFIRMED")
+
+        status, _headers, _content = self.request(
+            "POST",
+            "/api/index",
+            body=b"",
+            headers=self.api_headers(),
+        )
+        self.assertEqual(status, 202)
+        self.assertTrue(self.state.wait_for_index(timeout=10))
+        self.assertEqual(self.state_payload()["summary"]["open_issues"], 0)
+
 
 class SmartLabWebAppMainTests(unittest.TestCase):
-    def test_no_root_uses_picker_enables_no_egress_and_indexes(self) -> None:
+    def test_no_root_uses_picker_enables_no_egress_without_automatic_scan(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:
             root = Path(temporary) / "lab"
             root.mkdir()
@@ -299,7 +388,7 @@ class SmartLabWebAppMainTests(unittest.TestCase):
         managed_database = Path(create.call_args.kwargs["database"])
         self.assertEqual(managed_database.parent.name, "workspaces")
         self.assertNotIn(root.name, managed_database.name)
-        state.start_index.assert_called_once_with()
+        state.start_index.assert_not_called()
         server.serve_forever.assert_called_once_with(poll_interval=0.25)
 
     def test_no_root_falls_back_to_local_browser_folder_navigator(self) -> None:
@@ -333,7 +422,7 @@ class SmartLabWebAppMainTests(unittest.TestCase):
         browser_picker.assert_called_once_with(port=9025, open_browser=False)
         self.assertTrue(create.call_args.kwargs["allow_source_change"])
         self.assertTrue(create.call_args.kwargs["policy"].no_egress)
-        state.start_index.assert_called_once_with()
+        state.start_index.assert_not_called()
 
     def test_source_change_restarts_same_port_and_clears_explicit_source_id(
         self,
@@ -393,7 +482,11 @@ class SmartLabWebAppMainTests(unittest.TestCase):
                     source_id="explicit-source",
                     policy=RuntimePolicy(no_egress=False),
                     disabled_module_ids=[],
+                    enabled_module_ids=[],
                     allow_source_change=True,
+                    max_files=DEFAULT_MAX_FILES,
+                    max_total_bytes=DEFAULT_MAX_TOTAL_BYTES,
+                    exclude_patterns=[],
                     port=9030,
                 ),
                 call(
@@ -402,13 +495,17 @@ class SmartLabWebAppMainTests(unittest.TestCase):
                     source_id=None,
                     policy=RuntimePolicy(no_egress=False),
                     disabled_module_ids=[],
+                    enabled_module_ids=[],
                     allow_source_change=True,
+                    max_files=DEFAULT_MAX_FILES,
+                    max_total_bytes=DEFAULT_MAX_TOTAL_BYTES,
+                    exclude_patterns=[],
                     port=9030,
                 ),
             ],
         )
         states[0].start_index.assert_not_called()
-        states[1].start_index.assert_called_once_with()
+        states[1].start_index.assert_not_called()
 
     def test_source_change_uses_browser_navigator_when_system_dialog_is_absent(
         self,
@@ -466,7 +563,7 @@ class SmartLabWebAppMainTests(unittest.TestCase):
         self.assertEqual(create.call_count, 2)
         self.assertEqual(create.call_args_list[1].args[0], second_root)
         self.assertTrue(create.call_args_list[1].kwargs["allow_source_change"])
-        states[1].start_index.assert_called_once_with()
+        states[1].start_index.assert_not_called()
 
     def test_failed_source_change_restores_previous_workspace(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:

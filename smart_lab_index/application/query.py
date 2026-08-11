@@ -15,6 +15,8 @@ _RESPONSIBILITY_PREDICATES = {
     "owns",
     "responsible_for",
 }
+DISPLAY_LIMIT = 500
+ASSERTION_DISPLAY_LIMIT = 1_500
 
 
 class KnowledgeQueryService:
@@ -30,14 +32,41 @@ class KnowledgeQueryService:
         modules: Sequence[Mapping[str, Any]],
         operation: Mapping[str, Any],
     ) -> dict[str, Any]:
-        sources = self._store.list_sources()
-        entities = self._store.list_entities()
+        counts = self._store.projection_counts()
+        sources = self._store.list_sources(
+            include_deleted=False,
+            limit=DISPLAY_LIMIT,
+        )
+        entities = self._store.list_entities(limit=DISPLAY_LIMIT)
+        assertion_records = self._store.list_active_assertions(
+            limit=ASSERTION_DISPLAY_LIMIT
+        )
+        document_records = self._store.list_documents(
+            active_only=True,
+            limit=DISPLAY_LIMIT,
+        )
+        issue_records = self._store.list_issues(limit=DISPLAY_LIMIT)
+        entity_ids = {entity.entity_id for entity in entities}
+        source_record_ids = {item["source_record_id"] for item in sources}
+        for assertion in assertion_records:
+            entity_ids.add(assertion.subject_entity_id)
+            if assertion.object_entity_id is not None:
+                entity_ids.add(assertion.object_entity_id)
+            source_record_ids.add(assertion.source_record_id)
+        for document in document_records:
+            source_record_ids.add(document["source_record_id"])
+        for issue in issue_records:
+            if issue["entity_id"] is not None:
+                entity_ids.add(issue["entity_id"])
+            if issue["source_record_id"] is not None:
+                source_record_ids.add(issue["source_record_id"])
+
         entity_values = [_entity_value(entity) for entity in entities]
-        entity_names = {entity.entity_id: entity.canonical_name for entity in entities}
-        source_paths = {item["source_record_id"]: item["path"] for item in sources}
+        entity_names = self._store.entity_names(entity_ids)
+        source_paths = self._store.source_paths(source_record_ids)
         assertions = [
             _assertion_value(assertion, entity_names, source_paths)
-            for assertion in self._store.list_active_assertions()
+            for assertion in assertion_records
         ]
         responsibilities = [
             assertion
@@ -52,15 +81,27 @@ class KnowledgeQueryService:
                     document["source_record_id"],
                 ),
             }
-            for document in self._store.list_documents()
+            for document in document_records
         ]
         issues = [
             {
                 **issue,
                 "entity_name": entity_names.get(issue["entity_id"]),
             }
-            for issue in self._store.list_issues()
+            for issue in issue_records
         ]
+        reviews_by_issue: dict[str, list[dict[str, Any]]] = {}
+        for review in self._store.list_review_decisions(
+            issue_ids=[issue["issue_id"] for issue in issues]
+        ):
+            reviews_by_issue.setdefault(review["target_id"], []).append(review)
+        for issue in issues:
+            issue["reviews"] = reviews_by_issue.get(issue["issue_id"], [])
+        facts_by_entity: dict[str, list[dict[str, Any]]] = {}
+        for assertion in assertions:
+            facts_by_entity.setdefault(assertion["subject_entity_id"], []).append(assertion)
+        for entity in entity_values:
+            entity["facts"] = facts_by_entity.get(entity["entity_id"], [])
         summary = self._store.summary()
         normalized_modules = [dict(module) for module in modules]
         return {
@@ -75,6 +116,7 @@ class KnowledgeQueryService:
                 documents,
                 issues,
                 sources,
+                counts,
             ),
             "entities": entity_values,
             "assertions": assertions,
@@ -83,7 +125,20 @@ class KnowledgeQueryService:
             "issues": issues,
             "sources": sources,
             "modules": normalized_modules,
+            "collections": {
+                "entities": _collection(len(entity_values), counts["entities"]),
+                "assertions": _collection(
+                    len(assertions), counts["active_assertions"]
+                ),
+                "documents": _collection(len(documents), counts["documents"]),
+                "issues": _collection(len(issues), counts["issues"]),
+                "sources": _collection(len(sources), counts["sources"]),
+            },
         }
+
+    def search(self, query: str, *, limit: int = 50) -> dict[str, Any]:
+        results = self._store.search(query, limit=limit)
+        return {"query": " ".join(query.split()), "results": results, "count": len(results)}
 
 
 def _entity_value(entity: EntityRecord) -> dict[str, Any]:
@@ -136,6 +191,7 @@ def _view_manifest(
     documents: Sequence[Mapping[str, Any]],
     issues: Sequence[Mapping[str, Any]],
     sources: Sequence[Mapping[str, Any]],
+    counts: Mapping[str, Any],
 ) -> list[dict[str, Any]]:
     active_types = {
         str(module.get("module_type"))
@@ -144,13 +200,12 @@ def _view_manifest(
         and module.get("health") not in {"ERROR", "UNAVAILABLE"}
     }
     entity_counts = {
-        entity_type.value: sum(
-            1 for entity in entities if entity["entity_type"] == entity_type.value
-        )
+        entity_type.value: counts["entities_by_type"].get(entity_type.value, 0)
         for entity_type in EntityType
     }
     values: list[dict[str, Any]] = [
         {"view_id": "overview", "label": "Overview", "kind": "overview"},
+        {"view_id": "search", "label": "Search", "kind": "search"},
     ]
     if "ENTITY_EXTRACTOR" in active_types or entities:
         values.extend(
@@ -197,7 +252,7 @@ def _view_manifest(
                 "view_id": "responsibilities",
                 "label": "Responsibilities",
                 "kind": "relationship_list",
-                "count": len(responsibilities),
+                "count": counts["responsibilities"],
             }
         )
     if "PARSER" in active_types or documents:
@@ -206,11 +261,11 @@ def _view_manifest(
                 "view_id": "documents",
                 "label": "Documents",
                 "kind": "document_list",
-                "count": len(documents),
+                "count": counts["documents"],
             }
         )
     if "ISSUE_RULE" in active_types or issues:
-        open_issues = sum(1 for issue in issues if issue["status"] == "OPEN")
+        open_issues = counts["issues_by_status"].get("OPEN", 0)
         values.extend(
             (
                 {
@@ -224,7 +279,7 @@ def _view_manifest(
                     "view_id": "issues",
                     "label": "All issues",
                     "kind": "issue_list",
-                    "count": len(issues),
+                    "count": counts["issues"],
                 },
             )
         )
@@ -234,7 +289,7 @@ def _view_manifest(
                 "view_id": "sources",
                 "label": "Sources",
                 "kind": "source_list",
-                "count": len(sources),
+                "count": counts["sources"],
             }
         )
     values.append(
@@ -246,3 +301,7 @@ def _view_manifest(
         }
     )
     return values
+
+
+def _collection(loaded: int, total: int) -> dict[str, Any]:
+    return {"loaded": loaded, "total": total, "truncated": loaded < total}

@@ -22,9 +22,10 @@ python -m venv .venv
 ```
 
 Choose a laboratory folder in the system dialog or the built-in local folder navigator. The browser
-opens the Overview workspace and starts the first index automatically. Equipment, Locations, People,
-Responsibilities, Documents, Review queue, Sources, and Modules remain local. **Change folder**
-switches workspaces without a terminal. The app binds only to loopback and serves bundled assets.
+opens the Overview workspace; review the selected path, then use **Index now**. Equipment, Locations,
+People, Responsibilities, Documents, local Search, Review queue, Sources, and Modules remain local.
+Indexing reports its phase and progress and can be cancelled between files. **Change folder** switches
+workspaces without a terminal. The app binds only to loopback and serves bundled assets.
 
 The release workflow also creates standalone `smart-lab-index` ZIP applications and SHA-256
 manifests for Windows, macOS, and Linux. After extraction, open the application directly; Python is

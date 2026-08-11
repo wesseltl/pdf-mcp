@@ -24,7 +24,7 @@ from smart_lab_index.core.domain import (
     SourceRecord,
 )
 
-SCHEMA_VERSION = 1
+SCHEMA_VERSION = 2
 
 
 class StorageError(RuntimeError):
@@ -139,6 +139,8 @@ class KnowledgeStore:
             raise StorageError("database schema is newer than this Smart Lab Core")
         if 1 not in applied:
             self._apply_v1()
+        if 2 not in applied:
+            self._apply_v2()
 
     def _apply_v1(self) -> None:
         with self._write():
@@ -361,6 +363,22 @@ class KnowledgeStore:
                 (1, _now()),
             )
 
+    def _apply_v2(self) -> None:
+        with self._write():
+            self.connection.execute(
+                "ALTER TABLE document_processing ADD COLUMN entity_count INTEGER NOT NULL DEFAULT 0"
+            )
+            self.connection.execute(
+                "ALTER TABLE document_processing ADD COLUMN assertion_count INTEGER NOT NULL DEFAULT 0"
+            )
+            self.connection.execute(
+                "ALTER TABLE document_processing ADD COLUMN warnings_json TEXT NOT NULL DEFAULT '[]'"
+            )
+            self.connection.execute(
+                "INSERT INTO schema_migrations(version, applied_at) VALUES (?, ?)",
+                (2, _now()),
+            )
+
     def sync_modules(self, modules: Iterable[Mapping[str, Any]]) -> None:
         timestamp = _now()
         with self._write():
@@ -507,12 +525,21 @@ class KnowledgeStore:
         )
         return {row["external_id"]: self._source_from_row(row) for row in rows}
 
-    def list_sources(self, *, include_deleted: bool = True) -> list[dict[str, Any]]:
+    def list_sources(
+        self,
+        *,
+        include_deleted: bool = True,
+        limit: int | None = None,
+    ) -> list[dict[str, Any]]:
         sql = "SELECT * FROM source_records"
         if not include_deleted:
             sql += " WHERE deleted_at IS NULL"
         sql += " ORDER BY source_id, external_id"
-        rows = self.connection.execute(sql).fetchall()
+        parameters: tuple[int, ...] = ()
+        if limit is not None:
+            sql += " LIMIT ?"
+            parameters = (_positive_limit(limit),)
+        rows = self.connection.execute(sql, parameters).fetchall()
         return [
             {
                 "source_record_id": row["source_record_id"],
@@ -750,16 +777,86 @@ class KnowledgeStore:
         content = DocumentContent.from_dict(_load_json(row["content_json"], {}))
         return row["document_id"], content
 
-    def list_documents(self) -> list[dict[str, Any]]:
-        rows = self.connection.execute(
+    def list_documents(
+        self,
+        *,
+        active_only: bool = False,
+        limit: int | None = None,
+    ) -> list[dict[str, Any]]:
+        if active_only:
+            sql = """
+                WITH ranked AS (
+                    SELECT documents.*,
+                           ROW_NUMBER() OVER (
+                               PARTITION BY source_record_id, source_generation
+                               ORDER BY created_at DESC, document_id DESC
+                           ) AS document_rank
+                    FROM documents
+                )
+                SELECT ranked.document_id, ranked.source_record_id,
+                       ranked.source_checksum, ranked.content_type,
+                       ranked.source_generation, ranked.parser_module_id,
+                       ranked.parser_version, ranked.content_json,
+                       ranked.created_at, ranked.index_run_id
+                FROM ranked
+                JOIN source_records
+                  ON source_records.source_record_id=ranked.source_record_id
+                WHERE ranked.document_rank=1
+                  AND source_records.deleted_at IS NULL
+                  AND ranked.source_generation=source_records.source_generation
+                  AND ranked.source_checksum=source_records.checksum
+                ORDER BY source_records.path
             """
-            SELECT document_id, source_record_id, source_checksum, content_type,
-                   source_generation, parser_module_id, parser_version,
-                   created_at, index_run_id
-            FROM documents ORDER BY created_at, document_id
+        else:
+            sql = """
+                SELECT document_id, source_record_id, source_checksum, content_type,
+                       source_generation, parser_module_id, parser_version,
+                       content_json, created_at, index_run_id
+                FROM documents ORDER BY created_at, document_id
             """
+        parameters: tuple[int, ...] = ()
+        if limit is not None:
+            sql += " LIMIT ?"
+            parameters = (_positive_limit(limit),)
+        rows = self.connection.execute(sql, parameters).fetchall()
+        documents = []
+        for row in rows:
+            value = dict(row)
+            content = _load_json(value.pop("content_json"), {})
+            value["parser_warnings"] = list(content.get("warnings", []))
+            value["processing"] = []
+            value["extracted_entity_count"] = 0
+            value["extracted_assertion_count"] = 0
+            documents.append(value)
+        if not documents:
+            return documents
+        placeholders = ",".join("?" for _ in documents)
+        processing_rows = self.connection.execute(
+            f"""
+            SELECT * FROM document_processing
+            WHERE document_id IN ({placeholders})
+            ORDER BY completed_at, module_id
+            """,
+            tuple(document["document_id"] for document in documents),
         ).fetchall()
-        return [dict(row) for row in rows]
+        latest: dict[tuple[str, str], sqlite3.Row] = {}
+        for row in processing_rows:
+            latest[(row["document_id"], row["module_id"])] = row
+        by_document = {document["document_id"]: document for document in documents}
+        for row in latest.values():
+            processing = {
+                "module_id": row["module_id"],
+                "module_version": row["module_version"],
+                "entity_count": row["entity_count"],
+                "assertion_count": row["assertion_count"],
+                "warnings": _load_json(row["warnings_json"], []),
+                "completed_at": row["completed_at"],
+            }
+            document = by_document[row["document_id"]]
+            document["processing"].append(processing)
+            document["extracted_entity_count"] += row["entity_count"]
+            document["extracted_assertion_count"] += row["assertion_count"]
+        return documents
 
     def processing_complete(
         self,
@@ -795,14 +892,18 @@ class KnowledgeStore:
         configuration_hash: str,
         processing_context_hash: str,
         index_run_id: str,
+        entity_count: int = 0,
+        assertion_count: int = 0,
+        warnings: Sequence[str] = (),
     ) -> None:
         with self._write():
             self.connection.execute(
                 """
                 INSERT OR REPLACE INTO document_processing(
                     document_id, module_id, module_version, configuration_hash,
-                    processing_context_hash, index_run_id, completed_at
-                ) VALUES (?, ?, ?, ?, ?, ?, ?)
+                    processing_context_hash, index_run_id, completed_at,
+                    entity_count, assertion_count, warnings_json
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 """,
                 (
                     document_id,
@@ -812,6 +913,9 @@ class KnowledgeStore:
                     processing_context_hash,
                     index_run_id,
                     _now(),
+                    entity_count,
+                    assertion_count,
+                    _json(list(warnings)),
                 ),
             )
 
@@ -950,17 +1054,47 @@ class KnowledgeStore:
         ).fetchall()
         return self._entity_from_row(rows[0]) if len(rows) == 1 else None
 
-    def list_entities(self, entity_type: EntityType | None = None) -> list[EntityRecord]:
+    def list_entities(
+        self,
+        entity_type: EntityType | None = None,
+        *,
+        limit: int | None = None,
+    ) -> list[EntityRecord]:
         if entity_type is None:
-            rows = self.connection.execute(
-                "SELECT * FROM entities ORDER BY entity_type, canonical_name"
-            ).fetchall()
+            sql = "SELECT * FROM entities ORDER BY entity_type, canonical_name"
+            parameters: tuple[Any, ...] = ()
         else:
-            rows = self.connection.execute(
-                "SELECT * FROM entities WHERE entity_type=? ORDER BY canonical_name",
-                (entity_type.value,),
-            ).fetchall()
+            sql = "SELECT * FROM entities WHERE entity_type=? ORDER BY canonical_name"
+            parameters = (entity_type.value,)
+        if limit is not None:
+            sql += " LIMIT ?"
+            parameters += (_positive_limit(limit),)
+        rows = self.connection.execute(sql, parameters).fetchall()
         return [self._entity_from_row(row) for row in rows]
+
+    def entity_names(self, entity_ids: Iterable[str]) -> dict[str, str]:
+        values: dict[str, str] = {}
+        for identifiers in _identifier_batches(entity_ids):
+            placeholders = ",".join("?" for _ in identifiers)
+            rows = self.connection.execute(
+                f"SELECT entity_id, canonical_name FROM entities "
+                f"WHERE entity_id IN ({placeholders})",
+                identifiers,
+            )
+            values.update({row["entity_id"]: row["canonical_name"] for row in rows})
+        return values
+
+    def source_paths(self, source_record_ids: Iterable[str]) -> dict[str, str]:
+        values: dict[str, str] = {}
+        for identifiers in _identifier_batches(source_record_ids):
+            placeholders = ",".join("?" for _ in identifiers)
+            rows = self.connection.execute(
+                f"SELECT source_record_id, path FROM source_records "
+                f"WHERE source_record_id IN ({placeholders})",
+                identifiers,
+            )
+            values.update({row["source_record_id"]: row["path"] for row in rows})
+        return values
 
     def create_assertion(
         self,
@@ -1037,7 +1171,12 @@ class KnowledgeStore:
             )
         return assertion_id, True
 
-    def list_active_assertions(self, predicate: str | None = None) -> list[AssertionRecord]:
+    def list_active_assertions(
+        self,
+        predicate: str | None = None,
+        *,
+        limit: int | None = None,
+    ) -> list[AssertionRecord]:
         parameters: list[Any] = [
             AssertionStatus.REJECTED.value,
             AssertionStatus.SUPERSEDED.value,
@@ -1047,16 +1186,27 @@ class KnowledgeStore:
             sql += " AND predicate=?"
             parameters.append(predicate)
         sql += " ORDER BY created_at, assertion_id"
+        if limit is not None:
+            sql += " LIMIT ?"
+            parameters.append(_positive_limit(limit))
         rows = self.connection.execute(sql, parameters).fetchall()
         return [self._assertion_from_row(row) for row in rows]
 
-    def list_assertions(self, *, include_superseded: bool = True) -> list[AssertionRecord]:
+    def list_assertions(
+        self,
+        *,
+        include_superseded: bool = True,
+        limit: int | None = None,
+    ) -> list[AssertionRecord]:
         if include_superseded:
-            rows = self.connection.execute(
-                "SELECT * FROM assertions ORDER BY created_at, assertion_id"
-            ).fetchall()
+            sql = "SELECT * FROM assertions ORDER BY created_at, assertion_id"
+            parameters: tuple[int, ...] = ()
+            if limit is not None:
+                sql += " LIMIT ?"
+                parameters = (_positive_limit(limit),)
+            rows = self.connection.execute(sql, parameters).fetchall()
             return [self._assertion_from_row(row) for row in rows]
-        return self.list_active_assertions()
+        return self.list_active_assertions(limit=limit)
 
     def create_issue(
         self,
@@ -1073,21 +1223,34 @@ class KnowledgeStore:
         index_run_id: str,
     ) -> tuple[str, bool]:
         existing = self.connection.execute(
-            "SELECT issue_id FROM issues WHERE fingerprint=?", (fingerprint,)
+            "SELECT issue_id, status, assertion_ids_json FROM issues WHERE fingerprint=?",
+            (fingerprint,),
         ).fetchone()
         timestamp = _now()
         if existing:
+            reviewed = self.connection.execute(
+                """
+                SELECT 1 FROM review_decisions
+                WHERE target_type='ISSUE' AND target_id=? LIMIT 1
+                """,
+                (existing["issue_id"],),
+            ).fetchone()
+            same_evidence = set(_load_json(existing["assertion_ids_json"], [])) == set(
+                assertion_ids
+            )
+            status = existing["status"] if reviewed and same_evidence else "OPEN"
             with self._write():
                 self.connection.execute(
                     """
-                    UPDATE issues SET status='OPEN', severity=?, entity_id=?, source_record_id=?,
+                    UPDATE issues SET status=?, severity=?, entity_id=?, source_record_id=?,
                         assertion_ids_json=?, evidence_json=?, rule_version=?,
-                        last_seen_run_id=?, updated_at=?, resolved_at=NULL
+                        last_seen_run_id=?, updated_at=?,
+                        resolved_at=CASE WHEN ?='OPEN' THEN NULL ELSE resolved_at END
                     WHERE issue_id=?
                     """,
                     (
-                        severity, entity_id, source_record_id, _json(list(assertion_ids)),
-                        _json(dict(evidence)), rule_version, index_run_id, timestamp,
+                        status, severity, entity_id, source_record_id, _json(list(assertion_ids)),
+                        _json(dict(evidence)), rule_version, index_run_id, timestamp, status,
                         existing["issue_id"],
                     ),
                 )
@@ -1144,30 +1307,396 @@ class KnowledgeStore:
             )
         return cursor.rowcount == 1
 
-    def list_issues(self, *, status: str | None = None) -> list[dict[str, Any]]:
+    def list_issues(
+        self,
+        *,
+        status: str | None = None,
+        limit: int | None = None,
+    ) -> list[dict[str, Any]]:
         if status is None:
+            sql = "SELECT * FROM issues ORDER BY status, code, created_at"
+            parameters: tuple[Any, ...] = ()
+        else:
+            sql = "SELECT * FROM issues WHERE status=? ORDER BY code, created_at"
+            parameters = (status,)
+        if limit is not None:
+            sql += " LIMIT ?"
+            parameters += (_positive_limit(limit),)
+        rows = self.connection.execute(sql, parameters).fetchall()
+        return [self._issue_from_row(row) for row in rows]
+
+    def get_issue(self, issue_id: str) -> dict[str, Any] | None:
+        row = self.connection.execute(
+            "SELECT * FROM issues WHERE issue_id=?",
+            (issue_id,),
+        ).fetchone()
+        return None if row is None else self._issue_from_row(row)
+
+    def review_issue(
+        self,
+        *,
+        issue_id: str,
+        decision: str,
+        reason: str,
+        reviewer: str,
+        assertion_id: str | None = None,
+    ) -> dict[str, Any]:
+        reason = " ".join(reason.split())
+        if not reason or len(reason) > 1000:
+            raise ValueError("review reason must contain between 1 and 1000 characters")
+        if not reviewer.strip() or len(reviewer) > 100:
+            raise ValueError("reviewer must contain between 1 and 100 characters")
+        if decision not in {"CONFIRM_ASSERTION", "DISMISS"}:
+            raise ValueError("unsupported review decision")
+        timestamp = _now()
+        review_id = _id()
+        with self.transaction():
+            issue_row = self.connection.execute(
+                "SELECT * FROM issues WHERE issue_id=?",
+                (issue_id,),
+            ).fetchone()
+            if issue_row is None:
+                raise StorageError(f"unknown issue: {issue_id}")
+            if issue_row["status"] != "OPEN":
+                raise StorageError("only open issues can be reviewed")
+            assertion_ids = set(_load_json(issue_row["assertion_ids_json"], []))
+            if decision == "CONFIRM_ASSERTION" and assertion_id not in assertion_ids:
+                raise ValueError("selected assertion does not belong to this issue")
+            if decision == "CONFIRM_ASSERTION":
+                rows = self.connection.execute(
+                    f"SELECT assertion_id, object_entity_id FROM assertions WHERE assertion_id IN ({','.join('?' for _ in assertion_ids)})",
+                    tuple(sorted(assertion_ids)),
+                ).fetchall()
+                if {row["assertion_id"] for row in rows} != assertion_ids:
+                    raise StorageError("issue references an unknown assertion")
+                selected_object = next(
+                    row["object_entity_id"]
+                    for row in rows
+                    if row["assertion_id"] == assertion_id
+                )
+                if selected_object is None:
+                    raise ValueError(
+                        "only entity-valued assertions can resolve this issue"
+                    )
+                for row in rows:
+                    candidate_id = row["assertion_id"]
+                    status = (
+                        AssertionStatus.CONFIRMED.value
+                        if row["object_entity_id"] == selected_object
+                        else AssertionStatus.REJECTED.value
+                    )
+                    self.connection.execute(
+                        "UPDATE assertions SET status=?, updated_at=? WHERE assertion_id=?",
+                        (status, timestamp, candidate_id),
+                    )
+                issue_status = "RESOLVED"
+            else:
+                issue_status = "DISMISSED"
+            updated = self.connection.execute(
+                """
+                UPDATE issues SET status=?, resolved_at=?, updated_at=?
+                WHERE issue_id=? AND status='OPEN'
+                """,
+                (issue_status, timestamp, timestamp, issue_id),
+            )
+            if updated.rowcount != 1:
+                raise StorageError("issue was reviewed by another operation")
+            self.connection.execute(
+                """
+                INSERT INTO review_decisions(
+                    review_decision_id, target_type, target_id, decision,
+                    reason, reviewer, created_at
+                ) VALUES (?, 'ISSUE', ?, ?, ?, ?, ?)
+                """,
+                (review_id, issue_id, decision, reason, reviewer, timestamp),
+            )
+            self.record_audit_event(
+                event_type="ISSUE_REVIEWED",
+                actor=reviewer,
+                target_type="issue",
+                target_id=issue_id,
+                detail={
+                    "decision": decision,
+                    "reason": reason,
+                    "assertion_id": assertion_id,
+                    "review_decision_id": review_id,
+                },
+            )
+        reviewed = self.get_issue(issue_id)
+        if reviewed is None:  # pragma: no cover - protected by transaction
+            raise StorageError(f"unknown issue after review: {issue_id}")
+        return reviewed
+
+    def list_review_decisions(
+        self,
+        *,
+        issue_id: str | None = None,
+        issue_ids: Sequence[str] | None = None,
+        per_issue_limit: int = 20,
+    ) -> list[dict[str, Any]]:
+        if issue_id is not None and issue_ids is not None:
+            raise ValueError("provide issue_id or issue_ids, not both")
+        if issue_ids is not None:
+            identifiers = tuple(dict.fromkeys(issue_ids))
+            if not identifiers:
+                return []
+            if len(identifiers) > 500:
+                raise ValueError("at most 500 issue IDs can be loaded at once")
+            limit = _positive_limit(per_issue_limit)
+            placeholders = ",".join("?" for _ in identifiers)
             rows = self.connection.execute(
-                "SELECT * FROM issues ORDER BY status, code, created_at"
+                f"""
+                WITH ranked AS (
+                    SELECT review_decisions.*,
+                           ROW_NUMBER() OVER (
+                               PARTITION BY target_id ORDER BY created_at DESC
+                           ) AS review_rank
+                    FROM review_decisions
+                    WHERE target_type='ISSUE' AND target_id IN ({placeholders})
+                )
+                SELECT review_decision_id, target_type, target_id, decision,
+                       reason, reviewer, created_at
+                FROM ranked WHERE review_rank <= ?
+                ORDER BY created_at DESC
+                """,
+                (*identifiers, limit),
+            ).fetchall()
+        elif issue_id is None:
+            rows = self.connection.execute(
+                "SELECT * FROM review_decisions ORDER BY created_at DESC"
             ).fetchall()
         else:
             rows = self.connection.execute(
-                "SELECT * FROM issues WHERE status=? ORDER BY code, created_at", (status,)
+                """
+                SELECT * FROM review_decisions
+                WHERE target_type='ISSUE' AND target_id=?
+                ORDER BY created_at DESC
+                """,
+                (issue_id,),
             ).fetchall()
-        return [
-            {
+        return [dict(row) for row in rows]
+
+    def projection_counts(self) -> dict[str, Any]:
+        entity_counts = {
+            row["entity_type"]: row["value"]
+            for row in self.connection.execute(
+                "SELECT entity_type, COUNT(*) AS value FROM entities GROUP BY entity_type"
+            )
+        }
+        issue_counts = {
+            row["status"]: row["value"]
+            for row in self.connection.execute(
+                "SELECT status, COUNT(*) AS value FROM issues GROUP BY status"
+            )
+        }
+        responsibilities = self.connection.execute(
+            """
+            SELECT COUNT(*) AS value FROM assertions
+            WHERE status NOT IN ('REJECTED', 'SUPERSEDED')
+              AND predicate IN ('backup_for', 'maintained_by', 'owns', 'responsible_for')
+            """
+        ).fetchone()["value"]
+        documents = self.connection.execute(
+            """
+            SELECT COUNT(DISTINCT source_records.source_record_id) AS value
+            FROM source_records
+            JOIN documents
+              ON documents.source_record_id=source_records.source_record_id
+             AND documents.source_generation=source_records.source_generation
+             AND documents.source_checksum=source_records.checksum
+            WHERE source_records.deleted_at IS NULL
+            """
+        ).fetchone()["value"]
+        sources = self.connection.execute(
+            "SELECT COUNT(*) AS value FROM source_records WHERE deleted_at IS NULL"
+        ).fetchone()["value"]
+        assertions = self.connection.execute(
+            """
+            SELECT COUNT(*) AS value FROM assertions
+            WHERE status NOT IN ('REJECTED', 'SUPERSEDED')
+            """
+        ).fetchone()["value"]
+        return {
+            "sources": sources,
+            "documents": documents,
+            "entities": sum(entity_counts.values()),
+            "entities_by_type": entity_counts,
+            "active_assertions": assertions,
+            "responsibilities": responsibilities,
+            "issues": sum(issue_counts.values()),
+            "issues_by_status": issue_counts,
+        }
+
+    def search(self, query: str, *, limit: int = 50) -> list[dict[str, Any]]:
+        query = " ".join(query.split())
+        if len(query) < 2:
+            raise ValueError("search query must contain at least two characters")
+        if len(query) > 200:
+            raise ValueError("search query must not exceed 200 characters")
+        limit = min(_positive_limit(limit), 100)
+        pattern = f"%{_escape_like(query)}%"
+        results: list[dict[str, Any]] = []
+
+        entity_rows = self.connection.execute(
+            """
+            SELECT * FROM entities
+            WHERE canonical_name LIKE ? ESCAPE '\\' COLLATE NOCASE
+               OR COALESCE(identifier, '') LIKE ? ESCAPE '\\' COLLATE NOCASE
+               OR COALESCE(subtype, '') LIKE ? ESCAPE '\\' COLLATE NOCASE
+               OR metadata_json LIKE ? ESCAPE '\\' COLLATE NOCASE
+               OR EXISTS (
+                   SELECT 1 FROM entity_aliases
+                   WHERE entity_aliases.entity_id=entities.entity_id
+                     AND alias LIKE ? ESCAPE '\\' COLLATE NOCASE
+               )
+            ORDER BY canonical_name LIMIT ?
+            """,
+            (pattern, pattern, pattern, pattern, pattern, limit),
+        ).fetchall()
+        for row in entity_rows:
+            details = [row["entity_type"]]
+            if row["subtype"]:
+                details.append(row["subtype"])
+            if row["identifier"] and row["identifier"] != row["canonical_name"]:
+                details.append(row["identifier"])
+            results.append({
+                "kind": "entity",
+                "id": row["entity_id"],
+                "title": row["canonical_name"],
+                "subtitle": " | ".join(details),
+                "snippet": "",
+                "entity_type": row["entity_type"],
+            })
+
+        document_rows = self.connection.execute(
+            """
+            SELECT documents.document_id, source_records.path, source_records.name,
+                   documents.parser_module_id,
+                   CASE WHEN source_records.path LIKE ? ESCAPE '\\' COLLATE NOCASE
+                        THEN 1 ELSE 0 END AS path_match
+            FROM documents
+            JOIN source_records
+              ON source_records.source_record_id=documents.source_record_id
+             AND source_records.source_generation=documents.source_generation
+             AND source_records.checksum=documents.source_checksum
+            WHERE source_records.deleted_at IS NULL
+              AND (
+                  source_records.path LIKE ? ESCAPE '\\' COLLATE NOCASE
+                  OR documents.content_json LIKE ? ESCAPE '\\' COLLATE NOCASE
+              )
+              AND documents.created_at=(
+                  SELECT MAX(current_document.created_at) FROM documents current_document
+                  WHERE current_document.source_record_id=documents.source_record_id
+                    AND current_document.source_generation=documents.source_generation
+              )
+            ORDER BY source_records.path LIMIT ?
+            """,
+            (pattern, pattern, pattern, limit),
+        ).fetchall()
+        for row in document_rows:
+            if row["path_match"]:
+                snippet = row["path"]
+            else:
+                content_row = self.connection.execute(
+                    "SELECT content_json FROM documents WHERE document_id=?",
+                    (row["document_id"],),
+                ).fetchone()
+                content = _load_json(content_row["content_json"], {})
+                snippet = _document_snippet(content, query)
+            results.append({
+                "kind": "document",
+                "id": row["document_id"],
+                "title": row["name"],
+                "subtitle": row["path"],
+                "snippet": snippet,
+                "source_path": row["path"],
+            })
+
+        issue_rows = self.connection.execute(
+            """
+            SELECT issues.*, entities.canonical_name
+            FROM issues LEFT JOIN entities ON entities.entity_id=issues.entity_id
+            WHERE issues.code LIKE ? ESCAPE '\\' COLLATE NOCASE
+               OR issues.evidence_json LIKE ? ESCAPE '\\' COLLATE NOCASE
+               OR COALESCE(entities.canonical_name, '') LIKE ? ESCAPE '\\' COLLATE NOCASE
+            ORDER BY issues.status, issues.code LIMIT ?
+            """,
+            (pattern, pattern, pattern, limit),
+        ).fetchall()
+        for row in issue_rows:
+            issue = self._issue_from_row(row)
+            issue["entity_name"] = row["canonical_name"]
+            results.append({
+                "kind": "issue",
+                "id": row["issue_id"],
+                "title": row["code"].replace("_", " ").title(),
+                "subtitle": f"{row['status']} | {row['severity']}",
+                "snippet": row["canonical_name"] or "",
                 "issue_id": row["issue_id"],
-                "code": row["code"],
-                "severity": row["severity"],
-                "status": row["status"],
-                "entity_id": row["entity_id"],
-                "source_record_id": row["source_record_id"],
-                "assertion_ids": _load_json(row["assertion_ids_json"], []),
-                "evidence": _load_json(row["evidence_json"], {}),
-                "rule_module_id": row["rule_module_id"],
-                "rule_version": row["rule_version"],
-            }
-            for row in rows
-        ]
+                "record": issue,
+            })
+
+        source_rows = self.connection.execute(
+            """
+            SELECT source_record_id, name, path, content_type FROM source_records
+            WHERE deleted_at IS NULL
+              AND (name LIKE ? ESCAPE '\\' COLLATE NOCASE
+                   OR path LIKE ? ESCAPE '\\' COLLATE NOCASE)
+            ORDER BY path LIMIT ?
+            """,
+            (pattern, pattern, limit),
+        ).fetchall()
+        for row in source_rows:
+            results.append({
+                "kind": "source",
+                "id": row["source_record_id"],
+                "title": row["name"],
+                "subtitle": row["content_type"],
+                "snippet": row["path"],
+                "source_path": row["path"],
+            })
+
+        assertion_rows = self.connection.execute(
+            """
+            SELECT assertions.assertion_id, assertions.predicate,
+                   assertions.literal_json, subjects.canonical_name AS subject_name,
+                   objects.canonical_name AS object_name, source_records.path
+            FROM assertions
+            JOIN entities subjects ON subjects.entity_id=assertions.subject_entity_id
+            LEFT JOIN entities objects ON objects.entity_id=assertions.object_entity_id
+            JOIN source_records ON source_records.source_record_id=assertions.source_record_id
+            WHERE assertions.status NOT IN ('REJECTED', 'SUPERSEDED')
+              AND (
+                  assertions.predicate LIKE ? ESCAPE '\\' COLLATE NOCASE
+                  OR COALESCE(assertions.literal_json, '') LIKE ? ESCAPE '\\' COLLATE NOCASE
+                  OR subjects.canonical_name LIKE ? ESCAPE '\\' COLLATE NOCASE
+                  OR COALESCE(objects.canonical_name, '') LIKE ? ESCAPE '\\' COLLATE NOCASE
+              )
+            ORDER BY subjects.canonical_name, assertions.predicate LIMIT ?
+            """,
+            (pattern, pattern, pattern, pattern, limit),
+        ).fetchall()
+        for row in assertion_rows:
+            value = row["object_name"]
+            if value is None:
+                value = _load_json(row["literal_json"], None)
+            results.append({
+                "kind": "assertion",
+                "id": row["assertion_id"],
+                "title": row["subject_name"],
+                "subtitle": row["predicate"].replace("_", " "),
+                "snippet": "" if value is None else str(value),
+                "source_path": row["path"],
+            })
+
+        kind_order = {"entity": 0, "document": 1, "assertion": 2, "issue": 3, "source": 4}
+        folded = query.casefold()
+        results.sort(key=lambda item: (
+            not item["title"].casefold().startswith(folded),
+            kind_order[item["kind"]],
+            item["title"].casefold(),
+        ))
+        return results[:limit]
 
     def record_audit_event(
         self,
@@ -1200,9 +1729,11 @@ class KnowledgeStore:
         latest = self.connection.execute(
             "SELECT * FROM index_runs ORDER BY started_at DESC LIMIT 1"
         ).fetchone()
+        projections = self.projection_counts()
         return {
             "sources": count("source_records", "WHERE deleted_at IS NULL"),
-            "documents": count("documents"),
+            "documents": projections["documents"],
+            "historical_documents": count("documents"),
             "entities": count("entities"),
             "active_assertions": count(
                 "assertions", "WHERE status NOT IN ('REJECTED', 'SUPERSEDED')"
@@ -1270,6 +1801,24 @@ class KnowledgeStore:
             source_checksum=row["source_checksum"],
         )
 
+    @staticmethod
+    def _issue_from_row(row: sqlite3.Row) -> dict[str, Any]:
+        return {
+            "issue_id": row["issue_id"],
+            "code": row["code"],
+            "severity": row["severity"],
+            "status": row["status"],
+            "entity_id": row["entity_id"],
+            "source_record_id": row["source_record_id"],
+            "assertion_ids": _load_json(row["assertion_ids_json"], []),
+            "evidence": _load_json(row["evidence_json"], {}),
+            "rule_module_id": row["rule_module_id"],
+            "rule_version": row["rule_version"],
+            "created_at": row["created_at"],
+            "updated_at": row["updated_at"],
+            "resolved_at": row["resolved_at"],
+        }
+
 
 def _validate_private_state_path(path: Path) -> None:
     if not path.exists():
@@ -1279,3 +1828,45 @@ def _validate_private_state_path(path: Path) -> None:
         raise StorageError(f"Core database is not a regular file: {path}")
     if value.st_nlink != 1:
         raise StorageError("Core database must not have hard links")
+
+
+def _positive_limit(limit: int) -> int:
+    if not isinstance(limit, int) or isinstance(limit, bool) or limit <= 0:
+        raise ValueError("limit must be a positive integer")
+    return limit
+
+
+def _identifier_batches(values: Iterable[str]) -> Iterator[tuple[str, ...]]:
+    identifiers = tuple(sorted(set(values)))
+    for offset in range(0, len(identifiers), 400):
+        yield identifiers[offset : offset + 400]
+
+
+def _escape_like(value: str) -> str:
+    return value.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_")
+
+
+def _document_snippet(content: Mapping[str, Any], query: str) -> str:
+    folded = query.casefold()
+    for block in content.get("text_blocks", []):
+        text = str(block.get("text", ""))
+        if folded in text.casefold():
+            return _around_match(text, folded)
+    for table in content.get("tables", []):
+        for row in table.get("rows", []):
+            text = " | ".join(str(cell) for cell in row)
+            if folded in text.casefold():
+                return _around_match(text, folded)
+    return ""
+
+
+def _around_match(text: str, folded_query: str, maximum: int = 240) -> str:
+    compact = " ".join(text.split())
+    position = compact.casefold().find(folded_query)
+    if len(compact) <= maximum:
+        return compact
+    start = max(0, position - maximum // 3)
+    end = min(len(compact), start + maximum)
+    prefix = "..." if start else ""
+    suffix = "..." if end < len(compact) else ""
+    return f"{prefix}{compact[start:end]}{suffix}"
