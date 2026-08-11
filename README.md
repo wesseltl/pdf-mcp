@@ -51,7 +51,7 @@ a document; invitations begin only after the endpoint is verified:
 After acceptance, install and configure the separate bridge with the endpoint and key you receive:
 
 ```bash
-pip install "pdf-agent-mcp[cloud]"
+python -m pip install "pdf-agent-mcp[cloud] @ https://github.com/wesseltl/pdf-mcp/releases/download/v0.3.0/pdf_agent_mcp-0.3.0-py3-none-any.whl"
 ```
 
 ```json
@@ -123,7 +123,7 @@ The fastest way to use this is with an MCP client like Claude Desktop. Three ste
 **1. Install it**
 
 ```bash
-pip install "pdf-agent-mcp[mcp]"
+python -m pip install "pdf-agent-mcp[mcp] @ https://github.com/wesseltl/pdf-mcp/releases/download/v0.3.0/pdf_agent_mcp-0.3.0-py3-none-any.whl"
 ```
 
 **2. Add it to your client's config**
