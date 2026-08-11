@@ -4,6 +4,7 @@ from __future__ import annotations
 import os
 import tempfile
 import unittest
+from typing import ClassVar
 from unittest import mock
 
 from pdf_mcp import cloud_client
@@ -22,8 +23,8 @@ class FakeResponse:
 
 
 class FakeClient:
-    response = FakeResponse()
-    calls = []
+    response: ClassVar[FakeResponse] = FakeResponse()
+    calls: ClassVar[list[dict[str, object]]] = []
 
     def __init__(self, **kwargs):
         self.kwargs = kwargs
@@ -69,15 +70,19 @@ class CloudClientTests(unittest.TestCase):
         self.temp.cleanup()
 
     def test_cloud_configuration_is_explicit_and_https_only(self):
-        with mock.patch.dict(os.environ, {}, clear=True):
-            with self.assertRaises(cloud_client.CloudConfigurationError):
-                cloud_client.CloudConfig.from_env()
-        with mock.patch.dict(os.environ, {
-            "PDF_MCP_CLOUD_URL": "http://cloud.example.test",
-            "PDF_MCP_CLOUD_API_KEY": "key",
-        }, clear=True):
-            with self.assertRaises(cloud_client.CloudConfigurationError):
-                cloud_client.CloudConfig.from_env()
+        with (
+            mock.patch.dict(os.environ, {}, clear=True),
+            self.assertRaises(cloud_client.CloudConfigurationError),
+        ):
+            cloud_client.CloudConfig.from_env()
+        with (
+            mock.patch.dict(os.environ, {
+                "PDF_MCP_CLOUD_URL": "http://cloud.example.test",
+                "PDF_MCP_CLOUD_API_KEY": "key",
+            }, clear=True),
+            self.assertRaises(cloud_client.CloudConfigurationError),
+        ):
+            cloud_client.CloudConfig.from_env()
 
     def test_localhost_http_is_allowed_for_development(self):
         with mock.patch.dict(os.environ, {
@@ -86,6 +91,36 @@ class CloudClientTests(unittest.TestCase):
         }, clear=True):
             config = cloud_client.CloudConfig.from_env()
         self.assertEqual(config.base_url, "http://127.0.0.1:8000")
+
+    def test_no_egress_blocks_upload_before_http_client_is_constructed(self):
+        environment = {**self.environment, "SMART_LAB_INDEX_NO_EGRESS": "true"}
+        with (
+            mock.patch.dict(os.environ, environment, clear=True),
+            mock.patch.object(cloud_client.httpx, "Client") as client,
+            self.assertRaisesRegex(
+                cloud_client.CloudConfigurationError,
+                "SMART_LAB_INDEX_NO_EGRESS",
+            ),
+        ):
+            cloud_client.extract_tables(self.path)
+
+        client.assert_not_called()
+        self.assertEqual(FakeClient.calls, [])
+
+    def test_no_egress_blocks_usage_before_http_client_is_constructed(self):
+        environment = {**self.environment, "SMART_LAB_INDEX_NO_EGRESS": "true"}
+        with (
+            mock.patch.dict(os.environ, environment, clear=True),
+            mock.patch.object(cloud_client.httpx, "Client") as client,
+            self.assertRaisesRegex(
+                cloud_client.CloudConfigurationError,
+                "SMART_LAB_INDEX_NO_EGRESS",
+            ),
+        ):
+            cloud_client.usage()
+
+        client.assert_not_called()
+        self.assertEqual(FakeClient.calls, [])
 
     def test_upload_uses_generic_filename_and_returns_quota(self):
         with mock.patch.dict(os.environ, self.environment, clear=True), \

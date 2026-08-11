@@ -10,6 +10,8 @@ import os
 
 import pdfplumber
 
+from smart_lab_index.modules.parsers.common import assess_table
+
 # Optional sandbox: if PDF_MCP_ALLOWED_DIR is set, only files inside it may be read. This lets you hand
 # the server to an agent without it being able to read arbitrary files on the machine.
 _ALLOWED_DIR = os.environ.get("PDF_MCP_ALLOWED_DIR")
@@ -47,7 +49,9 @@ def _select_pages(pdf, page: int | None):
     if page is None:
         return pdf.pages
     if isinstance(page, bool) or not isinstance(page, int):
-        raise ValueError("page must be an integer using 1-based numbering")
+        raise ValueError(  # noqa: TRY004 - preserve the public validation contract
+            "page must be an integer using 1-based numbering"
+        )
     if page < 1 or page > len(pdf.pages):
         raise ValueError(f"page must be between 1 and {len(pdf.pages)} (received {page})")
     return [pdf.pages[page - 1]]
@@ -70,20 +74,7 @@ def _assess(rows: list[list]) -> dict:
       - ragged: rows with differing column counts usually mean the grid was detected wrong.
       - empty_ratio: a table that's mostly blank cells is often a bad extraction.
     """
-    if not rows:
-        return {"looks_clean": False, "warnings": ["empty table"]}
-    widths = {len(r) for r in rows}
-    ragged = len(widths) > 1
-    total = sum(len(r) for r in rows)
-    empty = sum(1 for r in rows for c in r if c == "")
-    empty_ratio = round(empty / total, 3) if total else 1.0
-    warnings = []
-    if ragged:
-        warnings.append(f"ragged: rows have {sorted(widths)} columns (grid may be misdetected)")
-    if empty_ratio > 0.4:
-        warnings.append(f"{int(empty_ratio * 100)}% of cells are empty (extraction may be off)")
-    return {"looks_clean": not warnings, "column_count": None if ragged else widths.pop(),
-            "empty_ratio": empty_ratio, "warnings": warnings}
+    return assess_table(rows)
 
 
 def _bbox(value) -> list[float] | None:

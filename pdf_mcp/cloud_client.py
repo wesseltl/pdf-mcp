@@ -7,6 +7,7 @@ from pathlib import Path
 from urllib.parse import urlparse
 
 from pdf_mcp import __version__, extractor
+from smart_lab_index.core.config import no_egress_enabled
 
 try:
     import httpx
@@ -32,7 +33,11 @@ class CloudConfig:
     timeout_seconds: float = 40.0
 
     @classmethod
-    def from_env(cls) -> "CloudConfig":
+    def from_env(cls) -> CloudConfig:
+        if no_egress_enabled():
+            raise CloudConfigurationError(
+                "hosted extraction is disabled by SMART_LAB_INDEX_NO_EGRESS"
+            )
         base_url = os.environ.get("PDF_MCP_CLOUD_URL", "").strip().rstrip("/")
         api_key = os.environ.get("PDF_MCP_CLOUD_API_KEY", "").strip()
         if not base_url:

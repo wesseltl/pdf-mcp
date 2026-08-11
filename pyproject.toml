@@ -5,12 +5,12 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "pdf-agent-mcp"
 version = "0.4.0"
-description = "Evidence-backed, profile-checked table extraction from PDF and Word documents for AI agents."
+description = "Local-first laboratory knowledge indexing with compatible PDF and Word ingestion tools."
 readme = "README.md"
 requires-python = ">=3.10"
 license = "MIT"
 authors = [{ name = "Wessel ter Laak" }]
-keywords = ["mcp", "ai-agents", "pdf", "docx", "table-extraction", "data-extraction", "llm", "model-context-protocol"]
+keywords = ["laboratory", "knowledge-index", "local-first", "provenance", "mcp", "pdf", "docx", "data-extraction"]
 dependencies = ["pdfplumber>=0.11", "python-docx>=1.1", "openpyxl>=3.1"]
 
 [project.optional-dependencies]
@@ -29,6 +29,7 @@ Repository = "https://github.com/wesseltl/pdf-mcp"
 "Agent offers" = "https://github.com/wesseltl/pdf-mcp/tree/main/offers"
 
 [project.scripts]
+smart-lab-index = "smart_lab_index.cli:main"
 pdf-mcp-app = "pdf_mcp.web_app:main"
 pdf-agent-mcp = "pdf_mcp.server:main"
 pdf-agent-cloud-mcp = "pdf_mcp.cloud_server:main"
@@ -37,7 +38,7 @@ extract-document-with-profile = "pdf_mcp.profile_cli:extract_main"
 evaluate-document-profile = "pdf_mcp.profile_cli:evaluate_main"
 
 [tool.setuptools.packages.find]
-include = ["pdf_mcp*"]
+include = ["pdf_mcp*", "smart_lab_index*"]
 
 [tool.setuptools.package-data]
 "pdf_mcp.profile_templates" = ["*.json"]

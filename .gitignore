@@ -9,3 +9,6 @@ dist/
 *.swp
 tests/manual/files/
 evaluations/private/
+*.db
+*.db-shm
+*.db-wal

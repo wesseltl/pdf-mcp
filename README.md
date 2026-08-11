@@ -1,14 +1,32 @@
 <!-- mcp-name: io.github.wesseltl/pdf-mcp -->
 
-# pdf-mcp
+# Smart Lab Index
 
 ![CI](https://github.com/wesseltl/pdf-mcp/actions/workflows/ci.yml/badge.svg)
 ![Python](https://img.shields.io/badge/python-3.10%2B-blue)
 ![MCP](https://img.shields.io/badge/MCP-server-6E56CF)
 ![License](https://img.shields.io/badge/license-MIT-green)
 
-**Turn tables in PDF and Word documents into Excel, CSV, or JSON.** Use the simple browser app with
-no agent setup, or connect the same deterministic extraction tools to an AI agent through
+**Build a local, evidence-backed index above the laboratory files and systems you already use.**
+Smart Lab Index discovers supported files, connects names and relationships, preserves why every
+fact is believed, and reports contradictions without editing the source.
+
+The modular foundation is now available through a deterministic local CLI. It works without AI,
+cloud services, telemetry, or network access. Start with the four-file synthetic example in
+[SMART_LAB_INDEX.md](SMART_LAB_INDEX.md).
+
+```bash
+python -m venv .venv
+.venv/bin/python -m pip install -e .
+.venv/bin/smart-lab-index index examples/smart_lab_index/sample_lab \
+  --database .smart-lab-index-demo.db --no-egress
+```
+
+## Document ingestion compatibility
+
+The existing `pdf-mcp` browser app and MCP tools remain available as document-ingestion capabilities.
+They turn tables in PDF and Word documents into Excel, CSV, or JSON. The browser app needs no agent
+setup, while the same deterministic tools can be connected to an AI agent through
 [MCP](https://modelcontextprotocol.io).
 
 The browser app is for direct table conversion. It previews the extracted rows, highlights basic
