@@ -24,6 +24,10 @@ PUBLIC_FILES = (
     ROOT / "docs" / "terms.html",
     ROOT / "docs" / "privacy.html",
     ROOT / "docs" / "success.html",
+    ROOT / "docs" / "styles.css",
+    ROOT / "docs" / "offers.js",
+    ROOT / "docs" / "assets" / "hero-profile-checked-v2.jpg",
+    ROOT / "docs" / "assets" / "hero-profile-checked-v2.webp",
     ROOT / "docs" / "examples" / "sample-invoice.pdf",
     ROOT / "docs" / "examples" / "sample-invoice-output.xlsx",
 )
