@@ -13,8 +13,11 @@ enforcement, checksummed archives, certificate-driven platform signing/notarizat
 public request-only beta page built around actual product output. Version `0.5.0` adds bounded source
 preflight, progress and cancellation, parser resource budgets, broader deterministic extraction,
 server-side local search, extraction-coverage reporting, calibration issues, and auditable issue
-review. The foundation findings remain the record for the `0.1.0` iteration; the validation and
-limitations sections include the current post-update state.
+review. Version `0.6.0` adds disposable parser processes, a fail-closed controlled-production mode,
+operator authentication, scheduled indexing, health probes, exclusive database ownership, crash-run
+recovery, verified atomic backup/restore operations, tested dependency constraints, and hardened
+systemd templates. The foundation findings remain the record for the `0.1.0` iteration; the
+validation and limitations sections include the current post-update state.
 
 ## Existing Architecture
 
@@ -209,10 +212,15 @@ files use `0600`; database hardlinks are rejected. POSIX owner, group, mode, and
 access are retained as inventory metadata; rich Windows/Active Directory/network-share ACLs are not
 captured or enforced.
 
-This is application policy, not a hostile-code sandbox. Structural parser limits now include Office
-expanded-archive budgets, but process-level CPU/memory/wall-clock isolation, dependency pinning/offline
-bundles, application-level encryption, packaged socket-level tests, and OS firewall/service-account
-controls remain release gates for confidential lab data.
+Each selected parser now runs in a disposable spawned worker. Inputs are checksum-verified bytes;
+outputs are bounded normalized JSON. Parent-enforced timeout/cancellation and worker CPU, memory,
+file-size, network, subprocess, file-write, and output controls isolate malformed inputs. The packaged
+smoke test must complete real Office parsing through that process boundary. The supplied systemd unit
+adds a dedicated account, filesystem restrictions, loopback-only network policy, and service resource
+limits. This remains trusted application code, not a malware-analysis sandbox; disk encryption,
+publisher signing, and organization firewall controls are deployment gates.
+Release workflows use immutable third-party Action revisions and publish distribution checksums,
+the production runbook, systemd templates, and dependency locks as tagged-release assets.
 See [SECURITY_NO_EGRESS_REVIEW.md](SECURITY_NO_EGRESS_REVIEW.md).
 
 ## Database
@@ -234,30 +242,39 @@ and warnings. This is not yet a mature production migration history.
 
 Validation completed on 2026-08-11:
 
-- Full repository suite: 183 tests passed in 17.808 seconds.
-- Focused Smart Lab suite: 77 tests passed in 9.530 seconds.
-- Ruff: all new Smart Lab code/tests and touched cloud bridge files passed.
+- Full repository suite: 204 tests passed in 51.016 seconds.
+- Focused Smart Lab suite: 98 tests passed in 40.560 seconds.
+- Ruff: all changed Smart Lab code, tests, and release scripts passed targeted checks.
 - Existing sample, simulated development, and simulated holdout evaluation gates passed with 1.0
   field precision/recall/F1, exact-record rate, and decision accuracy.
 - Wheel and source distribution built successfully; `twine check` passed for both.
-- The Smart Lab Index `0.5.0` Linux standalone executable completed its packaged synthetic no-egress
-  smoke test with 4 sources, 4 documents, 4 entities, 3 assertions, and 1 open issue. Its generated
-  SHA-256 manifest verified. The release workflow builds equivalent artifacts on Windows and macOS.
-- The `0.5.0` GUI completed fresh desktop and 390-pixel mobile browser checks with HTTP 200, no
-  console/page errors, no mobile horizontal overflow, eight bounded search results for the synthetic
-  asset, a visible top-of-dialog review form, and a successfully persisted review decision.
+- The Smart Lab Index `0.6.0` Linux standalone executable completed its packaged synthetic no-egress
+  smoke test through spawned parser workers with 4 sources, 4 documents, 4 entities, 3 assertions,
+  and 1 open issue. The archive SHA-256 manifest verified.
+- The `0.6.0` controlled-production GUI completed authenticated desktop and 390-pixel mobile browser
+  checks with HTTP 200, expected counts, no console/page errors, and no horizontal overflow. Health,
+  readiness, Basic operator authentication, source locking, and all six parser-isolation indicators
+  were also verified against a live process.
+- The target-specific hash lock downloaded every runtime wheel with `--require-hashes`; `pip-audit`
+  reported no known vulnerabilities in that locked set on 2026-08-11.
+- A clean CPython 3.12 virtual environment installed those wheels with `--no-index`, installed the
+  final application wheel with `--no-deps`, passed `pip check`, completed the synthetic production
+  index with zero failures, and completed backup verification plus restore with identical counts.
 
-Coverage includes the loopback GUI session/exact-origin/CSP controls, authenticated source switching,
-native and browser picker path validation, same-port session rotation, isolated picker workspaces,
-release checksum/signing helpers, and full
-GUI-triggered incremental indexing with provenance, progress, cancellation, search, and review. It
+Coverage includes the loopback GUI session/exact-origin/CSP controls, operator authentication,
+health/readiness probes, authenticated source switching, scheduled indexing, native and browser
+picker path validation, same-port session rotation, isolated picker workspaces, release
+checksum/signing helpers, and full GUI-triggered incremental indexing with provenance, progress,
+cancellation, search, and review. It
 also covers bounded source preflight/exclusions, module registration, disable,
 dependencies, policy blocking before initialization, event failure isolation, private state modes,
 multiple source instances, checksummed incremental discovery, symlink/special-file handling, all
 parser contracts and resource budgets, parser replacement, realistic title-row extraction,
 calibration and responsibility issue configuration, conflict provenance and review reopening,
 changed/deleted/restored generations, failed-change rollback, processing invalidation, explicit-ID
-separation, bounded projections, read-only facades, and no socket attempts by built-ins.
+separation, bounded projections, read-only facades, disposable worker failures and limits, database
+leases and crash recovery, private operator credentials, manifested backup/restore, and no socket
+attempts by built-ins.
 The synthetic Office generator is also checked for byte-identical output across different folders.
 
 ## Demonstration
@@ -299,10 +316,12 @@ smart-lab-index status
 
 ## Current Limitations
 
-- This is a modular foundation, not a production release for confidential laboratory data.
-- The graphical UI is a local single-user operator workspace. It does not provide multi-user
-  authentication, role-based access control, review-decision reversal, or source-permission
-  enforcement. Permission metadata is retained but not applied to queries.
+- Version `0.6.0` provides a controlled-production baseline for one dedicated Linux host, one approved
+  read-only source scope, and a small trusted operator group. It is not a validated regulated system,
+  multi-tenant service, or malware-analysis sandbox.
+- Production mode uses one shared operator credential. It does not provide named users, role-based
+  access control, review-decision reversal, or source-permission enforcement. Permission metadata is
+  retained but not applied to queries.
 - Standalone archives are ZIP applications, not native installers. They remain unsigned until real
   publisher credentials are configured; SHA-256 manifests are generated for verification.
 - Only the filesystem connector and one broad general-lab domain pack exist.
@@ -310,19 +329,20 @@ smart-lab-index status
   general document understanding and still requires site-specific mapping validation.
 - Source-authority projection, configurable terminology, export modules, local inference, embeddings,
   semantic search, OCR, and vendor connectors are absent.
-- Parsers enforce structural/resource budgets but run in-process without OS-enforced CPU, memory, or
-  wall-clock isolation. Do not index hostile or unapproved document trees.
+- Parsers run in disposable resource-limited processes, but only trusted built-in module code is
+  loaded. Continue to index organization-approved document roots only.
 - SQLite content is owner-restricted but plaintext. Use encrypted storage and a dedicated OS account
   for controlled evaluation.
-- The distribution still has the compatibility identity `pdf-agent-mcp` `0.5.0`; select and validate
+- The distribution still has the compatibility identity `pdf-agent-mcp` `0.6.0`; select and validate
   a distinct Smart Lab Index release identity before publishing this branch.
+- The hash-verified production dependency lock covers CPython 3.12 on Linux x86_64. Other targets
+  still require their own generated lock and audit, and the release does not yet include an SBOM.
 - Dynamic third-party installation is intentionally absent. Built-in module boundaries are ready;
   a plugin marketplace is not.
 
 ## Next Iteration
 
-Implement **process-isolated parsing**: execute each parser in a bounded local worker with enforced
-CPU, memory, wall-clock, temporary-file, and serialized-output limits, preserve bounded parser-failure
-issues, and verify the packaged artifact under socket-denied no-egress tests. This is the single
-highest-value next step before expanding controlled pilots to untrusted or broadly writable document
-trees.
+Implement **permission-aware source and result access**: capture Windows/AD and network-share ACLs in
+a connector contract, map operators to source identities, filter every query/evidence path by retained
+permissions, and test deny-by-default behavior. This is the single highest-value next iteration before
+multiple teams can safely share one deployment.

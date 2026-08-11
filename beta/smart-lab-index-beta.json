@@ -3,7 +3,7 @@
   "offer_id": "smart-lab-index-request-beta",
   "offer_kind": "local_software_beta",
   "product": "Smart Lab Index",
-  "version": "0.5.0",
+  "version": "0.6.0",
   "status": "accepting_beta_requests",
   "access": {
     "type": "request_only",
@@ -28,6 +28,10 @@
     "bounded source preflight with progress and cancellation",
     "overdue calibration date detection",
     "incremental re-indexing",
+    "scheduled incremental indexing",
+    "process-isolated parser resource controls",
+    "operator-authenticated controlled-production mode",
+    "verified local backup and offline restore",
     "local no-egress operation without telemetry"
   ],
   "current_limits": [
@@ -36,7 +40,7 @@
     "no multi-user access enforcement",
     "POSIX owner/group metadata only; no Windows or SharePoint ACL enforcement",
     "no source write-back",
-    "not approved for hostile documents or regulated production use",
+    "not a malware-analysis sandbox or validated regulated system",
     "desktop artifacts are unsigned until publisher credentials are configured"
   ],
   "application_rules": {
@@ -53,6 +57,7 @@
     "analytics": false,
     "runtime_external_assets": false,
     "no_egress_mode": true,
+    "production_operator_authentication": "shared local operator credential over loopback or an SSH tunnel",
     "local_index_storage": "owner-restricted SQLite; content is not application-encrypted"
   },
   "access_methods": [

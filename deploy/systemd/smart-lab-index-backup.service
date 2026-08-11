@@ -1,0 +1,33 @@
+[Unit]
+Description=Create and verify a Smart Lab Index backup
+ConditionPathExists=/var/lib/smart-lab-index/index.db
+
+[Service]
+Type=oneshot
+User=smart-lab-index
+Group=smart-lab-index
+UMask=0077
+StateDirectory=smart-lab-index
+StateDirectoryMode=0700
+ExecStart=/opt/smart-lab-index/venv/bin/smart-lab-index backup --database /var/lib/smart-lab-index/index.db
+NoNewPrivileges=true
+ProtectSystem=strict
+ProtectHome=true
+ProtectHostname=true
+PrivateTmp=true
+PrivateDevices=true
+ProtectProc=invisible
+ProcSubset=pid
+ProtectKernelTunables=true
+ProtectKernelModules=true
+ProtectKernelLogs=true
+ProtectControlGroups=true
+RestrictSUIDSGID=true
+LockPersonality=true
+RestrictNamespaces=true
+SystemCallArchitectures=native
+CapabilityBoundingSet=
+AmbientCapabilities=
+ReadWritePaths=/var/lib/smart-lab-index
+RestrictAddressFamilies=AF_UNIX
+IPAddressDeny=any

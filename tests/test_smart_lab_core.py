@@ -225,6 +225,15 @@ class ModuleRegistryTests(unittest.TestCase):
         with self.assertRaises(ConfigurationError):
             RuntimePolicy.from_env({"SMART_LAB_INDEX_NO_EGRESS": "tru"})
 
+    def test_non_finite_parser_timeout_fails_closed(self):
+        for value in ("nan", "inf", "-inf"):
+            with self.subTest(value=value), self.assertRaises(ConfigurationError):
+                RuntimePolicy.from_env({
+                    "SMART_LAB_INDEX_PARSER_TIMEOUT_SECONDS": value,
+                })
+        with self.assertRaises(ConfigurationError):
+            RuntimePolicy(parser_timeout_seconds=float("nan"))
+
     def test_snapshot_redacts_declared_and_conventionally_named_secrets(self):
         schema = {
             "type": "object",
@@ -344,6 +353,12 @@ class KnowledgeStoreTests(unittest.TestCase):
             os.link(database, linked_database)
             with self.assertRaisesRegex(StorageError, "must not have hard links"):
                 KnowledgeStore(database)
+
+            linked_database.unlink()
+            symlinked_database = Path(temporary_directory, "symlinked.db")
+            symlinked_database.symlink_to(database)
+            with self.assertRaisesRegex(StorageError, "symbolic link"):
+                KnowledgeStore(symlinked_database)
 
     def test_core_records_survive_reopening_and_keep_provenance(self):
         with tempfile.TemporaryDirectory() as temporary_directory:

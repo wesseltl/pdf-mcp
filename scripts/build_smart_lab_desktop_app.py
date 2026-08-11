@@ -266,6 +266,17 @@ def _wait_for_expected_index(
                 )
             if not state["source"]["no_egress"]:
                 raise RuntimeError("desktop app did not preserve no-egress mode")
+            isolation = state["source"].get("parser_isolation", {})
+            required_isolation = {
+                "process_boundary",
+                "wall_clock_timeout",
+                "serialized_output_limit",
+                "network_audit_guard",
+            }
+            if not all(isolation.get(key) for key in required_isolation):
+                raise RuntimeError(
+                    "desktop app did not preserve the parser process boundary"
+                )
             return
         except OSError:
             time.sleep(0.4)
@@ -313,6 +324,19 @@ def archive_app(signing_status: str) -> Path:
         "If a system folder dialog is unavailable, the app opens its own local folder navigator.\n\n"
         f"{trust_note}\n",
         encoding="utf-8",
+    )
+    shutil.copy2(
+        ROOT / "requirements" / "smart-lab-production-constraints.txt",
+        staging / "DEPENDENCY-CONSTRAINTS.txt",
+    )
+    lock_name = "smart-lab-production-linux-x86_64-py312.lock"
+    shutil.copy2(
+        ROOT / "requirements" / lock_name,
+        staging / "DEPENDENCY-LOCK-LINUX-X64-PY312.txt",
+    )
+    shutil.copy2(
+        ROOT / "PRODUCTION_DEPLOYMENT.md",
+        staging / "PRODUCTION_DEPLOYMENT.md",
     )
 
     FINAL_DIST.mkdir(exist_ok=True)

@@ -64,7 +64,7 @@ class SmartLabPublicSiteTests(unittest.TestCase):
     def test_structured_data_describes_limited_free_smart_lab_beta(self) -> None:
         payload = json.loads("".join(self.parser.json_ld))
         self.assertEqual(payload["name"], "Smart Lab Index")
-        self.assertEqual(payload["softwareVersion"], "0.5.0")
+        self.assertEqual(payload["softwareVersion"], "0.6.0")
         self.assertEqual(payload["offers"]["price"], "0.00")
         self.assertEqual(
             payload["offers"]["availability"],

@@ -51,11 +51,14 @@ class KnowledgeStore:
     """Single durable repository boundary owned by Core, not individual modules."""
 
     def __init__(self, database: str | Path = "smart-lab-index.db") -> None:
-        self.database = (
-            ":memory:"
-            if str(database) == ":memory:"
-            else str(Path(database).expanduser().resolve())
-        )
+        if str(database) == ":memory:":
+            self.database = ":memory:"
+        else:
+            requested = Path(
+                os.path.abspath(os.fspath(Path(database).expanduser()))
+            )
+            _validate_private_state_path(requested)
+            self.database = str(requested.parent.resolve() / requested.name)
         if self.database != ":memory:":
             state_path = Path(self.database)
             state_parent = state_path.parent
@@ -517,6 +520,43 @@ class KnowledgeStore:
             )
             if cursor.rowcount != 1:
                 raise StorageError(f"unknown index run: {run_id}")
+
+    def recover_interrupted_runs(self) -> int:
+        """Close runs left RUNNING after an exclusive-owner process stopped."""
+        timestamp = _now()
+        with self._write():
+            cursor = self.connection.execute(
+                """
+                UPDATE index_runs
+                SET status=?, completed_at=?, error=?
+                WHERE status=?
+                """,
+                (
+                    IndexRunStatus.FAILED.value,
+                    timestamp,
+                    "indexing process stopped before the run completed",
+                    IndexRunStatus.RUNNING.value,
+                ),
+            )
+            if cursor.rowcount:
+                self.connection.execute(
+                    """
+                    INSERT INTO audit_events(
+                        audit_event_id, event_type, actor, target_type, target_id,
+                        detail_json, occurred_at
+                    ) VALUES (?, ?, ?, ?, ?, ?, ?)
+                    """,
+                    (
+                        _id(),
+                        "INTERRUPTED_RUNS_RECOVERED",
+                        "system",
+                        "INDEX_RUN",
+                        None,
+                        _json({"count": cursor.rowcount}),
+                        timestamp,
+                    ),
+                )
+        return cursor.rowcount
 
     def source_records(self, source_id: str) -> dict[str, SourceRecord]:
         rows = self.connection.execute(
@@ -1752,6 +1792,29 @@ class KnowledgeStore:
             },
         }
 
+    def integrity_report(self) -> dict[str, Any]:
+        """Run bounded SQLite consistency checks for startup and supervision."""
+        quick_rows = self.connection.execute("PRAGMA quick_check(1)").fetchall()
+        quick_check = [str(row[0]) for row in quick_rows]
+        foreign_rows = self.connection.execute("PRAGMA foreign_key_check").fetchmany(100)
+        applied = [
+            int(row["version"])
+            for row in self.connection.execute(
+                "SELECT version FROM schema_migrations ORDER BY version"
+            )
+        ]
+        healthy = quick_check == ["ok"] and not foreign_rows and applied == list(
+            range(1, SCHEMA_VERSION + 1)
+        )
+        return {
+            "healthy": healthy,
+            "quick_check": quick_check,
+            "foreign_key_violations": len(foreign_rows),
+            "schema_version": applied[-1] if applied else 0,
+            "expected_schema_version": SCHEMA_VERSION,
+            "journal_mode": self.connection.execute("PRAGMA journal_mode").fetchone()[0],
+        }
+
     @staticmethod
     def _source_from_row(row: sqlite3.Row) -> SourceRecord:
         return SourceRecord(
@@ -1821,9 +1884,12 @@ class KnowledgeStore:
 
 
 def _validate_private_state_path(path: Path) -> None:
-    if not path.exists():
+    try:
+        value = path.lstat()
+    except FileNotFoundError:
         return
-    value = path.stat()
+    if stat.S_ISLNK(value.st_mode):
+        raise StorageError("Core database path must not be a symbolic link")
     if not stat.S_ISREG(value.st_mode):
         raise StorageError(f"Core database is not a regular file: {path}")
     if value.st_nlink != 1:

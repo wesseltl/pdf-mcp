@@ -16,10 +16,10 @@ jobs:
 
     steps:
       - name: Check out repository
-        uses: actions/checkout@v7
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
 
       - name: Set up Python
-        uses: actions/setup-python@v7
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7
         with:
           python-version: "3.12"
           cache: pip
@@ -42,11 +42,27 @@ jobs:
       - name: Check package metadata
         run: python -m twine check dist/*
 
+      - name: Prepare verified production deployment assets
+        shell: bash
+        run: |
+          mkdir -p release-assets
+          cp PRODUCTION_DEPLOYMENT.md release-assets/
+          cp requirements/smart-lab-production-constraints.txt release-assets/
+          cp requirements/smart-lab-production-linux-x86_64-py312.lock release-assets/
+          cp deploy/systemd/* release-assets/
+          (cd dist && sha256sum * > ../release-assets/python-distributions-SHA256SUMS)
+
       - name: Upload distributions
-        uses: actions/upload-artifact@v7
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
         with:
           name: python-package-distributions
           path: dist/
+
+      - name: Upload production deployment assets
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+        with:
+          name: production-deployment-assets
+          path: release-assets/
 
   desktop-app:
     name: Desktop apps (${{ matrix.os }})
@@ -59,10 +75,10 @@ jobs:
 
     steps:
       - name: Check out repository
-        uses: actions/checkout@v7
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
 
       - name: Set up Python
-        uses: actions/setup-python@v7
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7
         with:
           python-version: "3.12"
           cache: pip
@@ -126,7 +142,7 @@ jobs:
           python scripts/build_smart_lab_desktop_app.py
 
       - name: Upload desktop app
-        uses: actions/upload-artifact@v7
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
         with:
           name: desktop-app-${{ runner.os }}-${{ runner.arch }}
           path: |
@@ -144,18 +160,24 @@ jobs:
 
     steps:
       - name: Download release artifacts
-        uses: actions/download-artifact@v8
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8
         with:
           pattern: "*-distributions"
           path: release/
           merge-multiple: true
 
       - name: Download desktop apps
-        uses: actions/download-artifact@v8
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8
         with:
           pattern: desktop-app-*
           path: release/
           merge-multiple: true
+
+      - name: Download production deployment assets
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8
+        with:
+          name: production-deployment-assets
+          path: release/
 
       - name: Create GitHub release
         env:
@@ -174,13 +196,13 @@ jobs:
 
     steps:
       - name: Download distributions
-        uses: actions/download-artifact@v8
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8
         with:
           name: python-package-distributions
           path: dist/
 
       - name: Publish package distributions to PyPI
-        uses: pypa/gh-action-pypi-publish@release/v1
+        uses: pypa/gh-action-pypi-publish@dc37677b2e1c63e2034f94d8a5b11f265b73ba33 # release/v1
 
   publish-mcp-registry:
     name: Publish to MCP Registry
@@ -193,7 +215,7 @@ jobs:
 
     steps:
       - name: Check out repository
-        uses: actions/checkout@v7
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
 
       - name: Install MCP publisher
         run: |

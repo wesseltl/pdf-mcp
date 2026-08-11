@@ -50,26 +50,42 @@ addressed the critical connector/provenance findings identified during integrati
   cancellation, and never infers deletions from cancelled scans. The filesystem connector records
   POSIX ownership/mode/effective-process access but explicitly does not claim rich ACL capture or
   enforcement.
-- Smart Lab Index parsers receive read-only streams, isolate failures per record, and enforce byte,
-  page, text, block, row, cell, Office-entry, and expanded-archive budgets. They still run in-process
-  without OS-enforced CPU, memory, wall-clock, or socket isolation.
+- Smart Lab Index `0.6.0` executes each selected parser in a disposable spawned process. Inputs are
+  checksum-verified bytes and outputs are bounded normalized JSON. Parent timeout/cancellation plus
+  worker CPU, address-space, file-size, network, subprocess, file-write, and serialized-output limits
+  prevent one malformed document from taking down the indexer on the supported production target.
+- Controlled-production mode fails closed without no-egress, process isolation, POSIX CPU/memory
+  controls, and a private operator credential. It disables source switching and exposes only minimal
+  unauthenticated loopback health/readiness status. Indexed APIs retain session and origin controls.
+- One OS-held database lease prevents concurrent index writers. Startup closes runs interrupted by a
+  prior process, and backup/restore operations verify SQLite integrity, foreign keys, schema,
+  checksums, mandatory private manifests, atomic replacement, and pre-restore safety snapshots.
+- Direct parser dependencies now have bounded compatible ranges and the repository records the exact
+  tested transitive set. The supported CPython 3.12/Linux x86_64 production target has a tested
+  hash-verified wheel lock; additional platform locks and an SBOM remain deployment gaps.
+- Release workflows pin every third-party GitHub Action to an immutable upstream commit. Tagged
+  releases attach the production runbook, systemd units, dependency files, and distribution
+  checksums separately from the PyPI upload set.
 - Bounded local search, extraction-coverage reporting, calibration rules, and auditable conflict
   review operate only against the local SQLite store and add no external runtime dependency.
 
 Accordingly, `NE-001` through `NE-004` are remediated for the explicitly registered Smart Lab Index
 runtime path, and the connector now enforces the first source-root boundary. The retained legacy
 browser/export commands remain compatibility surfaces with their separately documented behavior.
-The remaining findings, especially process-level hostile-parser isolation, dependency locking/offline
-distribution, complete log redaction, packaged-artifact testing, at-rest encryption, and OS-level
-network denial, remain open. Application policy is not a sandbox for malicious in-process plugins.
+The remaining findings include hash-pinned build tools and inputs for additional release targets, an
+SBOM, complete compatibility-layer log redaction, application-level encryption, rich source ACL
+enforcement, and publisher-signed release artifacts. The supplied systemd unit adds OS-level
+loopback-only policy, filesystem restrictions, a dedicated account, and service limits, but
+application policy is not a sandbox for malicious plugins.
 
-Post-implementation validation on 2026-08-11 passed all 183 repository tests, including 77 focused
-Smart Lab tests, real-HTTP GUI tests, and picker/restart-loop tests. A complete built-in
-no-egress indexing run was executed with socket connection calls intercepted and made zero attempts.
-Fresh desktop and 390-pixel browser automation also completed search and review without console/page
-errors or horizontal overflow. This supports controlled synthetic or explicitly approved internal
-evaluation; it is not a claim that the process can contain malicious code or enforce access to a
-confidential shared laboratory root.
+Post-implementation validation on 2026-08-11 passed all 204 repository tests, including 98 focused
+Smart Lab tests, real-HTTP GUI tests, parser-isolation adversarial tests, backup/restore tests, and
+picker/restart-loop tests. A complete built-in no-egress indexing run was executed with socket
+connection calls intercepted and made zero attempts. Authenticated desktop and 390-pixel browser
+automation completed a controlled-production run without console/page errors or horizontal overflow.
+The locked runtime set had no known vulnerabilities according to `pip-audit` on that date. This
+supports controlled synthetic or explicitly approved internal evaluation; it is not a claim that the
+process can contain malicious code or enforce access to a confidential shared laboratory root.
 
 This review covers every current executable path declared in `pyproject.toml:31-37`, their shared
 runtime components, the static website, operational scripts, build/release automation, and every
@@ -77,8 +93,8 @@ module category proposed for Smart Lab Index. It distinguishes observed reposito
 requirements for the planned product.
 
 This is not a penetration test of an operating-system image or the unavailable hosted backend. The
-direct dependencies are version ranges rather than a locked, vendored set (`pyproject.toml:14-21`),
-so claims about transitive-package behavior cannot be proved from this repository alone. The hosted
+Smart Lab runtime has a target-specific lock, but build dependencies, optional compatibility extras,
+and other OS/Python targets are not all hash-locked or vendored, and no SBOM is supplied. The hosted
 service implementation called by `pdf_mcp/cloud_client.py` is also not present and cannot be audited.
 
 ## Executive verdict
@@ -355,6 +371,8 @@ These are release gates for the modular foundation.
 - [ ] `SLI-SEC-09`: Add no-fallback and local-files-only inference/embedding interfaces even before an
   AI implementation is enabled.
 - [ ] `SLI-SEC-10`: Produce a pinned dependency inventory, SBOM, hashes, and documented offline install
+  for every release target. The CPython 3.12/Linux x86_64 runtime lock and install procedure are
+  complete; the SBOM and other targets remain.
   process. No runtime package/model download code is permitted.
 - [ ] `SLI-SEC-11`: Run no-egress tests against the packaged desktop/application artifact, not only
   source imports.

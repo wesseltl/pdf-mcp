@@ -9,6 +9,7 @@ from dataclasses import dataclass
 from typing import Any
 
 from smart_lab_index import CORE_API_VERSION
+from smart_lab_index.application.parsing import InProcessParserExecutor, ParserExecutor
 from smart_lab_index.core.domain import (
     AssertionRecord,
     DiscoveryBatch,
@@ -144,10 +145,12 @@ class IndexingService:
         registry: ModuleRegistry,
         store: KnowledgeStore,
         events: EventBus | None = None,
+        parser_executor: ParserExecutor | None = None,
     ) -> None:
         self.registry = registry
         self.store = store
         self.events = events or registry.events
+        self.parser_executor = parser_executor or InProcessParserExecutor()
         self._entity_reader = _EntityReadRepository(store)
         self._issue_reader = _IssueReadRepository(store)
 
@@ -176,7 +179,7 @@ class IndexingService:
         run_id = self.store.begin_index_run(
             source_id=source.source_id,
             module_snapshot=snapshot,
-            runtime_policy={"no_egress": self.registry.policy.no_egress},
+            runtime_policy=self.registry.policy.to_dict(),
             source_configuration_hash=_source_configuration_hash(source),
         )
         stats = _empty_stats()
@@ -286,6 +289,7 @@ class IndexingService:
                     errors=errors,
                     configuration_hashes=configuration_hashes,
                     processing_context_hash=processing_context_hash,
+                    should_cancel=should_cancel,
                 )
                 stats["processed_files"] += 1
                 _report(
@@ -407,6 +411,7 @@ class IndexingService:
         errors: list[str],
         configuration_hashes: dict[str, str],
         processing_context_hash: str,
+        should_cancel: Callable[[], bool] | None,
     ) -> None:
         parser, selection_error = self._select_parser(
             source,
@@ -442,7 +447,12 @@ class IndexingService:
         if found is None:
             try:
                 with connector.open_content(definition, source) as content:
-                    document = parser.parse(source.document_source(), content)
+                    document = self.parser_executor.parse(
+                        parser,
+                        source.document_source(),
+                        content,
+                        should_cancel=should_cancel,
+                    )
                 document_id, _ = self.store.save_document(
                     source_record_id=source_record_id,
                     source_checksum=source.checksum,
@@ -485,6 +495,8 @@ class IndexingService:
                     ),
                     stats,
                 )
+            except OperationCancelled:
+                raise
             except Exception as exc:  # noqa: BLE001 - per-document parser isolation
                 stats["failed"] += 1
                 detail = (

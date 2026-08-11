@@ -7,9 +7,14 @@ from dataclasses import dataclass
 from pathlib import Path
 
 from smart_lab_index.application.indexing import IndexingService
+from smart_lab_index.application.parsing import (
+    InProcessParserExecutor,
+    ProcessParserExecutor,
+)
 from smart_lab_index.core.config import RuntimePolicy
 from smart_lab_index.core.domain import SourceDefinition
 from smart_lab_index.core.events import EventBus
+from smart_lab_index.core.locking import DatabaseLease
 from smart_lab_index.core.modules import ModuleRegistry
 from smart_lab_index.core.storage import KnowledgeStore
 from smart_lab_index.modules.connectors.filesystem import (
@@ -45,6 +50,8 @@ class SmartLabApplication:
     indexing: IndexingService
     source: SourceDefinition
     startup_errors: dict[str, str]
+    parser_isolation: dict[str, bool]
+    database_lease: DatabaseLease | None = None
 
     @property
     def connector_module_id(self) -> str:
@@ -53,6 +60,8 @@ class SmartLabApplication:
     def close(self) -> None:
         self.registry.stop_all()
         self.store.close()
+        if self.database_lease is not None:
+            self.database_lease.close()
 
     def __enter__(self) -> SmartLabApplication:  # noqa: PYI034
         return self
@@ -72,11 +81,14 @@ def build_application(
     max_files: int = DEFAULT_MAX_FILES,
     max_total_bytes: int = DEFAULT_MAX_TOTAL_BYTES,
     exclude_patterns: Iterable[str] = (),
+    acquire_database_lease: bool = True,
 ) -> SmartLabApplication:
     """Register built-ins explicitly; no dynamic imports or hidden plugin loading."""
     _validate_state_path(root, database)
+    database_lease: DatabaseLease | None = None
     events = EventBus()
-    registry = ModuleRegistry(policy=policy or RuntimePolicy.from_env(), events=events)
+    effective_policy = policy or RuntimePolicy.from_env()
+    registry = ModuleRegistry(policy=effective_policy, events=events)
     domain = GeneralLabDomain()
     connector = FilesystemConnector()
     source = connector.source(
@@ -113,15 +125,48 @@ def build_application(
         )
         registry.register(module, enabled=enabled)
     startup_errors = registry.start_all()
-    store = KnowledgeStore(database)
-    store.sync_modules(registry.snapshot())
-    return SmartLabApplication(
-        registry=registry,
-        store=store,
-        indexing=IndexingService(registry, store, events),
-        source=source,
-        startup_errors=startup_errors,
-    )
+    store: KnowledgeStore | None = None
+    try:
+        database_lease = (
+            DatabaseLease(database).acquire() if acquire_database_lease else None
+        )
+        store = KnowledgeStore(database)
+        store.recover_interrupted_runs()
+        store.sync_modules(registry.snapshot())
+        if effective_policy.parser_isolation:
+            parser_executor = ProcessParserExecutor(effective_policy)
+            parser_isolation = parser_executor.status.to_dict()
+        else:
+            parser_executor = InProcessParserExecutor()
+            parser_isolation = {
+                "process_boundary": False,
+                "wall_clock_timeout": False,
+                "serialized_output_limit": False,
+                "network_audit_guard": False,
+                "cpu_limit": False,
+                "memory_limit": False,
+            }
+        return SmartLabApplication(
+            registry=registry,
+            store=store,
+            indexing=IndexingService(
+                registry,
+                store,
+                events,
+                parser_executor=parser_executor,
+            ),
+            source=source,
+            startup_errors=startup_errors,
+            parser_isolation=parser_isolation,
+            database_lease=database_lease,
+        )
+    except Exception:
+        registry.stop_all()
+        if store is not None:
+            store.close()
+        if database_lease is not None:
+            database_lease.close()
+        raise
 
 
 def _validate_state_path(root: str | Path, database: str | Path) -> None:

@@ -2,10 +2,12 @@
 
 from __future__ import annotations
 
+import base64
 import http.client
 import json
 import tempfile
 import threading
+import time
 import unittest
 from pathlib import Path
 from unittest.mock import Mock, call, patch
@@ -133,6 +135,87 @@ class SmartLabWebAppTests(unittest.TestCase):
                 for module in payload["modules"]
             )
         )
+
+    def test_production_mode_requires_operator_authentication_and_reports_health(
+        self,
+    ) -> None:
+        self.server.shutdown()
+        self.server.server_close()
+        self.thread.join(timeout=2)
+        token = "production-access-key-" + "x" * 32
+        self.server, self.state = create_server(
+            self.state.root,
+            database=self.database,
+            source_id="lab-alpha-web",
+            policy=RuntimePolicy(no_egress=True, production_mode=True),
+            operator_token=token,
+            port=0,
+        )
+        self.port = self.server.server_address[1]
+        self.thread = threading.Thread(target=self.server.serve_forever, daemon=True)
+        self.thread.start()
+
+        status, headers, _content = self.request("GET", "/")
+        self.assertEqual(status, 401)
+        self.assertIn("Basic", headers["WWW-Authenticate"])
+        status, _headers, content = self.request("GET", "/healthz")
+        self.assertEqual(status, 200)
+        self.assertEqual(json.loads(content), {"status": "ok"})
+        status, _headers, content = self.request("GET", "/readyz")
+        self.assertEqual(status, 200)
+        self.assertEqual(json.loads(content), {"status": "ready"})
+
+        authorization = base64.b64encode(f"operator:{token}".encode()).decode()
+        operator_headers = {"Authorization": f"Basic {authorization}"}
+        status, _headers, html = self.request("GET", "/", headers=operator_headers)
+        self.assertEqual(status, 200)
+        self.assertIn(self.state.session_token.encode(), html)
+        operator_headers["X-Smart-Lab-Session"] = self.state.session_token
+        status, _headers, content = self.request(
+            "GET",
+            "/api/health",
+            headers=operator_headers,
+        )
+        health = json.loads(content)
+        self.assertEqual(status, 200)
+        self.assertTrue(health["ready"])
+        self.assertTrue(health["production_mode"])
+        self.assertTrue(health["parser_isolation"]["process_boundary"])
+
+    def test_production_mode_fails_closed_without_an_operator_token(self) -> None:
+        with self.assertRaisesRegex(ValueError, "requires an operator token"):
+            create_server(
+                self.state.root,
+                database=Path(self.temporary.name) / "other.db",
+                policy=RuntimePolicy(no_egress=True, production_mode=True),
+                port=0,
+            )
+
+    def test_configured_interval_runs_incremental_indexing_automatically(self) -> None:
+        self.server.shutdown()
+        self.server.server_close()
+        self.thread.join(timeout=2)
+        scheduled_database = Path(self.temporary.name) / "scheduled.db"
+        self.server, self.state = create_server(
+            self.state.root,
+            database=scheduled_database,
+            policy=RuntimePolicy(no_egress=True, parser_isolation=False),
+            index_interval_seconds=0.05,
+            port=0,
+        )
+        self.port = self.server.server_address[1]
+        self.thread = threading.Thread(target=self.server.serve_forever, daemon=True)
+        self.thread.start()
+
+        deadline = time.monotonic() + 3
+        while time.monotonic() < deadline:
+            payload = self.state_payload()
+            if payload["summary"]["documents"] == 4:
+                break
+            time.sleep(0.05)
+        else:
+            self.fail("scheduled indexing did not complete")
+        self.assertEqual(payload["source"]["index_interval_seconds"], 0.05)
 
     def test_index_action_requires_session_and_same_origin(self) -> None:
         status, _headers, content = self.request(
@@ -355,6 +438,56 @@ class SmartLabWebAppTests(unittest.TestCase):
 
 
 class SmartLabWebAppMainTests(unittest.TestCase):
+    def test_non_finite_index_interval_is_rejected(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary) / "lab"
+            root.mkdir()
+            with patch("smart_lab_index.web_app.create_server") as create:
+                result = main([
+                    str(root),
+                    "--index-interval-minutes",
+                    "nan",
+                    "--no-browser",
+                ])
+
+        self.assertEqual(result, 2)
+        create.assert_not_called()
+
+    def test_production_mode_starts_authenticated_scheduled_indexing(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary) / "lab"
+            root.mkdir()
+            token_file = Path(temporary) / "operator.token"
+            token_file.write_text("x" * 48, encoding="ascii")
+            token_file.chmod(0o600)
+            server = Mock()
+            server.server_address = ("127.0.0.1", 9040)
+            state = Mock()
+            state.root = str(root)
+            state.database = str(Path(temporary) / "index.db")
+            state.policy = RuntimePolicy(no_egress=True, production_mode=True)
+            state.source_change_requested = False
+            with patch(
+                "smart_lab_index.web_app.create_server",
+                return_value=(server, state),
+            ) as create:
+                result = main([
+                    str(root),
+                    "--production",
+                    "--operator-token-file",
+                    str(token_file),
+                    "--no-browser",
+                    "--port",
+                    "0",
+                ])
+
+        self.assertEqual(result, 0)
+        self.assertTrue(create.call_args.kwargs["policy"].production_mode)
+        self.assertTrue(create.call_args.kwargs["policy"].no_egress)
+        self.assertFalse(create.call_args.kwargs["allow_source_change"])
+        self.assertEqual(create.call_args.kwargs["index_interval_seconds"], 900)
+        state.start_index.assert_called_once_with()
+
     def test_no_root_uses_picker_enables_no_egress_without_automatic_scan(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:
             root = Path(temporary) / "lab"
@@ -487,6 +620,8 @@ class SmartLabWebAppMainTests(unittest.TestCase):
                     max_files=DEFAULT_MAX_FILES,
                     max_total_bytes=DEFAULT_MAX_TOTAL_BYTES,
                     exclude_patterns=[],
+                    operator_token=None,
+                    index_interval_seconds=None,
                     port=9030,
                 ),
                 call(
@@ -500,6 +635,8 @@ class SmartLabWebAppMainTests(unittest.TestCase):
                     max_files=DEFAULT_MAX_FILES,
                     max_total_bytes=DEFAULT_MAX_TOTAL_BYTES,
                     exclude_patterns=[],
+                    operator_token=None,
+                    index_interval_seconds=None,
                     port=9030,
                 ),
             ],

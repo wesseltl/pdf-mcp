@@ -7,6 +7,7 @@ include MODULARITY_ASSESSMENT.md
 include MODULAR_ARCHITECTURE.md
 include ORGANIZATION_COUPLING_AUDIT.md
 include PRIVACY.md
+include PRODUCTION_DEPLOYMENT.md
 include PROFILE_FORMAT.md
 include README.md
 include REPOSITORY_ASSESSMENT.md
@@ -22,12 +23,14 @@ include profile.schema.json
 include server.json
 include evaluations/sample-invoice.json
 recursive-include beta *.json
+recursive-include deploy *.env.example *.service *.timer
 recursive-include docs *
 recursive-include evaluations/simulated-customer *.docx *.json *.md *.pdf
 recursive-include examples *.pdf
 recursive-include examples/smart_lab_index *.docx *.md *.xlsx
 recursive-include offers *.json
 recursive-include pdf_mcp/web_ui *.css *.html *.js
+recursive-include requirements *.lock *.txt
 recursive-include scripts *.py
 recursive-include smart_lab_index/web_ui *.css *.html *.js
 recursive-include tests *.md *.py

@@ -2,9 +2,12 @@
 
 from __future__ import annotations
 
+import base64
+import binascii
 import hmac
 import json
 import logging
+from collections.abc import Callable, Mapping
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from typing import Any
 from urllib.parse import urlparse
@@ -18,12 +21,23 @@ class LoopbackHTTPServer(ThreadingHTTPServer):
 
     allow_reuse_address = True
     daemon_threads = True
+    close_callback: Callable[[], None] | None = None
+
+    def server_close(self) -> None:
+        try:
+            super().server_close()
+        finally:
+            callback = self.close_callback
+            self.close_callback = None
+            if callback is not None:
+                callback()
 
 
 class LoopbackHandler(BaseHTTPRequestHandler):
     """Hardened response and request helpers shared by local browser tools."""
 
     session_token = ""
+    operator_token: str | None = None
 
     def log_message(self, format: str, *args: object) -> None:
         LOGGER.debug("Loopback %s request completed", self.command)
@@ -69,6 +83,34 @@ class LoopbackHandler(BaseHTTPRequestHandler):
             self.session_token,
         )
 
+    def _valid_operator(self) -> bool:
+        expected = self.operator_token
+        if expected is None:
+            return True
+        authorization = self.headers.get("Authorization", "")
+        scheme, separator, encoded = authorization.partition(" ")
+        if separator != " " or scheme.casefold() != "basic" or not encoded:
+            return False
+        try:
+            decoded = base64.b64decode(encoded, validate=True).decode("utf-8")
+        except (binascii.Error, UnicodeDecodeError, ValueError):
+            return False
+        username, separator, supplied = decoded.partition(":")
+        return (
+            separator == ":"
+            and hmac.compare_digest(username, "operator")
+            and hmac.compare_digest(supplied, expected)
+        )
+
+    def _send_operator_challenge(self) -> None:
+        self._send_json(
+            401,
+            {"error": "Operator authentication is required."},
+            headers={
+                "WWW-Authenticate": 'Basic realm="Smart Lab Index", charset="UTF-8"'
+            },
+        )
+
     def _valid_body_size(self, maximum: int = 4096) -> bool:
         try:
             length = int(self.headers.get("Content-Length", "0"))
@@ -84,16 +126,32 @@ class LoopbackHandler(BaseHTTPRequestHandler):
             return None
         return payload if isinstance(payload, dict) else None
 
-    def _send_json(self, status: int, payload: dict[str, Any]) -> None:
+    def _send_json(
+        self,
+        status: int,
+        payload: dict[str, Any],
+        *,
+        headers: Mapping[str, str] | None = None,
+    ) -> None:
         self._send_bytes(
             status,
             json.dumps(payload, ensure_ascii=True).encode("utf-8"),
             "application/json; charset=utf-8",
+            headers=headers,
         )
 
-    def _send_bytes(self, status: int, content: bytes, content_type: str) -> None:
+    def _send_bytes(
+        self,
+        status: int,
+        content: bytes,
+        content_type: str,
+        *,
+        headers: Mapping[str, str] | None = None,
+    ) -> None:
         self.send_response(status)
         self._security_headers(content_type)
+        for name, value in (headers or {}).items():
+            self.send_header(name, value)
         self.send_header("Content-Length", str(len(content)))
         self.end_headers()
         self.wfile.write(content)

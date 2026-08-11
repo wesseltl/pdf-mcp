@@ -66,6 +66,11 @@ Picker-created workspaces store durable state under `~/.smart-lab-index/workspac
 runs default to `~/.smart-lab-index/index.db`. Core rejects a database path inside the indexed source
 root.
 
+For a dedicated single-tenant Linux deployment, use the release gates and hardened service templates
+in [PRODUCTION_DEPLOYMENT.md](PRODUCTION_DEPLOYMENT.md). Controlled-production mode adds an operator
+credential, scheduled incremental runs, exclusive database ownership, health probes, isolated parser
+workers, verified backup/restore operations, and a hash-locked CPython 3.12/Linux x86_64 runtime.
+
 ## Commands
 
 | Command | Purpose |
@@ -73,8 +78,13 @@ root.
 | `smart-lab-index-app [ROOT]` | Choose a folder graphically or open an explicit source root |
 | `index ROOT` | Recursively discover and incrementally index supported files |
 | `status` | Show source, document, entity, assertion, issue, and latest-run counts |
+| `health` | Verify database integrity, foreign keys, journal mode, and schema compatibility |
 | `inspect` | Return entities, assertions, provenance, and issues as JSON |
 | `modules ROOT` | Show installed/enabled state, health, versions, dependencies, configuration, and security declarations |
+| `init-operator` | Create a private operator access-key file |
+| `backup` | Create and verify a consistent snapshot plus SHA-256 manifest |
+| `verify-backup` | Verify backup checksum, integrity, foreign keys, and schema compatibility |
+| `restore` | Restore a manifested backup offline, atomically, with a pre-restore safety backup |
 
 Use repeatable `--disable MODULE_ID` and `--enable MODULE_ID` options to assemble a built-in profile.
 `issue.missing_responsibility` is installed but disabled by default because absence is only meaningful
@@ -178,6 +188,12 @@ POSIX runs record owner, group, mode, and effective process access. This is inve
 source ACL enforcement; Windows, Active Directory, SharePoint, and rich network-share ACLs are not
 resolved by this connector.
 
+Every selected parser runs in a fresh spawned process. Core verifies the input size and checksum,
+passes bytes rather than a source path, accepts only bounded JSON-normalized output, and terminates
+the worker on cancellation or wall-clock expiry. POSIX production mode additionally requires hard
+CPU and address-space limits. Python audit guards deny parser network, subprocess, and file-write
+operations. The parent records a bounded parsing issue and continues when one worker fails.
+
 ## No-egress mode
 
 Set:
@@ -195,9 +211,9 @@ declare zero network access.
 The retained `pdf-agent-cloud-mcp` compatibility bridge also checks this policy before reading cloud
 configuration or constructing an HTTP client. There is no external fallback.
 
-Application policy prevents accidental outbound use by built-ins. A strong adversarial no-egress
-deployment must additionally deny outbound network access at the operating-system or firewall layer,
-because in-process Python modules are trusted code rather than a security sandbox.
+Parser workers deny network operations, and the supplied systemd unit applies an outbound allowlist
+for loopback. The module registry remains trusted application code rather than a hostile plugin
+sandbox, so a strong deployment must retain the operating-system firewall/service controls.
 
 ## Compatibility layer
 
@@ -227,6 +243,11 @@ local. All API routes containing index data require a random browser-session tok
 additionally require the exact loopback origin and port. Assets are bundled and the Content Security
 Policy permits only same-origin resources.
 
+Controlled-production mode additionally requires a private operator key before serving the page,
+disables source switching, runs once at startup, and repeats incremental indexing every 15 minutes by
+default. Minimal `/healthz` and `/readyz` endpoints expose no indexed content. The server remains
+loopback-only; remote operators use an SSH tunnel instead of exposing its HTTP port.
+
 Folder selection uses fixed local system commands without a shell: PowerShell on Windows,
 `osascript` on macOS, and `zenity`, `kdialog`, or `yad` when available on Linux. If no system dialog
 is available, a bundled loopback folder navigator provides the same workflow without an extra
@@ -241,19 +262,20 @@ contents.
 - Deterministic rules recognize common equipment, room, people, responsibility, serial/model/status,
   calibration, and maintenance headers plus a narrow `located_in` text form. They are not general
   natural-language understanding and customer mappings still require configuration work.
-- The GUI is a local single-user operator workspace. Source-authority projection, configurable
-  terminology, multi-user authentication, and source-permission enforcement are not implemented.
+- The GUI is a local single-tenant operator workspace. Production mode has one shared operator
+  credential, not named users, role-based access control, or source-permission enforcement.
 - Local inference, embeddings, semantic search, OCR, and vendor connectors are intentionally absent.
-- Parsers enforce byte, page, text, row, cell, Office-entry, and expanded-archive limits, but still
-  run in-process without an OS-enforced CPU, memory, or wall-clock sandbox. Do not use hostile or
-  unapproved document roots.
+- Parsers have a disposable process boundary and resource limits, but the product is not a malware
+  analysis sandbox. Index only organization-approved source scopes.
 - Core creates private state (`0700` directory, `0600` SQLite files), but index content is not
   application-encrypted; deployments should use encrypted local storage and a dedicated OS account.
-- SQLite schema version 2 includes one tested forward migration but is not yet a mature production
-  migration history.
-- The repository distribution is still named `pdf-agent-mcp` at version `0.5.0` to preserve the
+- SQLite schema version 2 includes one tested forward migration. Back up and verify before every
+  application upgrade; long migration history and automated downgrade are not available.
+- The repository distribution is still named `pdf-agent-mcp` at version `0.6.0` to preserve the
   existing compatibility product. A distinct Smart Lab Index release identity and version must be
   chosen before publishing this branch.
+- The hash-verified runtime lock covers CPython 3.12 on Linux x86_64 only. Other production targets
+  require their own generated lock, vulnerability audit, and installation test.
 
 See [MODULAR_ARCHITECTURE.md](MODULAR_ARCHITECTURE.md) for dependency and extension rules and
 [SECURITY_NO_EGRESS_REVIEW.md](SECURITY_NO_EGRESS_REVIEW.md) for the baseline audit and remaining

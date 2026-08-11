@@ -6,10 +6,15 @@ import argparse
 import copy
 import hashlib
 import logging
+import math
+import multiprocessing
 import secrets
+import sqlite3
 import threading
+import time
 import webbrowser
 from collections.abc import Iterable, Mapping, Sequence
+from dataclasses import replace
 from datetime import datetime, timezone
 from importlib import resources
 from pathlib import Path
@@ -22,6 +27,8 @@ from smart_lab_index.application import (
     build_application,
 )
 from smart_lab_index.core.config import RuntimePolicy
+from smart_lab_index.core.locking import DatabaseLease
+from smart_lab_index.core.security import load_operator_token, validate_operator_token
 from smart_lab_index.core.storage import KnowledgeStore
 from smart_lab_index.folder_browser import choose_source_folder_in_browser
 from smart_lab_index.folder_picker import (
@@ -72,6 +79,8 @@ class WebAppState:
         max_files: int = DEFAULT_MAX_FILES,
         max_total_bytes: int = DEFAULT_MAX_TOTAL_BYTES,
         exclude_patterns: Iterable[str] = (),
+        operator_token: str | None = None,
+        index_interval_seconds: float | None = None,
     ) -> None:
         if str(database) == ":memory:":
             raise ValueError("the graphical app requires a durable database path")
@@ -86,8 +95,22 @@ class WebAppState:
         self.max_files = max_files
         self.max_total_bytes = max_total_bytes
         self.exclude_patterns = tuple(exclude_patterns)
+        if operator_token is not None:
+            validate_operator_token(operator_token)
+        if policy.production_mode and operator_token is None:
+            raise ValueError("production mode requires an operator token")
+        self.operator_token = operator_token
+        if index_interval_seconds is not None and (
+            not math.isfinite(index_interval_seconds) or index_interval_seconds <= 0
+        ):
+            raise ValueError("index interval must be positive when enabled")
+        self.index_interval_seconds = index_interval_seconds
+        self._database_lease = DatabaseLease(self.database).acquire()
         self._lock = threading.Lock()
         self._cancel_event = threading.Event()
+        self._scheduler_stop = threading.Event()
+        self._scheduler_thread: threading.Thread | None = None
+        self._readiness_cache: tuple[float, bool] | None = None
         self._index_thread: threading.Thread | None = None
         self._source_change_requested = False
         self._operation: dict[str, Any] = {
@@ -99,9 +122,21 @@ class WebAppState:
             "cancel_requested": False,
             "progress": None,
         }
-        with self._application() as application:
-            self.source_id = application.source.source_id
-            self._modules = application.registry.snapshot()
+        try:
+            with self._application() as application:
+                self.source_id = application.source.source_id
+                self._modules = application.registry.snapshot()
+                self._parser_isolation = dict(application.parser_isolation)
+        except Exception:
+            self._database_lease.close()
+            raise
+        if self.index_interval_seconds is not None:
+            self._scheduler_thread = threading.Thread(
+                target=self._schedule_indexes,
+                name="smart-lab-index-scheduler",
+                daemon=True,
+            )
+            self._scheduler_thread.start()
 
     def _application(self):
         return build_application(
@@ -114,6 +149,7 @@ class WebAppState:
             max_files=self.max_files,
             max_total_bytes=self.max_total_bytes,
             exclude_patterns=self.exclude_patterns,
+            acquire_database_lease=False,
         )
 
     def snapshot(self) -> dict[str, Any]:
@@ -126,6 +162,9 @@ class WebAppState:
                     "source_id": self.source_id,
                     "root": self.root,
                     "no_egress": self.policy.no_egress,
+                    "production_mode": self.policy.production_mode,
+                    "parser_isolation": dict(self._parser_isolation),
+                    "index_interval_seconds": self.index_interval_seconds,
                     "can_change_source": self.allow_source_change,
                     "limits": {
                         "max_files": self.max_files,
@@ -140,6 +179,43 @@ class WebAppState:
     def search(self, query: str, *, limit: int = 50) -> dict[str, Any]:
         with KnowledgeStore(self.database) as store:
             return KnowledgeQueryService(store).search(query, limit=limit)
+
+    def operational_health(self) -> dict[str, Any]:
+        with KnowledgeStore(self.database) as store:
+            database = store.integrity_report()
+        with self._lock:
+            operation = self._operation["state"]
+            modules = copy.deepcopy(self._modules)
+        required_failures = [
+            module["module_id"]
+            for module in modules
+            if module["enabled"] and module["health"] in {"ERROR", "MISCONFIGURED"}
+        ]
+        ready = database["healthy"] and not required_failures
+        return {
+            "status": "READY" if ready else "DEGRADED",
+            "ready": ready,
+            "database": database,
+            "operation": operation,
+            "required_module_failures": required_failures,
+            "parser_isolation": dict(self._parser_isolation),
+            "production_mode": self.policy.production_mode,
+            "no_egress": self.policy.no_egress,
+        }
+
+    def is_ready(self) -> bool:
+        now = time.monotonic()
+        with self._lock:
+            cached = self._readiness_cache
+            if cached is not None and now - cached[0] < 5:
+                return cached[1]
+        try:
+            ready = bool(self.operational_health()["ready"])
+        except Exception:  # noqa: BLE001 - readiness must fail closed
+            ready = False
+        with self._lock:
+            self._readiness_cache = (now, ready)
+        return ready
 
     def review_issue(self, payload: dict[str, Any]) -> dict[str, Any]:
         with self._lock:
@@ -255,6 +331,21 @@ class WebAppState:
         thread.join(timeout)
         return not thread.is_alive()
 
+    def close(self) -> None:
+        self._scheduler_stop.set()
+        if self._scheduler_thread is not None:
+            self._scheduler_thread.join(timeout=2)
+        self.request_cancel()
+        self.wait_for_index()
+        self._database_lease.close()
+
+    def _schedule_indexes(self) -> None:
+        interval = self.index_interval_seconds
+        if interval is None:
+            return
+        while not self._scheduler_stop.wait(interval):
+            self.start_index()
+
 
 class SmartLabHandler(LoopbackHandler):
     app_state: WebAppState
@@ -264,11 +355,27 @@ class SmartLabHandler(LoopbackHandler):
     def session_token(self) -> str:
         return self.app_state.session_token
 
+    @property
+    def operator_token(self) -> str | None:
+        return self.app_state.operator_token
+
     def do_GET(self) -> None:
         if not self._request_host_is_local():
             self._send_json(403, {"error": "This app accepts local requests only."})
             return
         parsed = urlparse(self.path)
+        if parsed.path == "/healthz":
+            self._send_json(200, {"status": "ok"})
+            return
+        if parsed.path == "/readyz":
+            ready = self.app_state.is_ready()
+            self._send_json(200 if ready else 503, {
+                "status": "ready" if ready else "unavailable"
+            })
+            return
+        if not self._valid_operator():
+            self._send_operator_challenge()
+            return
         if parsed.path == "/":
             html = _asset_bytes("index.html").replace(
                 b"__SMART_LAB_SESSION__",
@@ -309,11 +416,26 @@ class SmartLabHandler(LoopbackHandler):
                 LOGGER.error("Smart Lab search failed (%s)", type(exc).__name__)
                 self._send_json(500, {"error": "Search could not be completed."})
             return
+        if parsed.path == "/api/health":
+            if not self._valid_session():
+                self._send_json(
+                    403, {"error": "This browser session is not authorized."}
+                )
+                return
+            try:
+                self._send_json(200, self.app_state.operational_health())
+            except Exception as exc:  # noqa: BLE001 - bounded local API error
+                LOGGER.error("Smart Lab health check failed (%s)", type(exc).__name__)
+                self._send_json(503, {"error": "Health checks could not be completed."})
+            return
         self._send_json(404, {"error": "Not found."})
 
     def do_POST(self) -> None:
         if not self._request_host_is_local() or not self._origin_is_same():
             self._send_json(403, {"error": "This app accepts local requests only."})
+            return
+        if not self._valid_operator():
+            self._send_operator_challenge()
             return
         if not self._valid_session():
             self._send_json(403, {"error": "This browser session is not authorized."})
@@ -388,6 +510,8 @@ def create_server(
     max_files: int = DEFAULT_MAX_FILES,
     max_total_bytes: int = DEFAULT_MAX_TOTAL_BYTES,
     exclude_patterns: Iterable[str] = (),
+    operator_token: str | None = None,
+    index_interval_seconds: float | None = None,
     port: int = DEFAULT_PORT,
 ) -> tuple[LoopbackHTTPServer, WebAppState]:
     """Create a session-protected server bound only to loopback."""
@@ -404,23 +528,37 @@ def create_server(
         max_files=max_files,
         max_total_bytes=max_total_bytes,
         exclude_patterns=exclude_patterns,
+        operator_token=operator_token,
+        index_interval_seconds=index_interval_seconds,
     )
     handler = type(
         "ConfiguredSmartLabHandler",
         (SmartLabHandler,),
         {"app_state": state},
     )
-    server = bind_loopback_server(
-        handler,
-        port,
-        error_message="No available local port was found for Smart Lab Index.",
-    )
+    try:
+        server = bind_loopback_server(
+            handler,
+            port,
+            error_message="No available local port was found for Smart Lab Index.",
+        )
+    except Exception:
+        state.close()
+        raise
+    server.close_callback = state.close
     return server, state
 
 
-def _policy(force_no_egress: bool) -> RuntimePolicy:
+def _policy(force_no_egress: bool, *, production_mode: bool = False) -> RuntimePolicy:
     environment_policy = RuntimePolicy.from_env()
-    return RuntimePolicy(no_egress=force_no_egress or environment_policy.no_egress)
+    effective_production = production_mode or environment_policy.production_mode
+    return replace(
+        environment_policy,
+        no_egress=(
+            force_no_egress or effective_production or environment_policy.no_egress
+        ),
+        production_mode=effective_production,
+    )
 
 
 def _desktop_database(root: str | Path) -> Path:
@@ -445,9 +583,23 @@ def main(argv: Sequence[str] | None = None) -> int:
     parser.add_argument("--disable", action="append", default=[], metavar="MODULE_ID")
     parser.add_argument("--enable", action="append", default=[], metavar="MODULE_ID")
     parser.add_argument("--no-egress", action="store_true")
+    parser.add_argument(
+        "--production",
+        action="store_true",
+        help="enforce the controlled-production startup policy",
+    )
+    parser.add_argument(
+        "--operator-token-file",
+        help="owner-only access-key file required by production mode",
+    )
     parser.add_argument("--port", type=int, default=DEFAULT_PORT)
     parser.add_argument("--no-browser", action="store_true")
     parser.add_argument("--index-on-start", action="store_true")
+    parser.add_argument(
+        "--index-interval-minutes",
+        type=float,
+        help="repeat incremental indexing at this interval; production default: 15",
+    )
     parser.add_argument("--max-files", type=int, default=DEFAULT_MAX_FILES)
     parser.add_argument(
         "--max-total-gb",
@@ -456,6 +608,32 @@ def main(argv: Sequence[str] | None = None) -> int:
     )
     parser.add_argument("--exclude", action="append", default=[], metavar="GLOB")
     args = parser.parse_args(argv)
+
+    environment_policy = RuntimePolicy.from_env()
+    production_mode = args.production or environment_policy.production_mode
+    if production_mode and args.root is None:
+        print("smart-lab-index-app: production mode requires an explicit source root")
+        return 2
+    try:
+        operator_token = (
+            None
+            if args.operator_token_file is None
+            else load_operator_token(args.operator_token_file)
+        )
+    except ValueError as exc:
+        print(f"smart-lab-index-app: {exc}")
+        return 2
+    if production_mode and operator_token is None:
+        print("smart-lab-index-app: production mode requires --operator-token-file")
+        return 2
+    index_interval_minutes = args.index_interval_minutes
+    if index_interval_minutes is None and production_mode:
+        index_interval_minutes = 15.0
+    if index_interval_minutes is not None and (
+        not math.isfinite(index_interval_minutes) or index_interval_minutes <= 0
+    ):
+        print("smart-lab-index-app: --index-interval-minutes must be positive")
+        return 2
 
     picker_supported = folder_picker_available()
     selected_at_start = args.root is None
@@ -476,23 +654,26 @@ def main(argv: Sequence[str] | None = None) -> int:
                 port=requested_port,
                 open_browser=not args.no_browser,
             )
-        except (OSError, RuntimeError, ValueError) as exc:
+        except (OSError, RuntimeError, ValueError, sqlite3.Error) as exc:
             print(f"smart-lab-index-app: {exc}")
             return 2
         browser_started = not args.no_browser
         if root is None:
             return 0
 
-    policy = _policy(args.no_egress or selected_at_start)
+    policy = _policy(
+        args.no_egress or selected_at_start,
+        production_mode=production_mode,
+    )
     source_id = args.source_id
     managed_database = selected_at_start and args.database is None
     database: str | Path = args.database or DEFAULT_DATABASE
     if managed_database:
         database = _desktop_database(root)
-    if args.max_total_gb <= 0:
+    if not math.isfinite(args.max_total_gb) or args.max_total_gb <= 0:
         print("smart-lab-index-app: --max-total-gb must be positive")
         return 2
-    index_on_start = args.index_on_start
+    index_on_start = args.index_on_start or production_mode
     recovery: tuple[str | Path, str | Path, str | None] | None = None
 
     while True:
@@ -504,10 +685,16 @@ def main(argv: Sequence[str] | None = None) -> int:
                 policy=policy,
                 disabled_module_ids=args.disable,
                 enabled_module_ids=args.enable,
-                allow_source_change=True,
+                allow_source_change=not production_mode,
                 max_files=args.max_files,
                 max_total_bytes=int(args.max_total_gb * 1024**3),
                 exclude_patterns=args.exclude,
+                operator_token=operator_token,
+                index_interval_seconds=(
+                    None
+                    if index_interval_minutes is None
+                    else index_interval_minutes * 60
+                ),
                 port=requested_port,
             )
         except (OSError, RuntimeError, ValueError) as exc:
@@ -529,6 +716,10 @@ def main(argv: Sequence[str] | None = None) -> int:
         print(f"Source: {state.root}")
         print(f"Database: {Path(state.database).expanduser()}")
         print(f"No-egress: {'on' if state.policy.no_egress else 'off'}")
+        print(f"Production mode: {'on' if state.policy.production_mode else 'off'}")
+        print(f"Operator authentication: {'on' if operator_token else 'off'}")
+        if index_interval_minutes is not None:
+            print(f"Index interval: {index_interval_minutes:g} minutes")
         print("Press Ctrl+C to stop the app.")
         if index_on_start:
             state.start_index()
@@ -587,4 +778,5 @@ def main(argv: Sequence[str] | None = None) -> int:
 
 
 if __name__ == "__main__":
+    multiprocessing.freeze_support()
     raise SystemExit(main())

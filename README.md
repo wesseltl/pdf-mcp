@@ -27,6 +27,12 @@ People, Responsibilities, Documents, local Search, Review queue, Sources, and Mo
 Indexing reports its phase and progress and can be cancelled between files. **Change folder** switches
 workspaces without a terminal. The app binds only to loopback and serves bundled assets.
 
+For a dedicated, single-tenant Linux deployment, see
+[PRODUCTION_DEPLOYMENT.md](PRODUCTION_DEPLOYMENT.md). Controlled-production mode adds operator
+authentication, scheduled runs, disposable resource-limited parser processes, health probes,
+exclusive database ownership, manifested backup/restore commands, and a hash-verified Linux runtime
+lock. Organization-specific validation and source-access approval remain required.
+
 The release workflow also creates standalone `smart-lab-index` ZIP applications and SHA-256
 manifests for Windows, macOS, and Linux. After extraction, open the application directly; Python is
 not required. Windows signing and macOS signing/notarization activate when publisher credentials are
