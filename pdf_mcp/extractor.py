@@ -14,6 +14,13 @@ import pdfplumber
 # the server to an agent without it being able to read arbitrary files on the machine.
 _ALLOWED_DIR = os.environ.get("PDF_MCP_ALLOWED_DIR")
 
+_NO_TEXT_WARNING = (
+    "no text detected; scanned or image-only PDFs require OCR, which is not supported"
+)
+_NO_TABLES_WARNING = (
+    "no tables detected; scanned or image-only PDFs require OCR, which is not supported"
+)
+
 
 def _check_path(path: str) -> str:
     """Resolve `path` and, if a sandbox dir is configured, reject anything outside it.
@@ -35,15 +42,24 @@ def page_count(path: str) -> int:
         return len(pdf.pages)
 
 
+def _select_pages(pdf, page: int | None):
+    """Return all pages or one validated 1-based page."""
+    if page is None:
+        return pdf.pages
+    if isinstance(page, bool) or not isinstance(page, int):
+        raise ValueError("page must be an integer using 1-based numbering")
+    if page < 1 or page > len(pdf.pages):
+        raise ValueError(f"page must be between 1 and {len(pdf.pages)} (received {page})")
+    return [pdf.pages[page - 1]]
+
+
 def extract_text(path: str, page: int | None = None) -> dict:
     """Text from one page (1-based) or the whole document if page is None."""
     with pdfplumber.open(_check_path(path)) as pdf:
-        if page is not None:
-            pages = [pdf.pages[page - 1]]
-        else:
-            pages = pdf.pages
+        pages = _select_pages(pdf, page)
         parts = [{"page": p.page_number, "text": (p.extract_text() or "")} for p in pages]
-    return {"pages": parts, "n_pages": len(parts)}
+    warnings = [] if any(part["text"].strip() for part in parts) else [_NO_TEXT_WARNING]
+    return {"pages": parts, "n_pages": len(parts), "warnings": warnings}
 
 
 def _assess(rows: list[list]) -> dict:
@@ -115,14 +131,15 @@ def extract_tables(path: str, page: int | None = None, merge_multipage: bool = F
     """
     out = []
     with pdfplumber.open(_check_path(path)) as pdf:
-        pages = [pdf.pages[page - 1]] if page is not None else pdf.pages
+        pages = _select_pages(pdf, page)
         for p in pages:
             for tbl in p.extract_tables():
                 clean = [[("" if c is None else str(c).strip()) for c in row] for row in tbl]
                 out.append({"page": p.page_number, "rows": clean, "n_rows": len(clean), **_assess(clean)})
     if merge_multipage:
         out = _stitch_multipage(out)
-    return {"tables": out, "n_tables": len(out)}
+    warnings = [] if out else [_NO_TABLES_WARNING]
+    return {"tables": out, "n_tables": len(out), "warnings": warnings}
 
 
 def table_to_csv(path: str, page: int | None = None, index: int = 0) -> str:
@@ -135,6 +152,8 @@ def table_to_csv(path: str, page: int | None = None, index: int = 0) -> str:
     tables = extract_tables(path, page)["tables"]
     if not tables:
         return ""
+    if isinstance(index, bool) or not isinstance(index, int) or not 0 <= index < len(tables):
+        raise ValueError(f"table index must be between 0 and {len(tables) - 1} (received {index})")
     rows = tables[index]["rows"]
     buf = io.StringIO()
     csv.writer(buf).writerows(rows)

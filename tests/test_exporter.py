@@ -34,6 +34,14 @@ def make_docx(path):
     doc.save(path)
 
 
+def make_text_only_pdf(path):
+    from reportlab.lib.pagesizes import A4
+    from reportlab.lib.styles import getSampleStyleSheet
+    from reportlab.platypus import Paragraph, SimpleDocTemplate
+    doc = SimpleDocTemplate(path, pagesize=A4)
+    doc.build([Paragraph("A document without tables", getSampleStyleSheet()["BodyText"])])
+
+
 class TestExporter(unittest.TestCase):
     def test_export_pdf_to_xlsx(self):
         from openpyxl import load_workbook
@@ -80,6 +88,21 @@ class TestExporter(unittest.TestCase):
             data = json.load(f)
         self.assertEqual(data["source_type"], "docx")
         self.assertEqual(data["tables"][0]["rows"][0], ["Analyte", "Result"])
+
+    def test_export_without_tables_preserves_warning(self):
+        from openpyxl import load_workbook
+        tmp = tempfile.mkdtemp()
+        input_path = os.path.join(tmp, "text-only.pdf")
+        output_path = os.path.join(tmp, "text-only.xlsx")
+        make_text_only_pdf(input_path)
+
+        result = exporter.export_document_tables(input_path, output_path)
+
+        self.assertEqual(result["n_tables"], 0)
+        self.assertTrue(result["warnings"])
+        review_rows = list(load_workbook(output_path)["Review"].values)
+        self.assertEqual(review_rows[1][0], "document warning")
+        self.assertIn("no tables detected", review_rows[1][1])
 
     def test_export_rejects_unsupported_input(self):
         with self.assertRaises(ValueError):

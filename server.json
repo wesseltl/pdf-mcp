@@ -2,9 +2,9 @@
   "$schema": "https://static.modelcontextprotocol.io/schemas/2025-12-11/server.schema.json",
   "name": "io.github.wesseltl/pdf-mcp",
   "description": "Extract text and tables from PDFs and Word documents for an agent.",
-  "version": "0.1.4",
+  "version": "0.2.0",
   "repository": { "url": "https://github.com/wesseltl/pdf-mcp", "source": "github" },
   "packages": [
-    { "registryType": "pypi", "identifier": "pdf-agent-mcp", "version": "0.1.4", "transport": { "type": "stdio" } }
+    { "registryType": "pypi", "identifier": "pdf-agent-mcp", "version": "0.2.0", "transport": { "type": "stdio" } }
   ]
 }

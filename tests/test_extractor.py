@@ -59,6 +59,21 @@ def make_two_tables_one_page_pdf(path):
     ])
 
 
+def make_blank_pdf(path):
+    from reportlab.pdfgen import canvas
+    pdf = canvas.Canvas(path)
+    pdf.showPage()
+    pdf.save()
+
+
+def make_text_only_pdf(path):
+    from reportlab.lib.pagesizes import A4
+    from reportlab.lib.styles import getSampleStyleSheet
+    from reportlab.platypus import Paragraph, SimpleDocTemplate
+    doc = SimpleDocTemplate(path, pagesize=A4)
+    doc.build([Paragraph("No structured table on this page", getSampleStyleSheet()["BodyText"])])
+
+
 class TestExtractor(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
@@ -89,6 +104,33 @@ class TestExtractor(unittest.TestCase):
     def test_extract_text_specific_page(self):
         r = extractor.extract_text(self.path, page=1)
         self.assertEqual(r["n_pages"], 1)
+
+    def test_page_number_must_be_valid_and_one_based(self):
+        for invalid in (0, 2, -1, True, 1.5):
+            with self.subTest(page=invalid):
+                with self.assertRaises(ValueError):
+                    extractor.extract_text(self.path, page=invalid)
+                with self.assertRaises(ValueError):
+                    extractor.extract_tables(self.path, page=invalid)
+
+    def test_blank_pdf_reports_ocr_warning(self):
+        path = os.path.join(tempfile.mkdtemp(), "blank.pdf")
+        make_blank_pdf(path)
+        text_result = extractor.extract_text(path)
+        table_result = extractor.extract_tables(path)
+        self.assertTrue(any("OCR" in warning for warning in text_result["warnings"]))
+        self.assertTrue(any("OCR" in warning for warning in table_result["warnings"]))
+
+    def test_text_only_pdf_reports_no_tables(self):
+        path = os.path.join(tempfile.mkdtemp(), "text-only.pdf")
+        make_text_only_pdf(path)
+        result = extractor.extract_tables(path)
+        self.assertEqual(result["n_tables"], 0)
+        self.assertTrue(result["warnings"])
+
+    def test_table_index_must_exist(self):
+        with self.assertRaises(ValueError):
+            extractor.table_to_csv(self.path, index=1)
 
     def test_assessment_flags_ragged_and_empty(self):
         from pdf_mcp.extractor import _assess

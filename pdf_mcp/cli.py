@@ -28,6 +28,8 @@ def main() -> int:
         f"Wrote {result['n_tables']} table(s) to {result['output']} "
         f"({result['tables_needing_review']} need review)."
     )
+    for warning in result.get("warnings", []):
+        print(f"Warning: {warning}")
     return 0
 
 

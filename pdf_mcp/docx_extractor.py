@@ -26,6 +26,7 @@ def extract_docx_text(path: str) -> dict:
         "paragraphs": paragraphs,
         "text": "\n".join(p["text"] for p in paragraphs),
         "n_paragraphs": len(paragraphs),
+        "warnings": [] if paragraphs else ["no paragraph text detected in Word document"],
     }
 
 
@@ -54,7 +55,8 @@ def extract_docx_tables(path: str) -> dict:
             "has_merged_cells": has_merged_cells,
             **assessment,
         })
-    return {"tables": tables, "n_tables": len(tables)}
+    warnings = [] if tables else ["no tables detected in Word document"]
+    return {"tables": tables, "n_tables": len(tables), "warnings": warnings}
 
 
 def docx_table_to_csv(path: str, index: int = 0) -> str:
@@ -62,6 +64,8 @@ def docx_table_to_csv(path: str, index: int = 0) -> str:
     tables = extract_docx_tables(path)["tables"]
     if not tables:
         return ""
+    if isinstance(index, bool) or not isinstance(index, int) or not 0 <= index < len(tables):
+        raise ValueError(f"table index must be between 0 and {len(tables) - 1} (received {index})")
     rows = tables[index]["rows"]
     buf = io.StringIO()
     csv.writer(buf).writerows(rows)

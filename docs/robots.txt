@@ -1,0 +1,4 @@
+User-agent: *
+Allow: /
+
+Sitemap: https://wesseltl.github.io/pdf-mcp/sitemap.xml

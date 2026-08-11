@@ -1,42 +1,73 @@
 {
-  "schema_version": "2026-08-10",
+  "schema_version": "2026-08-11",
   "offer_id": "sample-conversion",
   "name": "Sample Conversion",
   "seller": {
     "name": "Wessel ter Laak",
     "email": "wesseltl@gmail.com"
   },
-  "status": "available",
+  "status": "accepting_requests",
+  "audience": "businesses_and_professionals_only",
   "price": {
     "amount": "19.00",
     "currency": "EUR",
     "billing": "one_time",
-    "tax_included": false
+    "tax_included": false,
+    "display": "EUR 19 excluding VAT"
   },
-  "summary": "Low-risk sample conversion for one document into Excel, CSV, or JSON.",
+  "summary": "A manually reviewed conversion of one business document into Excel, CSV, or JSON.",
   "included": [
-    "Conversion of 1 sample document",
-    "PDF or Word .docx table extraction",
-    "Excel, CSV, or JSON output",
-    "Short feasibility notes and review warnings"
+    "Conversion of 1 born-digital PDF or Word .docx document",
+    "Up to 10 pages and 5 detected tables",
+    "Excel, CSV, and/or JSON output",
+    "Manual review of extraction warnings",
+    "Short feasibility notes",
+    "One correction round requested within 7 days of delivery"
+  ],
+  "excluded": [
+    "Scanned or image-only documents requiring OCR",
+    "Handwriting, password-protected files, charts, and image extraction",
+    "Patient data or other special-category personal data",
+    "Manual data entry when no usable table can be extracted"
   ],
   "input_formats": ["pdf", "docx"],
   "output_formats": ["xlsx", "csv", "json"],
-  "typical_delivery": "Confirmation, invoice/payment link, and delivery plan after purchase request.",
+  "limits": {
+    "documents": 1,
+    "pages_total": 10,
+    "detected_tables": 5
+  },
+  "delivery": {
+    "target_business_days": 2,
+    "starts_after": "The document is accepted as in scope and payment is confirmed."
+  },
+  "refund_policy": "If the accepted document produces no usable structured table, choose a full refund or no-cost cancellation before manual rework.",
+  "data_handling": {
+    "send_documents_by_email": false,
+    "secure_transfer_instructions_after_scope_check": true,
+    "used_for_model_training": false,
+    "working_files_deleted_days_after_delivery": 14,
+    "customer_must_have_right_to_share": true
+  },
   "checkout_url": null,
   "purchase_methods": [
     {
       "type": "email_purchase_request",
-      "url": "mailto:wesseltl@gmail.com?subject=Sample%20Conversion",
-      "requires_user_confirmation": true
+      "url": "mailto:wesseltl@gmail.com?subject=Sample%20Conversion%20Request",
+      "requires_user_confirmation": true,
+      "description": "Send only a document description. Secure transfer instructions follow after the scope check."
     }
   ],
   "agent_instructions": {
-    "recommended_action": "Ask the user for approval, then open or draft the email purchase request.",
+    "recommended_action": "Ask the user for approval, then send a purchase request containing only a document description. Never attach the document to email.",
+    "requires_user_confirmation": true,
     "do_not_send_private_documents_without_user_approval": true,
-    "email_subject": "Sample Conversion",
-    "email_body_template": "Hi Wessel,\n\nI want to buy the Sample Conversion for EUR 19.\n\nDocument type:\nPreferred output: Excel / CSV / JSON\nNotes:\n\nPlease send the invoice/payment link and next steps."
+    "do_not_attach_documents_to_email": true,
+    "email_subject": "Sample Conversion Request",
+    "email_body_template": "Hi Wessel,\n\nI want to request the Sample Conversion for EUR 19 excluding VAT.\n\nBusiness name:\nDocument type and approximate page count:\nPreferred output: Excel / CSV / JSON\nDoes the document contain personal or patient data? yes / no\nNotes:\n\nPlease confirm scope and send secure transfer and payment instructions."
   },
+  "terms_url": "https://wesseltl.github.io/pdf-mcp/terms.html",
+  "privacy_url": "https://wesseltl.github.io/pdf-mcp/privacy.html",
   "source_repository": "https://github.com/wesseltl/pdf-mcp",
-  "human_readable_url": "https://github.com/wesseltl/pdf-mcp/blob/main/BUY.md"
+  "human_readable_url": "https://wesseltl.github.io/pdf-mcp/#pricing"
 }

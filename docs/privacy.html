@@ -1,0 +1,131 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Privacy Notice | pdf-mcp</title>
+    <meta name="description" content="Privacy notice for the local pdf-mcp tool, free hosted agent beta, and paid document-conversion beta.">
+    <link rel="canonical" href="https://wesseltl.github.io/pdf-mcp/privacy.html">
+    <link rel="stylesheet" href="styles.css">
+  </head>
+  <body>
+    <header class="site-header inner-header">
+      <a class="brand" href="./">pdf-mcp</a>
+      <nav aria-label="Legal navigation">
+        <a href="./#free-beta">Free beta</a>
+        <a href="./#pricing">Pricing</a>
+        <a href="terms.html">Terms</a>
+        <a href="mailto:wesseltl@gmail.com">Contact</a>
+      </nav>
+    </header>
+    <main class="legal-main">
+      <article class="legal">
+        <p class="eyebrow">Data handling</p>
+        <h1>Privacy Notice</h1>
+        <p class="effective">Effective 11 August 2026</p>
+        <p>This notice separates the local tool, optional free hosted beta, and paid beta.</p>
+
+        <h2>Local open-source tool</h2>
+        <p>
+          pdf-agent-mcp runs on the user's own computer. The extraction server does not upload
+          documents, make network calls, collect telemetry, or send usage analytics. The person or
+          organization running the tool controls its local files and agent configuration.
+        </p>
+
+        <h2>Free hosted beta</h2>
+        <p>
+          The free hosted beta is a separate, explicit configuration. Its public bridge uploads the
+          selected file to an authenticated extraction service. Use only redacted or non-sensitive
+          born-digital PDF or DOCX documents. Temporary uploads are deleted when the operation
+          completes or fails. Documents and extracted contents are not used for model training.
+        </p>
+        <p>The service retains these operational fields for up to 90 days:</p>
+        <ul>
+          <li>Non-secret API key ID and timestamp.</li>
+          <li>Tool name and PDF/DOCX type.</li>
+          <li>Upload byte count and page, table, and warning counts.</li>
+          <li>Processing duration and success or a bounded error code.</li>
+        </ul>
+        <p>
+          The usage ledger does not store the raw API key, source filename, document contents,
+          extracted text, or table cells. Infrastructure providers may process ordinary network
+          metadata, such as IP address, in security logs. Beta request emails contain the contact,
+          business, and project details supplied by the requester.
+        </p>
+        <p>
+          Operational data is used to enforce the allowance, secure and debug the service, and
+          measure activation, successful use, and repeat use. To revoke a key or request deletion of
+          associated beta account and operational data, email the address below. See the
+          <a class="text-link" href="beta-terms.html">hosted beta terms</a>.
+        </p>
+
+        <h2>Paid beta operator</h2>
+        <p>
+          The paid beta is operated by Wessel ter Laak. Contact:
+          <a class="text-link" href="mailto:wesseltl@gmail.com">wesseltl@gmail.com</a>. Live
+          self-service checkout remains disabled until the operator's business registration details
+          are published.
+        </p>
+
+        <h2>Information processed</h2>
+        <ul>
+          <li>Business contact details supplied in a purchase request.</li>
+          <li>Document descriptions used to decide whether a request is in scope.</li>
+          <li>Source files supplied through separately provided secure-transfer instructions.</li>
+          <li>Converted output, review notes, correspondence, and transaction identifiers.</li>
+        </ul>
+        <p>
+          This information is used to assess requests, perform and deliver the service, provide
+          support, prevent misuse, and meet accounting or legal obligations. Documents are not used
+          for advertising, model training, or public test data.
+        </p>
+
+        <h2>Sensitive information</h2>
+        <div class="notice">
+          Do not email source documents. Do not submit patient or health data, government
+          identifiers, payment-card details, passwords, or other special-category personal data.
+        </div>
+        <p>
+          Redact personal or confidential information that is not required for the conversion. The
+          customer must have the right to share every submitted document.
+        </p>
+
+        <h2>Providers and retention</h2>
+        <p>
+          Email providers process request correspondence. Stripe processes payment details when live
+          checkout is enabled; the seller does not receive full card details. The secure-transfer
+          provider is identified before any upload. Hosting providers process files only as needed
+          to supply the requested service.
+        </p>
+        <p>
+          Working source files and generated output are deleted within 14 days after delivery.
+          Purchase and transaction records may be kept for the period required by accounting, tax,
+          fraud-prevention, or legal obligations. Backups may expire on a separate technical
+          schedule.
+        </p>
+
+        <h2>Website</h2>
+        <p>
+          This static website sets no analytics or advertising cookies. It fetches public offer JSON
+          from GitHub to select the current request or checkout link. GitHub and the visitor's
+          network provider may process ordinary request metadata under their own privacy notices.
+        </p>
+
+        <h2>Your requests</h2>
+        <p>
+          To request access, correction, deletion, restriction, or a copy of personal data, email
+          <a class="text-link" href="mailto:wesseltl@gmail.com">wesseltl@gmail.com</a>. Some records
+          cannot be deleted immediately when retention is legally required. You may also complain to
+          the Dutch Data Protection Authority.
+        </p>
+      </article>
+    </main>
+    <footer>
+      <span>pdf-mcp</span>
+      <a href="./">Home</a>
+      <a href="beta-terms.html">Beta terms</a>
+      <a href="terms.html">Terms</a>
+      <a href="https://github.com/wesseltl/pdf-mcp">GitHub</a>
+    </footer>
+  </body>
+</html>

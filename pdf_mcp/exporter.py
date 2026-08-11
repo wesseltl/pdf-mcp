@@ -93,6 +93,8 @@ def _write_xlsx(result: dict, output_path: str) -> None:
 
     for row in _review_rows(result["tables"]):
         review.append(row)
+    for warning in result.get("warnings", []):
+        review.append(["document warning", warning])
     for cell in review[1]:
         cell.font = header_font
     for row in review.iter_rows(min_row=2):
@@ -121,6 +123,8 @@ def _write_csv(result: dict, output_path: str) -> None:
         writer = csv.writer(f)
         writer.writerow(["source", result["source"]])
         writer.writerow(["source_type", result["source_type"]])
+        for warning in result.get("warnings", []):
+            writer.writerow(["document_warning", warning])
         writer.writerow([])
         for i, table in enumerate(result["tables"]):
             writer.writerow([f"Table {i + 1}", _location(table)])
@@ -156,4 +160,5 @@ def export_document_tables(input_path: str, output_path: str, merge_multipage: b
         "source_type": result["source_type"],
         "n_tables": result["n_tables"],
         "tables_needing_review": sum(1 for t in result["tables"] if not t.get("looks_clean")),
+        "warnings": result.get("warnings", []),
     }

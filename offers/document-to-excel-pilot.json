@@ -1,43 +1,74 @@
 {
-  "schema_version": "2026-08-10",
+  "schema_version": "2026-08-11",
   "offer_id": "document-to-excel-pilot",
   "name": "Document-to-Excel Starter",
   "seller": {
     "name": "Wessel ter Laak",
     "email": "wesseltl@gmail.com"
   },
-  "status": "available",
+  "status": "accepting_requests",
+  "audience": "businesses_and_professionals_only",
   "price": {
     "amount": "99.00",
     "currency": "EUR",
     "billing": "one_time",
-    "tax_included": false
+    "tax_included": false,
+    "display": "EUR 99 excluding VAT"
   },
-  "summary": "Starter setup for one small document workflow into reviewed Excel, CSV, or JSON output.",
+  "summary": "A manually reviewed starter setup for one repeatable business-document workflow.",
   "included": [
-    "Setup for one small document workflow, such as COA to Excel or lab report to CSV",
-    "Up to 5 sample documents",
-    "PDF and Word .docx table extraction",
-    "Excel, CSV, or JSON export with review warnings",
-    "Written walkthrough"
+    "Setup for one document workflow, such as COA to Excel or lab report to CSV",
+    "Up to 5 similar born-digital PDF or Word .docx documents",
+    "Up to 50 pages in total",
+    "Excel, CSV, and/or JSON output",
+    "Manual review of extraction warnings",
+    "Written mapping and workflow notes",
+    "One correction round requested within 7 days of delivery"
+  ],
+  "excluded": [
+    "Scanned or image-only documents requiring OCR",
+    "Handwriting, password-protected files, charts, and image extraction",
+    "Patient data or other special-category personal data",
+    "Production hosting, ongoing processing, and custom integrations"
   ],
   "input_formats": ["pdf", "docx"],
   "output_formats": ["xlsx", "csv", "json"],
-  "typical_delivery": "Confirmation, invoice/payment link, and delivery plan after purchase request.",
+  "limits": {
+    "documents": 5,
+    "pages_total": 50,
+    "workflows": 1
+  },
+  "delivery": {
+    "target_business_days": 5,
+    "starts_after": "All documents are accepted as in scope and payment is confirmed."
+  },
+  "refund_policy": "If the accepted documents cannot produce a usable structured workflow, choose a full refund or a revised scope before additional work.",
+  "data_handling": {
+    "send_documents_by_email": false,
+    "secure_transfer_instructions_after_scope_check": true,
+    "used_for_model_training": false,
+    "working_files_deleted_days_after_delivery": 14,
+    "customer_must_have_right_to_share": true
+  },
   "checkout_url": null,
   "purchase_methods": [
     {
       "type": "email_purchase_request",
-      "url": "mailto:wesseltl@gmail.com?subject=Document-to-Excel%20Starter",
-      "requires_user_confirmation": true
+      "url": "mailto:wesseltl@gmail.com?subject=Document-to-Excel%20Starter%20Request",
+      "requires_user_confirmation": true,
+      "description": "Send only a document description. Secure transfer instructions follow after the scope check."
     }
   ],
   "agent_instructions": {
-    "recommended_action": "Ask the user for approval, then open or draft the email purchase request.",
+    "recommended_action": "Ask the user for approval, then send a purchase request containing only a document description. Never attach documents to email.",
+    "requires_user_confirmation": true,
     "do_not_send_private_documents_without_user_approval": true,
-    "email_subject": "Document-to-Excel Starter",
-    "email_body_template": "Hi Wessel,\n\nI want to buy the Document-to-Excel Starter for EUR 99.\n\nDocument type:\nPreferred output: Excel / CSV / JSON\nNotes:\n\nPlease send the invoice/payment link and next steps."
+    "do_not_attach_documents_to_email": true,
+    "email_subject": "Document-to-Excel Starter Request",
+    "email_body_template": "Hi Wessel,\n\nI want to request the Document-to-Excel Starter for EUR 99 excluding VAT.\n\nBusiness name:\nDocument types, count, and approximate total pages:\nPreferred output: Excel / CSV / JSON\nDo the documents contain personal or patient data? yes / no\nNotes:\n\nPlease confirm scope and send secure transfer and payment instructions."
   },
+  "terms_url": "https://wesseltl.github.io/pdf-mcp/terms.html",
+  "privacy_url": "https://wesseltl.github.io/pdf-mcp/privacy.html",
   "source_repository": "https://github.com/wesseltl/pdf-mcp",
-  "human_readable_url": "https://github.com/wesseltl/pdf-mcp/blob/main/BUY.md"
+  "human_readable_url": "https://wesseltl.github.io/pdf-mcp/#pricing"
 }

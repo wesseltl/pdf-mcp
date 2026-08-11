@@ -20,6 +20,53 @@ Need this set up for real documents? See
 Agents can use the structured offer at
 [`offers/document-to-excel-pilot.json`](https://raw.githubusercontent.com/wesseltl/pdf-mcp/main/offers/document-to-excel-pilot.json).
 
+Landing page: [local extraction and free hosted agent beta](https://wesseltl.github.io/pdf-mcp/).
+
+> **Current limitation:** PDF extraction supports born-digital documents. Scanned or image-only PDFs
+> require OCR, which is not included. Extraction warnings identify empty or uncertain results for
+> human review.
+
+## Local or free hosted beta
+
+The normal `pdf-agent-mcp` command remains local, MIT licensed, network-free, and telemetry-free.
+For people who explicitly want a measured agent beta, `pdf-agent-cloud-mcp` uploads only the selected
+document for one authenticated operation.
+
+| Edition | Document location | Measurement | Best for |
+|---|---|---|---|
+| Local `pdf-agent-mcp` | Stays on your machine | None | Confidential or unrestricted local use |
+| Hosted `pdf-agent-cloud-mcp` | Temporary authenticated upload | Bounded operational counters | Redacted/non-sensitive beta evaluation |
+
+The free hosted beta includes 25 operations per calendar month. Temporary uploads are deleted when
+each request completes. Usage metrics exclude filenames, document contents, extracted text, and
+table cells. Request access without attaching a document:
+
+[Request a free agent beta key](mailto:wesseltl@gmail.com?subject=pdf-mcp%20Free%20Agent%20Beta)
+
+After acceptance, install and configure the separate bridge with the endpoint and key you receive:
+
+```bash
+pip install "pdf-agent-mcp[cloud]"
+```
+
+```json
+{
+  "mcpServers": {
+    "pdf-cloud": {
+      "command": "pdf-agent-cloud-mcp",
+      "env": {
+        "PDF_MCP_CLOUD_URL": "https://endpoint-provided-with-beta-access.example",
+        "PDF_MCP_CLOUD_API_KEY": "key-provided-once"
+      }
+    }
+  }
+}
+```
+
+Use only redacted or non-sensitive files. See the [free beta terms](BETA_TERMS.md),
+[privacy notice](PRIVACY.md), and machine-readable
+[`beta/free-hosted-beta.json`](beta/free-hosted-beta.json).
+
 ## What it turns a document into
 
 A PDF or Word table like this:

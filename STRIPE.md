@@ -1,47 +1,54 @@
-# Stripe Connector
+# Stripe Payment Links
 
-This repo includes a small Stripe Payment Links connector:
+The connector builds Stripe Products, Prices, and Payment Links from `offers/*.json`. It enables
+automatic tax, collects billing addresses and tax IDs, and redirects successful checkouts to the
+order instructions page.
 
-```bash
-python scripts/create_stripe_payment_links.py
-```
+Live checkout is a launch gate, not a development default. Before creating live links:
 
-By default it runs in dry-run mode and prints the Products, Prices, and Payment Links it would create
-from the JSON files in `offers/`.
+- Complete the Stripe business profile and activate live payments.
+- Publish the seller's business registration number, VAT status/ID, address, and phone in the terms.
+- Configure and verify Stripe Tax for the countries where the offer will be sold.
+- Review the offer scope, refund policy, privacy notice, and success-page instructions.
 
-## Setup
-
-Create a restricted Stripe API key with permission to create Products, Prices, and Payment Links.
-Do not commit the key and do not paste it into chat.
-
-Set it only in your shell or deployment environment:
+Install the optional dependency:
 
 ```bash
-export STRIPE_SECRET_KEY=sk_live_...
 python -m pip install -e ".[commerce]"
 ```
 
-## Create checkout links
+Use a restricted Stripe key with only the permissions needed for Products, Prices, and Payment
+Links. Set it in the current shell; do not save it in the repository or paste it into chat.
 
-Dry run:
+## Dry run
+
+This performs no network calls and writes no files:
 
 ```bash
 python scripts/create_stripe_payment_links.py
 ```
 
-Create real Stripe Payment Links and write the resulting checkout URLs back to the offer files:
+## Test links
+
+Test mode creates disposable Stripe objects and prints their URLs. It refuses to write test URLs to
+the published offer files.
 
 ```bash
-python scripts/create_stripe_payment_links.py --live --write
+export STRIPE_SECRET_KEY=sk_test_...
+python scripts/create_stripe_payment_links.py --live --expected-mode test
+unset STRIPE_SECRET_KEY
 ```
 
-After reviewing the changed offer files:
+## Live links
+
+This command aborts if the supplied key is not a live key. It writes the resulting URLs and marks
+the offers `available`.
 
 ```bash
-git add offers/*.json BUY.md
-git commit -m "Add Stripe checkout links"
-git push origin main
+export STRIPE_SECRET_KEY=rk_live_...
+python scripts/create_stripe_payment_links.py --live --write --expected-mode live
+unset STRIPE_SECRET_KEY
 ```
 
-Agents can then read the `checkout_url` fields and direct users to Stripe checkout after explicit
-approval.
+Review the changed offer files and run the complete test suite before publishing them. Agents only
+use checkout when an offer has `status: available`; otherwise they use the purchase-request flow.
