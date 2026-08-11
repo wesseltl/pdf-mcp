@@ -29,6 +29,7 @@
     "one-time graphical folder setup with remembered private workspace settings",
     "automatic first scan and scheduled incremental scans",
     "plain-language desktop and mobile browser workspace",
+    "interactive entity and relationship map with source-linked review actions",
     "overdue calibration date detection",
     "incremental re-indexing",
     "scheduled incremental indexing",

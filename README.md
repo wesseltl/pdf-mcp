@@ -26,6 +26,8 @@ the Home workspace and starts the first read-only scan automatically. The app re
 folder, reopens it without setup, and repeats incremental scans every 15 minutes. Search, Equipment,
 Locations, People, Responsibilities, Documents, Files, and Needs review remain local. **Change**
 switches workspaces without a terminal. The app binds only to loopback and serves bundled assets.
+Home turns indexed entities and assertions into an interactive knowledge map and brings the most
+important evidence-backed decision to the top of the workspace.
 
 The target subscription architecture keeps billing and device enrollment in a hosted control plane
 while documents and extracted knowledge stay in the laboratory. See

@@ -59,6 +59,7 @@ DEFAULT_PORT = 8876
 DEFAULT_DATABASE = "~/.smart-lab-index/index.db"
 STATIC_ASSETS = {
     "/app.js": ("app.js", "text/javascript; charset=utf-8"),
+    "/favicon.svg": ("favicon.svg", "image/svg+xml"),
     "/styles.css": ("styles.css", "text/css; charset=utf-8"),
 }
 

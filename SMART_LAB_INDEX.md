@@ -230,11 +230,13 @@ transition.
 
 The local GUI exposes Home, Search, Equipment, Locations, People, Teams, Responsibilities, Documents,
 Needs review, Files, and System status. Navigation is generated from enabled module categories and
-stored data. Evidence rows open a detail dialog showing source path, structural
-locator, confidence, module, and issue evidence. Search is server-side and bounded, so it covers the
-whole SQLite index even when large list views return only their first 500 rows. Conflict review keeps
-all original assertions, marks the selected evidence confirmed and alternatives rejected, records a
-review decision and audit event, and reopens when materially new assertion evidence appears.
+stored data. Home includes an interactive map of indexed entities and relationships plus a focused
+review action for the highest-priority open finding. Evidence rows open a detail dialog showing source
+path, structural locator, confidence, module, and issue evidence. Search is server-side and bounded, so
+it covers the whole SQLite index even when large list views return only their first 500 rows.
+Conflict review keeps all original assertions. It marks selected evidence confirmed and alternatives
+rejected, records a review decision and audit event, and reopens when materially new assertion evidence
+appears.
 
 Indexing has explicit preflight, discovery, processing, and finalization phases. The GUI shows counts,
 bytes, and the current path, and cancellation stops cooperatively at the next file boundary. A

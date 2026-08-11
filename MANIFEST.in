@@ -33,5 +33,5 @@ recursive-include offers *.json
 recursive-include pdf_mcp/web_ui *.css *.html *.js
 recursive-include requirements *.lock *.txt
 recursive-include scripts *.py
-recursive-include smart_lab_index/web_ui *.css *.html *.js
+recursive-include smart_lab_index/web_ui *.css *.html *.js *.svg
 recursive-include tests *.md *.py
