@@ -274,7 +274,7 @@ def _wait_for_expected_index(
             )
             with urllib.request.urlopen(request, timeout=1) as response:
                 state = json.load(response)
-            if state["operation"]["state"] == "INDEXING":
+            if _index_pending(state["operation"]):
                 time.sleep(0.2)
                 continue
             summary = state["summary"]
@@ -312,6 +312,13 @@ def _wait_for_expected_index(
     detail = _startup_detail(output)
     message = "desktop app did not complete its smoke index within 90 seconds"
     raise RuntimeError(f"{message}:\n{detail}" if detail else message)
+
+
+def _index_pending(operation: dict[str, object]) -> bool:
+    state = operation.get("state")
+    return state == "INDEXING" or (
+        state == "IDLE" and operation.get("completed_at") is None
+    )
 
 
 def _request_shutdown(url: str, token: str) -> None:

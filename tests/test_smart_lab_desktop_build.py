@@ -13,6 +13,21 @@ from scripts import build_smart_lab_desktop_app as desktop_build
 
 
 class SmartLabDesktopBuildTests(unittest.TestCase):
+    def test_smoke_waits_for_a_deferred_initial_index(self) -> None:
+        self.assertTrue(
+            desktop_build._index_pending({"state": "IDLE", "completed_at": None})
+        )
+        self.assertTrue(
+            desktop_build._index_pending(
+                {"state": "INDEXING", "completed_at": None}
+            )
+        )
+        self.assertFalse(
+            desktop_build._index_pending(
+                {"state": "IDLE", "completed_at": "2026-08-12T00:00:00Z"}
+            )
+        )
+
     def test_index_failure_detail_is_bounded_and_actionable(self) -> None:
         state = {
             "operation": {"error": None},
