@@ -26,6 +26,8 @@ BUILD_ROOT = ROOT / "build" / "smart-lab-desktop-app"
 APP_DIST = BUILD_ROOT / "dist"
 FINAL_DIST = ROOT / "dist"
 APP_NAME = "smart-lab-index"
+APP_DISPLAY_NAME = "Smart Lab Index"
+APP_PUBLISHER = "Wessel ter Laak"
 SIGNING_REQUIRED_ENV = "SMART_LAB_REQUIRE_SIGNING"
 _SMOKE_ENVIRONMENT = {
     "ALLUSERSPROFILE",
@@ -86,35 +88,7 @@ def sign_desktop_app() -> str:
     """Sign the platform artifact when release credentials are configured."""
     target = signing_target()
     if sys.platform == "win32":
-        certificate_value = os.environ.get("SMART_LAB_WINDOWS_CERTIFICATE_PATH")
-        if not certificate_value:
-            return "unsigned"
-        certificate = Path(certificate_value).expanduser().resolve(strict=True)
-        password = os.environ.get("SMART_LAB_WINDOWS_CERTIFICATE_PASSWORD")
-        command = [
-            str(_windows_signtool()),
-            "sign",
-            "/fd",
-            "SHA256",
-            "/tr",
-            os.environ.get(
-                "SMART_LAB_WINDOWS_TIMESTAMP_URL",
-                "http://timestamp.digicert.com",
-            ),
-            "/td",
-            "SHA256",
-            "/f",
-            str(certificate),
-        ]
-        if password:
-            command.extend(["/p", password])
-        command.append(str(target))
-        subprocess.run(command, check=True)
-        subprocess.run(
-            [str(_windows_signtool()), "verify", "/pa", "/v", str(target)],
-            check=True,
-        )
-        return "signed"
+        return sign_windows_file(target)
 
     if sys.platform == "darwin":
         identity = os.environ.get("SMART_LAB_MACOS_SIGNING_IDENTITY")
@@ -145,6 +119,39 @@ def sign_desktop_app() -> str:
         return "signed"
 
     return "unsigned"
+
+
+def sign_windows_file(target: Path) -> str:
+    """Authenticode-sign and verify one Windows release artifact when configured."""
+    certificate_value = os.environ.get("SMART_LAB_WINDOWS_CERTIFICATE_PATH")
+    if not certificate_value:
+        return "unsigned"
+    certificate = Path(certificate_value).expanduser().resolve(strict=True)
+    password = os.environ.get("SMART_LAB_WINDOWS_CERTIFICATE_PASSWORD")
+    command = [
+        str(_windows_signtool()),
+        "sign",
+        "/fd",
+        "SHA256",
+        "/tr",
+        os.environ.get(
+            "SMART_LAB_WINDOWS_TIMESTAMP_URL",
+            "http://timestamp.digicert.com",
+        ),
+        "/td",
+        "SHA256",
+        "/f",
+        str(certificate),
+    ]
+    if password:
+        command.extend(["/p", password])
+    command.append(str(target))
+    subprocess.run(command, check=True)
+    subprocess.run(
+        [str(_windows_signtool()), "verify", "/pa", "/v", str(target)],
+        check=True,
+    )
+    return "signed"
 
 
 def _windows_signtool() -> Path:
@@ -183,6 +190,89 @@ def _notarize_macos_app(target: Path, profile: str) -> None:
         )
     subprocess.run(["xcrun", "stapler", "staple", str(target)], check=True)
     subprocess.run(["xcrun", "stapler", "validate", str(target)], check=True)
+
+
+def write_windows_icon(target: Path) -> Path:
+    """Create the bundled multi-resolution Windows icon from simple local geometry."""
+    from PIL import Image, ImageDraw
+
+    size = 256
+    image = Image.new("RGBA", (size, size), (0, 0, 0, 0))
+    draw = ImageDraw.Draw(image)
+    draw.rounded_rectangle(
+        (8, 8, size - 8, size - 8),
+        radius=48,
+        fill="#174f49",
+    )
+    draw.line((67, 61, 67, 195), fill="#8fd3c7", width=11)
+    for y, end_x in ((66, 199), (128, 181), (190, 211)):
+        draw.ellipse((48, y - 19, 86, y + 19), fill="#dcebea")
+        draw.rounded_rectangle(
+            (102, y - 10, end_x, y + 10),
+            radius=10,
+            fill="#ffffff",
+        )
+
+    target.parent.mkdir(parents=True, exist_ok=True)
+    image.save(
+        target,
+        format="ICO",
+        sizes=[
+            (16, 16),
+            (24, 24),
+            (32, 32),
+            (48, 48),
+            (64, 64),
+            (128, 128),
+            (256, 256),
+        ],
+    )
+    return target
+
+
+def windows_version_quad(version: str) -> tuple[int, int, int, int]:
+    """Convert the product version into the numeric tuple required by Windows."""
+    parts = [int(value) for value in re.findall(r"\d+", version)[:4]]
+    values = (parts + [0] * 4)[:4]
+    return values[0], values[1], values[2], values[3]
+
+
+def write_windows_version_info(target: Path, version: str = __version__) -> Path:
+    """Write the PyInstaller version-resource definition for the desktop executable."""
+    version_quad = windows_version_quad(version)
+    target.parent.mkdir(parents=True, exist_ok=True)
+    target.write_text(
+        f"""VSVersionInfo(
+  ffi=FixedFileInfo(
+    filevers={version_quad!r},
+    prodvers={version_quad!r},
+    mask=0x3f,
+    flags=0x0,
+    OS=0x40004,
+    fileType=0x1,
+    subtype=0x0,
+    date=(0, 0)
+  ),
+  kids=[
+    StringFileInfo([
+      StringTable(
+        u'040904B0',
+        [StringStruct(u'CompanyName', u'{APP_PUBLISHER}'),
+         StringStruct(u'FileDescription', u'{APP_DISPLAY_NAME} local laboratory knowledge index'),
+         StringStruct(u'FileVersion', u'{version}'),
+         StringStruct(u'InternalName', u'{APP_NAME}'),
+         StringStruct(u'LegalCopyright', u'Copyright (c) {APP_PUBLISHER}'),
+         StringStruct(u'OriginalFilename', u'{APP_NAME}.exe'),
+         StringStruct(u'ProductName', u'{APP_DISPLAY_NAME}'),
+         StringStruct(u'ProductVersion', u'{version}')])
+    ]),
+    VarFileInfo([VarStruct(u'Translation', [1033, 1200])])
+  ]
+)
+""",
+        encoding="utf-8",
+    )
+    return target
 
 
 def available_port() -> int:
@@ -461,20 +551,27 @@ def main() -> int:
 
     shutil.rmtree(BUILD_ROOT, ignore_errors=True)
     APP_DIST.mkdir(parents=True)
-    PyInstaller.__main__.run(
-        [
-            str(ROOT / "smart_lab_index" / "web_app.py"),
-            f"--name={APP_NAME}",
-            "--onedir",
-            "--windowed",
-            "--noconfirm",
-            "--clean",
-            f"--distpath={APP_DIST}",
-            f"--workpath={BUILD_ROOT / 'work'}",
-            f"--specpath={BUILD_ROOT / 'spec'}",
-            "--collect-data=smart_lab_index.web_ui",
-        ]
-    )
+    pyinstaller_arguments = [
+        str(ROOT / "smart_lab_index" / "web_app.py"),
+        f"--name={APP_NAME}",
+        "--onedir",
+        "--windowed",
+        "--noconfirm",
+        "--clean",
+        f"--distpath={APP_DIST}",
+        f"--workpath={BUILD_ROOT / 'work'}",
+        f"--specpath={BUILD_ROOT / 'spec'}",
+        "--collect-data=smart_lab_index.web_ui",
+    ]
+    if sys.platform == "win32":
+        icon = write_windows_icon(BUILD_ROOT / f"{APP_NAME}.ico")
+        version_info = write_windows_version_info(
+            BUILD_ROOT / f"{APP_NAME}-version.txt"
+        )
+        pyinstaller_arguments.extend(
+            [f"--icon={icon}", f"--version-file={version_info}"]
+        )
+    PyInstaller.__main__.run(pyinstaller_arguments)
 
     executable = executable_path()
     if not executable.exists():

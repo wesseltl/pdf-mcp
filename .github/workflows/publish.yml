@@ -141,6 +141,13 @@ jobs:
           python scripts/build_desktop_app.py
           python scripts/build_smart_lab_desktop_app.py
 
+      - name: Build and smoke-test Windows installer
+        if: runner.os == 'Windows'
+        env:
+          SMART_LAB_REQUIRE_SIGNING: ${{ vars.DESKTOP_SIGNING_REQUIRED }}
+          SMART_LAB_WINDOWS_CERTIFICATE_PASSWORD: ${{ secrets.WINDOWS_CODESIGN_CERTIFICATE_PASSWORD }}
+        run: python scripts/build_smart_lab_windows_installer.py
+
       - name: Upload desktop app
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
         with:
@@ -149,6 +156,8 @@ jobs:
             dist/pdf-mcp-app-*.zip
             dist/smart-lab-index-*.zip
             dist/smart-lab-index-*.zip.sha256
+            dist/smart-lab-index-setup-*.exe
+            dist/smart-lab-index-setup-*.exe.sha256
 
   github-release:
     name: Publish GitHub release

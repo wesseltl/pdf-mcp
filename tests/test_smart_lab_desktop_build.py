@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import hashlib
 import os
+import struct
 import tempfile
 import unittest
 from pathlib import Path
@@ -77,6 +78,31 @@ class SmartLabDesktopBuildTests(unittest.TestCase):
                 checksum.read_text(encoding="ascii"),
                 f"{expected}  {archive.name}\n",
             )
+
+    def test_windows_version_quad_is_numeric_and_padded(self) -> None:
+        self.assertEqual(
+            desktop_build.windows_version_quad("0.7.0-beta.3"),
+            (0, 7, 0, 3),
+        )
+        self.assertEqual(desktop_build.windows_version_quad("2.1"), (2, 1, 0, 0))
+
+    def test_windows_assets_include_product_metadata_and_icon_sizes(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            icon = desktop_build.write_windows_icon(root / "smart-lab-index.ico")
+            version_info = desktop_build.write_windows_version_info(
+                root / "version.txt", "1.2.3"
+            )
+
+            reserved, image_type, image_count = struct.unpack(
+                "<HHH", icon.read_bytes()[:6]
+            )
+            metadata = version_info.read_text(encoding="utf-8")
+
+        self.assertEqual((reserved, image_type), (0, 1))
+        self.assertGreaterEqual(image_count, 6)
+        self.assertIn("ProductName', u'Smart Lab Index", metadata)
+        self.assertIn("filevers=(1, 2, 3, 0)", metadata)
 
     def test_unsigned_is_explicit_without_platform_credentials(self) -> None:
         with (

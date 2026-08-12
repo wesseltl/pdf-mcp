@@ -44,10 +44,19 @@ will still publish successfully.
    python -m pip install -e ".[desktop-build]"
    python scripts/build_desktop_app.py
    python scripts/build_smart_lab_desktop_app.py
+   # Windows only; requires Inno Setup 6
+   python scripts/build_smart_lab_windows_installer.py
    ```
 
-   The Smart Lab build writes a matching `.zip.sha256` manifest. Windows and macOS builds are
-   unsigned unless release credentials are configured. For GitHub Actions, use these secrets:
+   The Smart Lab build writes matching SHA-256 manifests. On Windows, the installer build performs
+   a silent per-user install, exercises the installed app through the complete synthetic index, and
+   uninstalls it before accepting the artifact. The installer has a stable application ID so a newer
+   release upgrades the existing installation. It never removes the user's
+   `%USERPROFILE%\.smart-lab-index` data directory.
+
+   Windows and macOS builds are unsigned unless release credentials are configured. The same
+   Windows Authenticode identity signs both the application executable and Setup executable. For
+   GitHub Actions, use these secrets:
 
    | Secret | Purpose |
    |---|---|
@@ -81,9 +90,10 @@ will still publish successfully.
    ```
 
 The `Publish` workflow builds and smoke-tests the PDF converter and Smart Lab Index standalone apps
-on Windows, macOS, and Linux, then creates a GitHub release with those archives and the Python
-distributions. The Smart Lab smoke test runs the compiled executable through the complete synthetic
-no-egress index. When
+on Windows, macOS, and Linux, then creates a GitHub release with those archives, the Windows Setup
+executable, and the Python distributions. The Smart Lab smoke test runs the compiled executable
+through the complete synthetic no-egress index; Windows additionally validates install and
+uninstall. When
 `PYPI_PUBLISH_ENABLED=true`, it also uploads the package to PyPI and, after that succeeds, publishes
 matching metadata to the MCP Registry. The `Pages` workflow deploys the public site from `docs/` on
 every push to `main`.

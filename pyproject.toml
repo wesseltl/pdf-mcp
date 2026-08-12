@@ -22,7 +22,7 @@ mcp = ["fastmcp>=2.0"]
 cloud = ["fastmcp>=2.0", "httpx>=0.27"]
 test = ["reportlab>=4", "httpx>=0.27"]
 commerce = ["stripe>=15"]
-desktop-build = ["pyinstaller>=6.0"]
+desktop-build = ["pyinstaller>=6.0", "pillow>=11,<13"]
 
 [project.urls]
 Homepage = "https://github.com/wesseltl/pdf-mcp"

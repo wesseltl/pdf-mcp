@@ -40,10 +40,12 @@ authentication, scheduled runs, disposable resource-limited parser processes, he
 exclusive database ownership, manifested backup/restore commands, and a hash-verified Linux runtime
 lock. Organization-specific validation and source-access approval remain required.
 
-The release workflow also creates standalone `smart-lab-index` ZIP applications and SHA-256
-manifests for Windows, macOS, and Linux. After extraction, open the application directly; Python is
-not required. Windows signing and macOS signing/notarization activate when publisher credentials are
-configured for the release workflow.
+The release workflow creates standalone `smart-lab-index` applications and SHA-256 manifests for
+Windows, macOS, and Linux. Windows users receive a standard per-user Setup executable as well as a
+portable ZIP. Setup needs no administrator rights, adds Smart Lab Index to the Start Menu, supports
+in-place upgrades and uninstall, and leaves indexes and settings in `%USERPROFILE%\.smart-lab-index`
+untouched. Python is not required. Windows signing and macOS signing/notarization activate when
+publisher credentials are configured for the release workflow.
 
 ## Document ingestion compatibility
 
