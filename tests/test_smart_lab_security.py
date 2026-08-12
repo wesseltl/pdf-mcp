@@ -3,12 +3,16 @@
 from __future__ import annotations
 
 import os
+import stat
 import tempfile
 import unittest
 from pathlib import Path
+from types import SimpleNamespace
+from unittest.mock import patch
 
 from smart_lab_index.core.security import (
     CredentialError,
+    _is_systemd_credential,
     create_operator_token,
     load_operator_token,
 )
@@ -35,6 +39,56 @@ class SmartLabCredentialTests(unittest.TestCase):
 
         with self.assertRaisesRegex(CredentialError, "permissions"):
             load_operator_token(self.token_path)
+
+    @unittest.skipUnless(os.name == "posix", "POSIX systemd credential contract")
+    def test_systemd_credential_contract_is_root_owned_and_tightly_scoped(self) -> None:
+        credential_directory = Path("/run/credentials/smart-lab-index.service")
+        target = credential_directory / "operator.token"
+        directory = SimpleNamespace(
+            st_mode=stat.S_IFDIR | 0o550,
+            st_uid=0,
+            st_gid=0,
+        )
+        credential = SimpleNamespace(
+            st_mode=stat.S_IFREG | 0o440,
+            st_uid=0,
+            st_gid=0,
+        )
+        with (
+            patch.dict(
+                os.environ,
+                {"CREDENTIALS_DIRECTORY": str(credential_directory)},
+            ),
+            patch.object(Path, "lstat", return_value=directory),
+        ):
+            self.assertTrue(_is_systemd_credential(target, credential))
+            self.assertFalse(
+                _is_systemd_credential(
+                    target,
+                    SimpleNamespace(
+                        st_mode=stat.S_IFREG | 0o444,
+                        st_uid=0,
+                        st_gid=0,
+                    ),
+                )
+            )
+            self.assertFalse(
+                _is_systemd_credential(
+                    credential_directory.parent / "other.token",
+                    credential,
+                )
+            )
+
+    @unittest.skipUnless(os.name == "posix", "POSIX systemd credential contract")
+    def test_systemd_managed_group_readable_token_can_be_loaded(self) -> None:
+        token = create_operator_token(self.token_path)
+        self.token_path.chmod(0o440)
+
+        with patch(
+            "smart_lab_index.core.security._is_systemd_credential",
+            return_value=True,
+        ):
+            self.assertEqual(load_operator_token(self.token_path), token)
 
     @unittest.skipUnless(os.name == "posix", "POSIX link checks")
     def test_linked_token_files_are_rejected(self) -> None:

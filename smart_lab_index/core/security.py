@@ -58,9 +58,14 @@ def load_operator_token(path: str | Path) -> str:
     if value.st_nlink != 1:
         raise CredentialError("operator token must not have hard links")
     if os.name == "posix":
-        if value.st_mode & 0o077:
+        systemd_managed = _is_systemd_credential(target, value)
+        if value.st_mode & 0o077 and not systemd_managed:
             raise CredentialError("operator token permissions must be 0600 or stricter")
-        if hasattr(os, "geteuid") and value.st_uid != os.geteuid():
+        if (
+            hasattr(os, "geteuid")
+            and value.st_uid != os.geteuid()
+            and not systemd_managed
+        ):
             raise CredentialError("operator token must be owned by the service account")
     try:
         descriptor = os.open(target, os.O_RDONLY | getattr(os, "O_NOFOLLOW", 0))
@@ -95,6 +100,34 @@ def validate_operator_token(token: str) -> None:
         for character in token
     ):
         raise CredentialError("operator token contains invalid characters")
+
+
+def _is_systemd_credential(target: Path, value: os.stat_result) -> bool:
+    """Recognize the root-owned, read-only files exposed by systemd credentials."""
+    directory_value = os.environ.get("CREDENTIALS_DIRECTORY")
+    if not directory_value:
+        return False
+    credential_directory = Path(directory_value)
+    if (
+        not credential_directory.is_absolute()
+        or credential_directory.parent != Path("/run/credentials")
+        or target.parent != credential_directory
+    ):
+        return False
+    try:
+        directory = credential_directory.lstat()
+    except OSError:
+        return False
+    return (
+        stat.S_ISDIR(directory.st_mode)
+        and not credential_directory.is_symlink()
+        and directory.st_uid == 0
+        and directory.st_gid == 0
+        and stat.S_IMODE(directory.st_mode) in {0o500, 0o550}
+        and value.st_uid == 0
+        and value.st_gid == 0
+        and stat.S_IMODE(value.st_mode) in {0o400, 0o440}
+    )
 
 
 def _absolute(path: str | Path) -> Path:
