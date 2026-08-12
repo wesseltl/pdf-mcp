@@ -57,7 +57,10 @@ def _parser() -> argparse.ArgumentParser:
         "--max-total-gb",
         type=float,
         default=DEFAULT_MAX_TOTAL_BYTES / (1024**3),
-        help="stop before indexing a larger source scope (default: 25 GiB)",
+        help=(
+            "stop before indexing a larger source scope "
+            f"(default: {DEFAULT_MAX_TOTAL_BYTES // 1024**3} GiB)"
+        ),
     )
     index.add_argument(
         "--exclude",
@@ -65,6 +68,11 @@ def _parser() -> argparse.ArgumentParser:
         default=[],
         metavar="GLOB",
         help="exclude a relative path or filename glob; may be repeated",
+    )
+    index.add_argument(
+        "--verify-all-content",
+        action="store_true",
+        help="re-hash unchanged files instead of trusting filesystem change metadata",
     )
     index.add_argument(
         "--no-egress",
@@ -205,6 +213,7 @@ def _index(args: argparse.Namespace) -> int:
         max_files=args.max_files,
         max_total_bytes=_gib_to_bytes(args.max_total_gb),
         exclude_patterns=args.exclude,
+        verify_unchanged_content=args.verify_all_content,
     ) as application:
         connector_error = application.startup_errors.get(application.connector_module_id)
         if connector_error:

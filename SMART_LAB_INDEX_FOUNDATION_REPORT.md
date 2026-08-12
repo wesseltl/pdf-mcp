@@ -155,7 +155,7 @@ Fifteen modules are installed. Fourteen are enabled and healthy in the synthetic
 
 | ID | Purpose | Version | Dependencies | Default status |
 |---|---|---:|---|---|
-| `connector.filesystem` | Bounded read-only incremental source discovery | `0.2.0` | None | Enabled / healthy |
+| `connector.filesystem` | Bounded read-only incremental source discovery | `0.3.0` | None | Enabled / healthy |
 | `parser.pdf` | Born-digital PDF text/table normalization | `0.2.0` | None | Enabled / healthy |
 | `parser.docx` | Word paragraph/table normalization | `0.2.0` | None | Enabled / healthy |
 | `parser.xlsx` | Workbook sheet/cell normalization | `0.2.0` | None | Enabled / healthy |

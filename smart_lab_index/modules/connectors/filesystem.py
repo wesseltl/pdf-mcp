@@ -7,6 +7,7 @@ import io
 import mimetypes
 import os
 import stat as stat_module
+import time
 from collections.abc import Callable, Iterator, Mapping
 from contextlib import contextmanager
 from dataclasses import dataclass
@@ -38,8 +39,9 @@ from smart_lab_index.core.modules import (
 
 DEFAULT_EXTENSIONS = (".csv", ".docx", ".pdf", ".txt", ".xlsx")
 DEFAULT_MAX_FILE_BYTES = 100 * 1024 * 1024
-DEFAULT_MAX_FILES = 10_000
-DEFAULT_MAX_TOTAL_BYTES = 25 * 1024 * 1024 * 1024
+DEFAULT_MAX_FILES = 250_000
+DEFAULT_MAX_TOTAL_BYTES = 1024 * 1024 * 1024 * 1024
+_PROGRESS_INTERVAL_SECONDS = 0.2
 _CONTENT_TYPES = {
     ".csv": "text/csv",
     ".docx": "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
@@ -53,7 +55,7 @@ class FilesystemConnector(ConnectorModule):
     manifest = ModuleManifest(
         module_id="connector.filesystem",
         name="Filesystem Connector",
-        version="0.2.0",
+        version="0.3.0",
         module_type=ModuleType.CONNECTOR,
         description="Recursively discovers local files without modifying source content.",
         capabilities=(ModuleCapability("connector.source_records", "1.0.0"),),
@@ -72,6 +74,7 @@ class FilesystemConnector(ConnectorModule):
                 "items": {"type": "string"},
             },
             "include_hidden": {"type": "boolean"},
+            "verify_unchanged_content": {"type": "boolean"},
             "max_file_bytes": {"type": "integer"},
             "max_files": {"type": "integer"},
             "max_total_bytes": {"type": "integer"},
@@ -99,6 +102,7 @@ class FilesystemConnector(ConnectorModule):
         source_id: str | None = None,
         include_extensions: tuple[str, ...] = DEFAULT_EXTENSIONS,
         include_hidden: bool = False,
+        verify_unchanged_content: bool = False,
         max_file_bytes: int = DEFAULT_MAX_FILE_BYTES,
         max_files: int = DEFAULT_MAX_FILES,
         max_total_bytes: int = DEFAULT_MAX_TOTAL_BYTES,
@@ -118,6 +122,7 @@ class FilesystemConnector(ConnectorModule):
                     extension.lower() for extension in include_extensions
                 })),
                 "include_hidden": include_hidden,
+                "verify_unchanged_content": verify_unchanged_content,
                 "max_file_bytes": max_file_bytes,
                 "max_files": max_files,
                 "max_total_bytes": max_total_bytes,
@@ -158,6 +163,8 @@ class FilesystemConnector(ConnectorModule):
         candidates: list[_Candidate] = []
         planned_files = 0
         planned_bytes = 0
+        scanned_directories = 0
+        last_progress_at = 0.0
         try:
             self._stat_file(settings.root)
         except OSError as exc:
@@ -184,6 +191,22 @@ class FilesystemConnector(ConnectorModule):
         ):
             _check_cancelled(should_cancel)
             directory_path = Path(directory)
+            scanned_directories += 1
+            now = time.monotonic()
+            if (
+                scanned_directories == 1
+                or now - last_progress_at >= _PROGRESS_INTERVAL_SECONDS
+            ):
+                _notify(
+                    progress,
+                    phase="PREFLIGHT",
+                    current=planned_files,
+                    total=None,
+                    bytes_total=planned_bytes,
+                    directories_scanned=scanned_directories,
+                    path=_relative_or_dot(directory_path, settings.root),
+                )
+                last_progress_at = now
             retained_directories = []
             for name in sorted(directory_names):
                 if not _include_name(name, settings):
@@ -239,14 +262,18 @@ class FilesystemConnector(ConnectorModule):
                             f"file exceeds connector limit of {settings.max_file_bytes} bytes"
                         )
                     candidates.append(_Candidate(external_id, path, resolved, stat))
-                    _notify(
-                        progress,
-                        phase="PREFLIGHT",
-                        current=planned_files,
-                        total=None,
-                        bytes_total=planned_bytes,
-                        path=external_id,
-                    )
+                    now = time.monotonic()
+                    if now - last_progress_at >= _PROGRESS_INTERVAL_SECONDS:
+                        _notify(
+                            progress,
+                            phase="PREFLIGHT",
+                            current=planned_files,
+                            total=None,
+                            bytes_total=planned_bytes,
+                            directories_scanned=scanned_directories,
+                            path=external_id,
+                        )
+                        last_progress_at = now
                 except OperationCancelled:
                     raise
                 except (OSError, ValueError) as exc:
@@ -262,17 +289,27 @@ class FilesystemConnector(ConnectorModule):
             current=0,
             total=len(candidates),
             bytes_total=planned_bytes,
+            directories_scanned=scanned_directories,
         )
+        last_progress_at = 0.0
         for index, candidate in enumerate(candidates, start=1):
             _check_cancelled(should_cancel)
             external_id = candidate.external_id
             path = candidate.path
             try:
-                checksum, stat = self._checksum(
-                    candidate.resolved,
-                    settings,
-                    expected_stat=candidate.stat,
-                )
+                prior = previous.get(external_id)
+                if (
+                    prior is not None
+                    and not settings.verify_unchanged_content
+                    and _metadata_is_unchanged(prior, candidate.stat)
+                ):
+                    checksum, stat = prior.checksum, candidate.stat
+                else:
+                    checksum, stat = self._checksum(
+                        candidate.resolved,
+                        settings,
+                        expected_stat=candidate.stat,
+                    )
                 record = SourceRecord(
                     external_id=external_id,
                     source_id=definition.source_id,
@@ -296,7 +333,6 @@ class FilesystemConnector(ConnectorModule):
                     },
                     permission_metadata=_permission_metadata(candidate.resolved, stat),
                 )
-                prior = previous.get(external_id)
                 if prior is None:
                     change = DiscoveryChange.NEW
                 elif prior.checksum == checksum:
@@ -304,14 +340,21 @@ class FilesystemConnector(ConnectorModule):
                 else:
                     change = DiscoveryChange.CHANGED
                 sources.append(DiscoveredSource(change=change, record=record))
-                _notify(
-                    progress,
-                    phase="DISCOVERY",
-                    current=index,
-                    total=len(candidates),
-                    bytes_total=planned_bytes,
-                    path=external_id,
-                )
+                now = time.monotonic()
+                if (
+                    index == len(candidates)
+                    or now - last_progress_at >= _PROGRESS_INTERVAL_SECONDS
+                ):
+                    _notify(
+                        progress,
+                        phase="DISCOVERY",
+                        current=index,
+                        total=len(candidates),
+                        bytes_total=planned_bytes,
+                        directories_scanned=scanned_directories,
+                        path=external_id,
+                    )
+                    last_progress_at = now
             except OperationCancelled:
                 raise
             except (OSError, ValueError) as exc:
@@ -327,6 +370,7 @@ class FilesystemConnector(ConnectorModule):
             metadata={
                 "planned_files": planned_files,
                 "planned_bytes": planned_bytes,
+                "scanned_directories": scanned_directories,
                 "blocked": False,
             },
         )
@@ -398,11 +442,27 @@ class FilesystemConnector(ConnectorModule):
         finally:
             stream.close()
         return digest.hexdigest(), opened_stat
+
+
+def _metadata_is_unchanged(previous: SourceRecord, current: os.stat_result) -> bool:
+    """Use the provider change token for fast scheduled scans after the first hash."""
+    prefix = f"{current.st_mtime_ns}:{current.st_size}:"
+    if not previous.change_token.startswith(prefix):
+        return False
+    previous_device = previous.metadata.get("device")
+    previous_inode = previous.metadata.get("inode")
+    return (
+        previous_device in (None, current.st_dev)
+        and previous_inode in (None, current.st_ino)
+    )
+
+
 @dataclass(frozen=True)
 class _FilesystemSettings:
     root: Path
     include_extensions: tuple[str, ...]
     include_hidden: bool
+    verify_unchanged_content: bool
     max_file_bytes: int
     max_files: int
     max_total_bytes: int
@@ -427,6 +487,7 @@ def _settings(
         "root",
         "include_extensions",
         "include_hidden",
+        "verify_unchanged_content",
         "max_file_bytes",
         "max_files",
         "max_total_bytes",
@@ -456,6 +517,11 @@ def _settings(
     include_hidden = source.configuration.get("include_hidden", False)
     if not isinstance(include_hidden, bool):
         raise ModuleConfigurationError("source configuration.include_hidden must be boolean")
+    verify_unchanged = source.configuration.get("verify_unchanged_content", False)
+    if not isinstance(verify_unchanged, bool):
+        raise ModuleConfigurationError(
+            "source configuration.verify_unchanged_content must be boolean"
+        )
     maximum = source.configuration.get("max_file_bytes", DEFAULT_MAX_FILE_BYTES)
     if not isinstance(maximum, int) or isinstance(maximum, bool) or maximum <= 0:
         raise ModuleConfigurationError("source configuration.max_file_bytes must be positive")
@@ -480,6 +546,7 @@ def _settings(
         root,
         extensions,
         include_hidden,
+        verify_unchanged,
         maximum,
         max_files,
         max_total,

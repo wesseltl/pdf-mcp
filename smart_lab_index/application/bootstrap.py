@@ -82,6 +82,7 @@ def build_application(
     max_files: int = DEFAULT_MAX_FILES,
     max_total_bytes: int = DEFAULT_MAX_TOTAL_BYTES,
     exclude_patterns: Iterable[str] = (),
+    verify_unchanged_content: bool = False,
     acquire_database_lease: bool = True,
 ) -> SmartLabApplication:
     """Register built-ins explicitly; no dynamic imports or hidden plugin loading."""
@@ -99,6 +100,7 @@ def build_application(
         max_files=max_files,
         max_total_bytes=max_total_bytes,
         exclude_patterns=tuple(exclude_patterns),
+        verify_unchanged_content=verify_unchanged_content,
     )
     modules = (
         domain,

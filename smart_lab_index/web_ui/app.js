@@ -2,6 +2,7 @@
 
 const POLL_INTERVAL_MS = 1500;
 const FINAL_REFRESH_DELAY_MS = 250;
+const REQUEST_TIMEOUT_MS = 12000;
 const SVG_NAMESPACE = ["http:", "", "www.w3.org", "2000", "svg"].join("/");
 const SESSION_TOKEN = document.querySelector('meta[name="smart-lab-session"]')?.content || "";
 const DETAIL_KEY_ORDER = [
@@ -254,6 +255,10 @@ function operationState() {
   return String(ui.state?.operation?.state || "IDLE").toUpperCase();
 }
 
+function operationIsActive(state = operationState()) {
+  return state === "STARTING" || state === "INDEXING";
+}
+
 function currentViews() {
   return asArray(ui.state?.views);
 }
@@ -293,30 +298,41 @@ async function apiRequest(path, options = {}) {
   const headers = new Headers(options.headers || {});
   headers.set("Accept", "application/json");
   headers.set("X-Smart-Lab-Session", SESSION_TOKEN);
+  const controller = new AbortController();
+  const timeout = window.setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
+  try {
+    const response = await fetch(path, {
+      ...options,
+      cache: "no-store",
+      credentials: "same-origin",
+      headers,
+      signal: controller.signal,
+    });
 
-  const response = await fetch(path, {
-    ...options,
-    cache: "no-store",
-    credentials: "same-origin",
-    headers,
-  });
-
-  if (!response.ok) {
-    let message = `${response.status} ${response.statusText}`.trim();
-    try {
-      const payload = await response.json();
-      message = scalarText(payload.message || payload.error || message);
-    } catch (_error) {
-      // Keep the status text when the server does not return JSON.
+    if (!response.ok) {
+      let message = `${response.status} ${response.statusText}`.trim();
+      try {
+        const payload = await response.json();
+        message = scalarText(payload.message || payload.error || message);
+      } catch (_error) {
+        // Keep the status text when the server does not return JSON.
+      }
+      throw new Error(message || "Request failed");
     }
-    throw new Error(message || "Request failed");
-  }
 
-  if (response.status === 204) {
-    return null;
+    if (response.status === 204) {
+      return null;
+    }
+    const contentType = response.headers.get("content-type") || "";
+    return contentType.includes("application/json") ? response.json() : null;
+  } catch (error) {
+    if (error instanceof DOMException && error.name === "AbortError") {
+      throw new Error("The local LabOverlay service did not respond within 12 seconds.");
+    }
+    throw error;
+  } finally {
+    window.clearTimeout(timeout);
   }
-  const contentType = response.headers.get("content-type") || "";
-  return contentType.includes("application/json") ? response.json() : null;
 }
 
 function clearPoll() {
@@ -376,9 +392,9 @@ async function refreshState(options = {}) {
       announce("Data refreshed");
     }
 
-    if (ui.lastOperationState === "INDEXING") {
+    if (operationIsActive(ui.lastOperationState)) {
       schedulePoll();
-    } else if (previousOperation === "INDEXING" && !options.finalRefresh) {
+    } else if (operationIsActive(previousOperation) && !options.finalRefresh) {
       announce(ui.lastOperationState === "FAILED" ? "File scan failed" : "File scan complete");
       ui.pollTimer = window.setTimeout(
         () => refreshState({ finalRefresh: true }),
@@ -397,7 +413,7 @@ async function refreshState(options = {}) {
 }
 
 async function startIndex() {
-  if (ui.requestBusy || operationState() === "INDEXING" || ui.stopped) {
+  if (ui.requestBusy || operationIsActive() || ui.stopped) {
     return;
   }
   ui.requestBusy = true;
@@ -430,7 +446,7 @@ async function startIndex() {
 }
 
 async function cancelIndex() {
-  if (ui.requestBusy || operationState() !== "INDEXING" || ui.stopped) {
+  if (ui.requestBusy || !operationIsActive() || ui.stopped) {
     return;
   }
   ui.requestBusy = true;
@@ -523,7 +539,7 @@ async function stopApplication() {
 }
 
 function updateCommandState() {
-  const indexing = operationState() === "INDEXING";
+  const indexing = operationIsActive();
   const disabled = ui.requestBusy || ui.stopped || ui.changingSource;
   elements.indexButton.disabled = disabled || indexing || !ui.state;
   elements.indexButton.hidden = indexing;
@@ -729,7 +745,7 @@ function renderChrome() {
 
   const latestRun = asObject(ui.state?.summary?.latest_run);
   const state = operationState();
-  if (state === "INDEXING") {
+  if (operationIsActive(state)) {
     elements.sidebarSourceState.textContent = "Sync in progress";
   } else if (state === "FAILED") {
     elements.sidebarSourceState.textContent = "Last sync failed";
@@ -809,6 +825,7 @@ function progressDetail(operation) {
     DISCOVERY: "Checking files",
     FINALIZING: "Finishing scan",
     PARSING: "Reading documents",
+    OPENING_WORKSPACE: "Opening workspace",
     PREFLIGHT: "Checking folder",
     PROCESSING: "Reading documents",
     STARTING: "Starting scan",
@@ -822,8 +839,12 @@ function progressDetail(operation) {
       ? formatNumber(current)
       : "";
   const bytes = progress.bytes_total ? formatBytes(progress.bytes_total) : "";
+  const directories = Number(progress.directories_scanned);
+  const folderCount = Number.isFinite(directories) && directories > 0
+    ? `${formatNumber(directories)} folder${directories === 1 ? "" : "s"}`
+    : "";
   const path = progress.path ? scalarText(progress.path) : "";
-  return [phase, count, bytes, path].filter(Boolean).join(" · ") || "Starting scan";
+  return [phase, folderCount, count, bytes, path].filter(Boolean).join(" · ") || "Starting scan";
 }
 
 function renderOperationStatus() {
@@ -838,7 +859,7 @@ function renderOperationStatus() {
 
   const operation = asObject(ui.state?.operation);
   const state = operationState();
-  if (state === "INDEXING") {
+  if (operationIsActive(state)) {
     elements.operationStatus.append(
       createOperationStrip(
         "indexing",
@@ -856,6 +877,15 @@ function renderOperationStatus() {
         scalarText(operation.error, "The indexing run did not complete."),
         "!",
         formatDate(operation.completed_at),
+      ),
+    );
+  } else if (ui.state?.source?.scope_warning) {
+    elements.operationStatus.append(
+      createOperationStrip(
+        "warning",
+        "System drive selected",
+        scalarText(ui.state.source.scope_warning),
+        "!",
       ),
     );
   } else if (
@@ -1137,20 +1167,31 @@ function renderOverview(view) {
     || Number(summary.active_assertions || 0) > 0;
 
   if (!hasData) {
-    const scanning = operationState() === "INDEXING";
+    const scanning = operationIsActive();
     const scanned = Boolean(summary.latest_run);
+    const scopeWarning = scalarText(ui.state?.source?.scope_warning, "");
     const panel = emptyState(
-      scanning ? "Building your workspace" : scanned ? "No supported files found" : "Your source is connected",
+      scanning
+        ? "Building your workspace"
+        : scanned
+          ? "No supported files found"
+          : scopeWarning
+            ? "System drive connected"
+            : "Your source is connected",
       scanning
         ? "The first results will appear here automatically."
         : scanned
           ? "Choose another folder or scan again after files are added."
-          : "Start the first sync to create this workspace.",
+          : scopeWarning || "Start the first sync to create this workspace.",
       scanning ? "↻" : scanned ? "⌕" : "✓",
     );
     panel.append(renderSetupProgress(scanning, scanned));
     if (!scanning) {
-      panel.append(commandButton(scanned ? "Sync again" : "Sync now", "↻", startIndex));
+      panel.append(commandButton(
+        scanned ? "Sync again" : scopeWarning ? "Sync full drive" : "Sync now",
+        "↻",
+        startIndex,
+      ));
     }
     elements.viewRoot.replaceChildren(panel);
     setViewCount(null);

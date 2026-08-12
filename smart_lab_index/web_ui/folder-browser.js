@@ -1,6 +1,7 @@
 "use strict";
 
 const SESSION_TOKEN = document.querySelector('meta[name="smart-lab-session"]')?.content || "";
+const REQUEST_TIMEOUT_MS = 12000;
 const elements = {
   announcement: document.getElementById("announcement"),
   breadcrumbs: document.getElementById("breadcrumbs"),
@@ -30,20 +31,32 @@ function announce(message) {
 }
 
 async function apiRequest(path, options = {}) {
-  const response = await fetch(path, {
-    cache: "no-store",
-    credentials: "same-origin",
-    ...options,
-    headers: {
-      "X-Smart-Lab-Session": SESSION_TOKEN,
-      ...(options.headers || {}),
-    },
-  });
-  const payload = await response.json().catch(() => ({}));
-  if (!response.ok) {
-    throw new Error(payload.error || "The folder could not be opened.");
+  const controller = new AbortController();
+  const timeout = window.setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
+  try {
+    const response = await fetch(path, {
+      cache: "no-store",
+      credentials: "same-origin",
+      ...options,
+      headers: {
+        "X-Smart-Lab-Session": SESSION_TOKEN,
+        ...(options.headers || {}),
+      },
+      signal: controller.signal,
+    });
+    const payload = await response.json().catch(() => ({}));
+    if (!response.ok) {
+      throw new Error(payload.error || "The folder could not be opened.");
+    }
+    return payload;
+  } catch (error) {
+    if (error instanceof DOMException && error.name === "AbortError") {
+      throw new Error("The folder did not respond within 12 seconds.");
+    }
+    throw error;
+  } finally {
+    window.clearTimeout(timeout);
   }
-  return payload;
 }
 
 function button(label, className, onClick, title = "") {
@@ -199,15 +212,22 @@ function showOpeningState() {
   document.querySelector(".picker-shell").innerHTML = `
     <section class="closed-state">
       <div class="loading-ring" aria-hidden="true"></div>
-      <h1>Opening workspace</h1>
-      <p>The file scan will continue in the workspace.</p>
+      <h1 id="opening-title">Opening workspace</h1>
+      <p id="opening-detail">The file scan will continue in the workspace.</p>
     </section>`;
 }
 
 async function waitForWorkspace() {
+  const startedAt = Date.now();
   while (ui.stopped) {
+    const controller = new AbortController();
+    const timeout = window.setTimeout(() => controller.abort(), 3000);
     try {
-      const response = await fetch("/", { cache: "no-store", credentials: "same-origin" });
+      const response = await fetch("/", {
+        cache: "no-store",
+        credentials: "same-origin",
+        signal: controller.signal,
+      });
       const html = response.ok ? await response.text() : "";
       if (response.ok && html && !html.includes(SESSION_TOKEN)) {
         window.location.reload();
@@ -215,6 +235,18 @@ async function waitForWorkspace() {
       }
     } catch (_error) {
       // The loopback server restarts after validating the selected folder.
+    } finally {
+      window.clearTimeout(timeout);
+    }
+    if (Date.now() - startedAt > 15000) {
+      const title = document.getElementById("opening-title");
+      const detail = document.getElementById("opening-detail");
+      if (title) {
+        title.textContent = "Still opening workspace";
+      }
+      if (detail) {
+        detail.textContent = "The selected folder is responding slowly. LabOverlay will continue trying.";
+      }
     }
     await new Promise((resolve) => window.setTimeout(resolve, 500));
   }

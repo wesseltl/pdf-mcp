@@ -94,8 +94,8 @@ workers, verified backup/restore operations, and a hash-locked CPython 3.12/Linu
 Use repeatable `--disable MODULE_ID` and `--enable MODULE_ID` options to assemble a built-in profile.
 `issue.missing_responsibility` is installed but disabled by default because absence is only meaningful
 after the operator confirms that responsibility sources are complete. Dependencies are checked before
-modules start. Source runs also accept `--max-files`, `--max-total-gb`, and repeatable `--exclude GLOB`
-scope controls.
+modules start. Source runs also accept `--max-files`, `--max-total-gb`, repeatable `--exclude GLOB`,
+and `--verify-all-content` controls.
 
 ## Architecture
 
@@ -155,7 +155,7 @@ the last successful knowledge active.
 
 | Module | Purpose | Dependencies | Network | Files |
 |---|---|---|---|---|
-| `connector.filesystem` `0.2.0` | Bounded, incremental, read-only discovery | None | None | Read source root |
+| `connector.filesystem` `0.3.0` | Bounded, incremental, read-only discovery | None | None | Read source root |
 | `parser.pdf` `0.2.0` | Normalized bounded PDF text and tables | None | None | None; receives a stream |
 | `parser.docx` `0.2.0` | Normalized bounded Word paragraphs and tables | None | None | None; receives a stream |
 | `parser.xlsx` `0.2.0` | Normalized bounded workbook sheets and cells | None | None | None; receives a stream |
@@ -178,14 +178,15 @@ dynamic third-party code loader, microservice fleet, or hidden module-to-module 
 
 `connector.filesystem` currently supports `.pdf`, `.docx`, `.xlsx`, `.csv`, and `.txt`. It records
 relative path, timestamp, byte size, SHA-256 checksum, content type, change token, and available
-permission metadata. Checksums detect changes even if size and timestamp are restored.
+permission metadata. The first scan hashes eligible content. Incremental scans trust stable filesystem
+change metadata and reuse those hashes; `--verify-all-content` forces a full re-hash when required.
 
 Symlink files and root escapes are rejected. Individual inaccessible or malformed files become
 bounded failures while remaining records continue. Core infers deletion only when the connector says
 the scan completed, and it excludes paths that failed during that scan.
 
 Before hashing, the connector inventories eligible metadata and fails closed if the configured scope
-exceeds 10,000 files or 25 GiB by default. Operators can lower or explicitly raise those limits and
+exceeds 250,000 files or 1 TiB by default. Operators can lower or explicitly raise those limits and
 exclude path/filename globs. The connector accepts regular files only, opens with no-follow protection where the operating system
 supports it, verifies the opened device/inode, reads a bounded immutable snapshot, and checks that the
 snapshot matches the discovered SHA-256 before parsing. The default limit is 100 MiB per file.

@@ -20,7 +20,9 @@ from smart_lab_index.modules.connectors.filesystem import (
 )
 from smart_lab_index.web_app import (
     DEFAULT_DATABASE,
+    INITIAL_INDEX_FALLBACK_SECONDS,
     _schedule_initial_index,
+    _source_scope_warning,
     create_server,
     main,
 )
@@ -150,6 +152,19 @@ class SmartLabWebAppTests(unittest.TestCase):
                 for module in payload["modules"]
             )
         )
+
+    def test_first_state_response_starts_a_deferred_index_after_render_state(self) -> None:
+        self.assertTrue(self.state.defer_initial_index())
+        with patch.object(
+            self.state,
+            "start_deferred_index",
+            wraps=self.state.start_deferred_index,
+        ) as start:
+            payload = self.state_payload()
+
+        self.assertEqual(payload["operation"]["state"], "STARTING")
+        start.assert_called_once_with()
+        self.assertTrue(self.state.wait_for_index(timeout=10))
 
     def test_production_mode_requires_operator_authentication_and_reports_health(
         self,
@@ -460,9 +475,45 @@ class SmartLabWebAppMainTests(unittest.TestCase):
             scheduled = _schedule_initial_index(state)
 
         self.assertIs(scheduled, timer)
-        create.assert_called_once_with(0.15, state.start_index)
+        state.defer_initial_index.assert_called_once_with()
+        create.assert_called_once_with(
+            INITIAL_INDEX_FALLBACK_SECONDS,
+            state.start_deferred_index,
+        )
         self.assertTrue(timer.daemon)
         timer.start.assert_called_once_with()
+
+    def test_only_the_windows_system_volume_gets_a_scope_warning(self) -> None:
+        environment = {"SystemDrive": "C:"}
+
+        self.assertIsNotNone(
+            _source_scope_warning(
+                "C:\\",
+                platform="nt",
+                environment=environment,
+            )
+        )
+        self.assertIsNone(
+            _source_scope_warning(
+                "C:\\LabData",
+                platform="nt",
+                environment=environment,
+            )
+        )
+        self.assertIsNone(
+            _source_scope_warning(
+                "I:\\",
+                platform="nt",
+                environment=environment,
+            )
+        )
+        self.assertIsNone(
+            _source_scope_warning(
+                r"\\server\lab-share\\",
+                platform="nt",
+                environment=environment,
+            )
+        )
 
     def test_non_finite_index_interval_is_rejected(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:

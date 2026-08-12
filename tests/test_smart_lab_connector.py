@@ -58,7 +58,10 @@ class FilesystemConnectorTests(unittest.TestCase):
         path = self.root / "sample.txt"
         path.write_bytes(b"alpha")
         connector = FilesystemConnector()
-        definition = connector.source(self.root)
+        definition = connector.source(
+            self.root,
+            verify_unchanged_content=True,
+        )
 
         initial = connector.discover(definition, {})
         initial_source = initial.sources[0]
@@ -82,6 +85,26 @@ class FilesystemConnectorTests(unittest.TestCase):
         self.assertEqual(changed_record.modified_at, initial_source.record.modified_at)
         self.assertNotEqual(changed_record.checksum, initial_source.record.checksum)
         self.assertNotEqual(changed_record.change_token, initial_source.record.change_token)
+
+    def test_incremental_scan_does_not_rehash_unchanged_content(self) -> None:
+        path = self.root / "sample.txt"
+        path.write_bytes(b"stable content")
+        opened = mock.Mock(wraps=open)
+        connector = FilesystemConnector(open_file=opened)
+        definition = connector.source(self.root)
+
+        initial = connector.discover(definition, {})
+        previous = {
+            initial.sources[0].record.external_id: initial.sources[0].record,
+        }
+        repeated = connector.discover(definition, previous)
+
+        self.assertEqual(opened.call_count, 1)
+        self.assertIs(repeated.sources[0].change, DiscoveryChange.UNCHANGED)
+        self.assertEqual(
+            repeated.sources[0].record.checksum,
+            initial.sources[0].record.checksum,
+        )
 
     def test_inaccessible_file_failure_is_isolated(self) -> None:
         (self.root / "blocked.txt").write_bytes(b"not readable through boundary")
@@ -284,6 +307,7 @@ class FilesystemConnectorTests(unittest.TestCase):
 
         self.assertEqual([item.record.external_id for item in batch.sources], ["keep.txt"])
         self.assertEqual({item["phase"] for item in progress}, {"PREFLIGHT", "DISCOVERY"})
+        self.assertTrue(any(item.get("directories_scanned") == 1 for item in progress))
         with self.assertRaises(OperationCancelled):
             connector.discover(definition, {}, should_cancel=lambda: True)
 

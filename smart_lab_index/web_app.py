@@ -8,6 +8,7 @@ import hashlib
 import logging
 import math
 import multiprocessing
+import ntpath
 import os
 import secrets
 import sqlite3
@@ -61,6 +62,7 @@ from smart_lab_index.modules.connectors.filesystem import (
 
 LOGGER = logging.getLogger(__name__)
 DEFAULT_PORT = 8876
+INITIAL_INDEX_FALLBACK_SECONDS = 10.0
 DEFAULT_DATABASE = str(default_database_path())
 STATIC_ASSETS = {
     "/app.js": ("app.js", "text/javascript; charset=utf-8"),
@@ -122,6 +124,7 @@ class WebAppState:
             raise ValueError("index interval must be positive when enabled")
         self.index_interval_seconds = index_interval_seconds
         self.managed_desktop = managed_desktop
+        self.scope_warning = _source_scope_warning(self.root)
         self._database_lease = DatabaseLease(self.database).acquire()
         self._lock = threading.Lock()
         self._cancel_event = threading.Event()
@@ -193,6 +196,7 @@ class WebAppState:
                         ),
                     },
                     "can_change_source": self.allow_source_change,
+                    "scope_warning": self.scope_warning,
                     "limits": {
                         "max_files": self.max_files,
                         "max_total_bytes": self.max_total_bytes,
@@ -246,7 +250,7 @@ class WebAppState:
 
     def review_issue(self, payload: dict[str, Any]) -> dict[str, Any]:
         with self._lock:
-            if self._operation["state"] == "INDEXING":
+            if self._operation["state"] in {"STARTING", "INDEXING"}:
                 raise RuntimeError("wait for the active index run to finish")
             with KnowledgeStore(self.database) as store:
                 return IssueReviewService(store).review(
@@ -258,29 +262,62 @@ class WebAppState:
 
     def start_index(self) -> bool:
         with self._lock:
-            if self._operation["state"] == "INDEXING" or self._source_change_requested:
+            if (
+                self._operation["state"] in {"STARTING", "INDEXING"}
+                or self._source_change_requested
+            ):
+                return False
+            self._launch_index_locked()
+        return True
+
+    def defer_initial_index(self) -> bool:
+        """Expose the workspace before an automatic first scan can consume resources."""
+        with self._lock:
+            if self._operation["state"] != "IDLE" or self._source_change_requested:
                 return False
             self._operation = {
-                "state": "INDEXING",
-                "started_at": _now(),
+                "state": "STARTING",
+                "started_at": None,
                 "completed_at": None,
                 "result": None,
                 "error": None,
                 "cancel_requested": False,
                 "progress": {
-                    "phase": "STARTING",
+                    "phase": "OPENING_WORKSPACE",
                     "current": 0,
                     "total": None,
                 },
             }
-            self._cancel_event.clear()
-            self._index_thread = threading.Thread(
-                target=self._run_index,
-                name="laboverlay-job",
-                daemon=False,
-            )
-            self._index_thread.start()
-        return True
+            return True
+
+    def start_deferred_index(self) -> bool:
+        with self._lock:
+            if self._operation["state"] != "STARTING" or self._source_change_requested:
+                return False
+            self._launch_index_locked()
+            return True
+
+    def _launch_index_locked(self) -> None:
+        self._operation = {
+            "state": "INDEXING",
+            "started_at": _now(),
+            "completed_at": None,
+            "result": None,
+            "error": None,
+            "cancel_requested": False,
+            "progress": {
+                "phase": "STARTING",
+                "current": 0,
+                "total": None,
+            },
+        }
+        self._cancel_event.clear()
+        self._index_thread = threading.Thread(
+            target=self._run_index,
+            name="laboverlay-job",
+            daemon=False,
+        )
+        self._index_thread.start()
 
     def _run_index(self) -> None:
         result: dict[str, Any] | None = None
@@ -323,6 +360,11 @@ class WebAppState:
 
     def request_cancel(self) -> bool:
         with self._lock:
+            if self._operation["state"] == "STARTING":
+                self._operation["state"] = "IDLE"
+                self._operation["cancel_requested"] = True
+                self._operation["completed_at"] = _now()
+                return True
             if self._operation["state"] != "INDEXING":
                 return False
             self._operation["cancel_requested"] = True
@@ -331,13 +373,13 @@ class WebAppState:
 
     def is_indexing(self) -> bool:
         with self._lock:
-            return self._operation["state"] == "INDEXING"
+            return self._operation["state"] in {"STARTING", "INDEXING"}
 
     def request_source_change(self) -> bool:
         with self._lock:
             if (
                 not self.allow_source_change
-                or self._operation["state"] == "INDEXING"
+                or self._operation["state"] in {"STARTING", "INDEXING"}
                 or self._source_change_requested
             ):
                 return False
@@ -422,6 +464,7 @@ class SmartLabHandler(LoopbackHandler):
                 return
             try:
                 self._send_json(200, self.app_state.snapshot())
+                self.app_state.start_deferred_index()
             except Exception as exc:  # noqa: BLE001 - return a bounded local API error
                 LOGGER.error("LabOverlay state read failed (%s)", type(exc).__name__)
                 self._send_json(500, {"error": "The index state could not be read."})
@@ -597,9 +640,41 @@ def _desktop_database(root: str | Path) -> Path:
     return default_workspace_directory() / f"{identity}.db"
 
 
+def _source_scope_warning(
+    root: str | Path,
+    *,
+    platform: str | None = None,
+    environment: Mapping[str, str] | None = None,
+) -> str | None:
+    """Warn only for the Windows OS volume, not mapped or UNC data-drive roots."""
+    target = os.name if platform is None else platform
+    if target != "nt":
+        return None
+    value = ntpath.normpath(str(root))
+    drive, tail = ntpath.splitdrive(value)
+    if not drive or tail not in {"", "\\", "/"}:
+        return None
+    current_environment = os.environ if environment is None else environment
+    system_drive = current_environment.get("SystemDrive", "")
+    if not system_drive:
+        system_drive = ntpath.splitdrive(
+            current_environment.get("SystemRoot", "")
+        )[0]
+    if ntpath.normcase(drive) != ntpath.normcase(system_drive):
+        return None
+    return (
+        "This is the Windows system drive. Choose the lab data folder instead, "
+        "or start the sync manually if scanning the full drive is intentional."
+    )
+
+
 def _schedule_initial_index(state: WebAppState) -> threading.Timer:
-    """Let the loopback workspace accept requests before discovery starts."""
-    timer = threading.Timer(0.15, state.start_index)
+    """Wait for the first UI state response, with a headless fallback."""
+    state.defer_initial_index()
+    timer = threading.Timer(
+        INITIAL_INDEX_FALLBACK_SECONDS,
+        state.start_deferred_index,
+    )
     timer.daemon = True
     timer.start()
     return timer
@@ -751,6 +826,8 @@ def main(argv: Sequence[str] | None = None) -> int:
         print(f"{APP_CLI_NAME}: --max-total-gb must be positive")
         return 2
     index_on_start = args.index_on_start or production_mode or desktop_mode
+    if desktop_mode and _source_scope_warning(root) is not None:
+        index_on_start = False
     recovery: tuple[str | Path, str | Path, str | None] | None = None
 
     while True:
@@ -869,7 +946,11 @@ def main(argv: Sequence[str] | None = None) -> int:
                 source_id = None
                 if managed_database:
                     database = _desktop_database(selected)
-            index_on_start = desktop_mode and changed
+            index_on_start = (
+                desktop_mode
+                and changed
+                and _source_scope_warning(selected) is None
+            )
         else:
             root = state.root
             index_on_start = False
