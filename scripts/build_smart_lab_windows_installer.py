@@ -11,8 +11,12 @@ import tempfile
 import time
 from pathlib import Path
 
-from scripts import build_smart_lab_desktop_app as desktop_build
 from smart_lab_index import __version__
+
+if __package__:
+    from scripts import build_smart_lab_desktop_app as desktop_build
+else:
+    import build_smart_lab_desktop_app as desktop_build
 
 ROOT = Path(__file__).resolve().parents[1]
 INNO_SCRIPT = ROOT / "installer" / "windows" / "smart-lab-index.iss"
