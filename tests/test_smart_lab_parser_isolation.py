@@ -9,7 +9,9 @@ import socket
 import time
 import unittest
 from typing import BinaryIO
+from unittest.mock import patch
 
+from smart_lab_index.application import parsing
 from smart_lab_index.application.parsing import (
     ParserExecutionError,
     ParserResourceLimitError,
@@ -117,6 +119,10 @@ class ParserIsolationTests(unittest.TestCase):
         document = self.execute("ok")
         self.assertEqual(document.metadata, {"probe": "ok"})
         self.assertEqual(document.source_external_id, "probe.txt")
+
+    def test_macos_does_not_claim_unreliable_address_space_limits(self) -> None:
+        with patch.object(parsing.sys, "platform", "darwin"):
+            self.assertFalse(parsing._resource_limit_available("RLIMIT_AS"))
 
     def test_wall_clock_timeout_terminates_worker(self) -> None:
         with self.assertRaises(ParserTimeoutError):

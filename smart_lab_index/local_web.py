@@ -192,4 +192,10 @@ def bind_loopback_server(
             return LoopbackHTTPServer(("127.0.0.1", candidate), handler)
         except OSError as exc:
             last_error = exc
-    raise OSError(error_message) from last_error
+    code = None if last_error is None else getattr(last_error, "winerror", None)
+    if code is None and last_error is not None:
+        code = last_error.errno
+    detail = type(last_error).__name__ if last_error is not None else "OSError"
+    if code is not None:
+        detail = f"{detail} {code}"
+    raise OSError(f"{error_message.rstrip('.')} ({detail}).") from last_error

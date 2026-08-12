@@ -303,6 +303,8 @@ def _validate_document(
 
 
 def _resource_limit_available(name: str) -> bool:
+    if name == "RLIMIT_AS" and sys.platform == "darwin":
+        return False
     try:
         import resource
     except ImportError:
@@ -318,7 +320,7 @@ def _apply_resource_limits(cpu_seconds: int, memory_bytes: int) -> None:
     _set_resource_limit(resource.RLIMIT_CORE, 0, 0)
     _set_resource_limit(resource.RLIMIT_FSIZE, 0, 0)
     _set_resource_limit(resource.RLIMIT_CPU, cpu_seconds, cpu_seconds + 1)
-    if hasattr(resource, "RLIMIT_AS"):
+    if _resource_limit_available("RLIMIT_AS"):
         _set_resource_limit(resource.RLIMIT_AS, memory_bytes, memory_bytes)
 
 

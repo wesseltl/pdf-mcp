@@ -27,14 +27,33 @@ FINAL_DIST = ROOT / "dist"
 APP_NAME = "smart-lab-index"
 SIGNING_REQUIRED_ENV = "SMART_LAB_REQUIRE_SIGNING"
 _SMOKE_ENVIRONMENT = {
+    "ALLUSERSPROFILE",
+    "APPDATA",
+    "COMMONPROGRAMFILES",
+    "COMMONPROGRAMFILES(X86)",
+    "COMMONPROGRAMW6432",
+    "COMSPEC",
     "HOME",
+    "HOMEDRIVE",
+    "HOMEPATH",
     "LANG",
     "LC_ALL",
+    "LOCALAPPDATA",
+    "OS",
     "PATH",
-    "SystemRoot",
+    "PATHEXT",
+    "PROGRAMDATA",
+    "PROGRAMFILES",
+    "PROGRAMFILES(X86)",
+    "PROGRAMW6432",
+    "PUBLIC",
+    "SYSTEMDRIVE",
+    "SYSTEMROOT",
     "TEMP",
     "TMP",
     "TMPDIR",
+    "USERDOMAIN",
+    "USERNAME",
     "USERPROFILE",
     "WINDIR",
 }
@@ -169,9 +188,7 @@ def smoke_test(executable: Path) -> None:
     sample = ROOT / "examples" / "smart_lab_index" / "sample_lab"
     with tempfile.TemporaryDirectory() as temporary, tempfile.TemporaryFile() as output:
         database = Path(temporary) / "index.db"
-        environment = {
-            key: value for key, value in os.environ.items() if key in _SMOKE_ENVIRONMENT
-        }
+        environment = _smoke_environment()
         environment["PYTHONUNBUFFERED"] = "1"
         process = subprocess.Popen(
             [
@@ -201,6 +218,15 @@ def smoke_test(executable: Path) -> None:
                 except subprocess.TimeoutExpired:
                     process.kill()
                     process.wait(timeout=5)
+
+
+def _smoke_environment() -> dict[str, str]:
+    """Keep native runtime state while withholding credentials from the app."""
+    return {
+        key: value
+        for key, value in os.environ.items()
+        if key.upper() in _SMOKE_ENVIRONMENT
+    }
 
 
 def _wait_for_expected_index(

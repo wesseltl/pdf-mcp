@@ -42,6 +42,26 @@ class SmartLabDesktopBuildTests(unittest.TestCase):
             "PARSING_FAILURE=parser worker exited with code 1",
         )
 
+    def test_smoke_environment_preserves_case_insensitive_windows_runtime(self) -> None:
+        values = {
+            "Path": "C:\\Windows\\System32",
+            "SystemRoot": "C:\\Windows",
+            "APPDATA": "C:\\Users\\Example\\AppData\\Roaming",
+            "GITHUB_TOKEN": "must-not-reach-the-app",
+            "SMART_LAB_WINDOWS_CERTIFICATE_PASSWORD": "also-secret",
+        }
+        with patch.dict(os.environ, values, clear=True):
+            environment = desktop_build._smoke_environment()
+
+        self.assertEqual(
+            environment,
+            {
+                "Path": values["Path"],
+                "SystemRoot": values["SystemRoot"],
+                "APPDATA": values["APPDATA"],
+            },
+        )
+
     def test_checksum_manifest_matches_archive(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:
             archive = Path(temporary) / "smart-lab-index.zip"
