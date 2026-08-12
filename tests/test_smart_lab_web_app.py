@@ -18,7 +18,7 @@ from smart_lab_index.modules.connectors.filesystem import (
     DEFAULT_MAX_FILES,
     DEFAULT_MAX_TOTAL_BYTES,
 )
-from smart_lab_index.web_app import create_server, main
+from smart_lab_index.web_app import _schedule_initial_index, create_server, main
 
 
 class SmartLabWebAppTests(unittest.TestCase):
@@ -448,6 +448,17 @@ class SmartLabWebAppTests(unittest.TestCase):
 
 
 class SmartLabWebAppMainTests(unittest.TestCase):
+    def test_initial_index_is_deferred_until_the_server_can_accept_requests(self) -> None:
+        state = Mock()
+        timer = Mock()
+        with patch("smart_lab_index.web_app.threading.Timer", return_value=timer) as create:
+            scheduled = _schedule_initial_index(state)
+
+        self.assertIs(scheduled, timer)
+        create.assert_called_once_with(0.15, state.start_index)
+        self.assertTrue(timer.daemon)
+        timer.start.assert_called_once_with()
+
     def test_non_finite_index_interval_is_rejected(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:
             root = Path(temporary) / "lab"
@@ -480,7 +491,9 @@ class SmartLabWebAppMainTests(unittest.TestCase):
             with patch(
                 "smart_lab_index.web_app.create_server",
                 return_value=(server, state),
-            ) as create:
+            ) as create, patch(
+                "smart_lab_index.web_app._schedule_initial_index",
+            ) as schedule:
                 result = main([
                     str(root),
                     "--production",
@@ -496,7 +509,7 @@ class SmartLabWebAppMainTests(unittest.TestCase):
         self.assertTrue(create.call_args.kwargs["policy"].no_egress)
         self.assertFalse(create.call_args.kwargs["allow_source_change"])
         self.assertEqual(create.call_args.kwargs["index_interval_seconds"], 900)
-        state.start_index.assert_called_once_with()
+        schedule.assert_called_once_with(state)
 
     def test_no_root_uses_picker_remembers_workspace_and_starts_automatic_scan(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:
@@ -523,6 +536,9 @@ class SmartLabWebAppMainTests(unittest.TestCase):
                     "smart_lab_index.web_app.create_server",
                     return_value=(server, state),
                 ) as create,
+                patch(
+                    "smart_lab_index.web_app._schedule_initial_index",
+                ) as schedule,
             ):
                 result = main([
                     "--no-browser",
@@ -542,7 +558,7 @@ class SmartLabWebAppMainTests(unittest.TestCase):
         self.assertEqual(create.call_args.kwargs["index_interval_seconds"], 900)
         self.assertTrue(create.call_args.kwargs["managed_desktop"])
         self.assertTrue(settings_saved)
-        state.start_index.assert_called_once_with()
+        schedule.assert_called_once_with(state)
         server.serve_forever.assert_called_once_with(poll_interval=0.25)
 
     def test_no_root_falls_back_to_local_browser_folder_navigator(self) -> None:
@@ -570,6 +586,9 @@ class SmartLabWebAppMainTests(unittest.TestCase):
                     "smart_lab_index.web_app.create_server",
                     return_value=(server, state),
                 ) as create,
+                patch(
+                    "smart_lab_index.web_app._schedule_initial_index",
+                ) as schedule,
             ):
                 result = main([
                     "--no-browser",
@@ -584,7 +603,7 @@ class SmartLabWebAppMainTests(unittest.TestCase):
         self.assertTrue(create.call_args.kwargs["allow_source_change"])
         self.assertTrue(create.call_args.kwargs["policy"].no_egress)
         self.assertEqual(create.call_args.kwargs["index_interval_seconds"], 900)
-        state.start_index.assert_called_once_with()
+        schedule.assert_called_once_with(state)
 
     def test_remembered_workspace_reopens_without_folder_picker(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:
@@ -621,6 +640,9 @@ class SmartLabWebAppMainTests(unittest.TestCase):
                     "smart_lab_index.web_app.create_server",
                     return_value=(server, state),
                 ) as create,
+                patch(
+                    "smart_lab_index.web_app._schedule_initial_index",
+                ) as schedule,
             ):
                 result = main([
                     "--no-browser",
@@ -635,7 +657,7 @@ class SmartLabWebAppMainTests(unittest.TestCase):
         self.assertEqual(create.call_args.args[0], root.resolve())
         self.assertEqual(create.call_args.kwargs["database"], database.resolve())
         self.assertEqual(create.call_args.kwargs["index_interval_seconds"], 1200)
-        state.start_index.assert_called_once_with()
+        schedule.assert_called_once_with(state)
 
     def test_source_change_restarts_same_port_and_clears_explicit_source_id(
         self,

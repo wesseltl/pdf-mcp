@@ -592,6 +592,14 @@ def _desktop_database(root: str | Path) -> Path:
     return Path.home() / ".smart-lab-index" / "workspaces" / f"{identity}.db"
 
 
+def _schedule_initial_index(state: WebAppState) -> threading.Timer:
+    """Let the loopback workspace accept requests before discovery starts."""
+    timer = threading.Timer(0.15, state.start_index)
+    timer.daemon = True
+    timer.start()
+    return timer
+
+
 def main(argv: Sequence[str] | None = None) -> int:
     parser = argparse.ArgumentParser(
         prog="smart-lab-index-app",
@@ -803,8 +811,9 @@ def main(argv: Sequence[str] | None = None) -> int:
         if index_interval_minutes is not None:
             print(f"Index interval: {index_interval_minutes:g} minutes")
         print("Press Ctrl+C to stop the app.")
-        if index_on_start:
-            state.start_index()
+        initial_index_timer = (
+            _schedule_initial_index(state) if index_on_start else None
+        )
         if not args.no_browser and not browser_started:
             threading.Timer(
                 0.35,
@@ -819,6 +828,8 @@ def main(argv: Sequence[str] | None = None) -> int:
             interrupted = True
             print("\nStopping Smart Lab Index.")
         finally:
+            if initial_index_timer is not None:
+                initial_index_timer.cancel()
             server.server_close()
             if interrupted:
                 state.request_cancel()

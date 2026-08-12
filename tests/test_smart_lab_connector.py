@@ -117,6 +117,13 @@ class FilesystemConnectorTests(unittest.TestCase):
             self.assertEqual(stream.read(), b"source bytes")
         self.assertTrue(stream.closed)
 
+        with mock.patch.object(
+            Path,
+            "is_dir",
+            side_effect=AssertionError("network root was revalidated per file"),
+        ), connector.open_content(definition, record) as stream:
+            self.assertEqual(stream.read(), b"source bytes")
+
         with (
             self.assertRaisesRegex(PermissionError, "different connector"),
             connector.open_content(definition, replace(record, source_id="source-b")),

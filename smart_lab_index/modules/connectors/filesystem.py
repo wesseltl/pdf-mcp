@@ -128,7 +128,11 @@ class FilesystemConnector(ConnectorModule):
         return definition
 
     def validate_source(self, source: SourceDefinition) -> None:
-        _settings(source, self.manifest.module_id)
+        settings = _settings(source, self.manifest.module_id)
+        if not settings.root.is_dir():
+            raise ModuleConfigurationError(
+                f"filesystem root is not a directory: {settings.root}"
+            )
 
     def source_identity(self, source: SourceDefinition) -> Mapping[str, object]:
         settings = _settings(source, self.manifest.module_id)
@@ -436,7 +440,7 @@ def _settings(
     root_value = source.configuration.get("root")
     if not isinstance(root_value, str) or not root_value.strip():
         raise ModuleConfigurationError("source configuration.root must be a string")
-    root = Path(root_value).expanduser().resolve()
+    root = Path(os.path.abspath(os.fspath(Path(root_value).expanduser())))
     extension_values = source.configuration.get("include_extensions", DEFAULT_EXTENSIONS)
     if not isinstance(extension_values, (list, tuple)) or not all(
         isinstance(value, str) for value in extension_values
@@ -472,8 +476,6 @@ def _settings(
         )
     if len(patterns) > 100:
         raise ModuleConfigurationError("at most 100 exclusion patterns are allowed")
-    if not root.is_dir():
-        raise ModuleConfigurationError(f"filesystem root is not a directory: {root}")
     return _FilesystemSettings(
         root,
         extensions,
