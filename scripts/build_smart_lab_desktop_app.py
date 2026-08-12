@@ -9,7 +9,6 @@ import os
 import platform
 import re
 import shutil
-import socket
 import subprocess
 import sys
 import tempfile
@@ -18,8 +17,6 @@ import urllib.request
 import zipfile
 from pathlib import Path
 from typing import BinaryIO
-
-import PyInstaller.__main__
 
 from smart_lab_index import __version__
 
@@ -168,14 +165,7 @@ def _notarize_macos_app(target: Path, profile: str) -> None:
     subprocess.run(["xcrun", "stapler", "validate", str(target)], check=True)
 
 
-def available_port() -> int:
-    with socket.socket() as listener:
-        listener.bind(("127.0.0.1", 0))
-        return listener.getsockname()[1]
-
-
 def smoke_test(executable: Path) -> None:
-    port = available_port()
     sample = ROOT / "examples" / "smart_lab_index" / "sample_lab"
     with tempfile.TemporaryDirectory() as temporary, tempfile.TemporaryFile() as output:
         database = Path(temporary) / "index.db"
@@ -195,14 +185,14 @@ def smoke_test(executable: Path) -> None:
                 "--no-browser",
                 "--index-on-start",
                 "--port",
-                str(port),
+                "0",
             ],
             stdout=output,
             stderr=subprocess.STDOUT,
             env=environment,
         )
         try:
-            _wait_for_expected_index(process, output, port)
+            _wait_for_expected_index(process, output)
         finally:
             if process.poll() is None:
                 process.terminate()
@@ -216,10 +206,10 @@ def smoke_test(executable: Path) -> None:
 def _wait_for_expected_index(
     process: subprocess.Popen[bytes],
     output: BinaryIO,
-    port: int,
 ) -> None:
     deadline = time.monotonic() + 45
     token: str | None = None
+    url: str | None = None
     while time.monotonic() < deadline:
         if process.poll() is not None:
             detail = _startup_detail(output)
@@ -228,10 +218,13 @@ def _wait_for_expected_index(
             )
             raise RuntimeError(f"{message}:\n{detail}" if detail else message)
         try:
+            if url is None:
+                url = _ready_url(output)
+                if url is None:
+                    time.sleep(0.2)
+                    continue
             if token is None:
-                with urllib.request.urlopen(
-                    f"http://127.0.0.1:{port}/", timeout=1
-                ) as response:
+                with urllib.request.urlopen(url, timeout=1) as response:
                     page = response.read().decode("utf-8")
                 if "<title>Smart Lab Index</title>" not in page:
                     raise RuntimeError("desktop app returned an unexpected page")
@@ -243,13 +236,13 @@ def _wait_for_expected_index(
                     raise RuntimeError("desktop app did not provide a browser session")
                 token = match.group(1)
                 with urllib.request.urlopen(
-                    f"http://127.0.0.1:{port}/icons.svg", timeout=1
+                    f"{url}icons.svg", timeout=1
                 ) as response:
                     icons = response.read().decode("utf-8")
                 if 'id="shield-check"' not in icons:
                     raise RuntimeError("desktop app did not bundle the interface icons")
             request = urllib.request.Request(
-                f"http://127.0.0.1:{port}/api/state",
+                f"{url}api/state",
                 headers={"X-Smart-Lab-Session": token},
             )
             with urllib.request.urlopen(request, timeout=1) as response:
@@ -267,8 +260,11 @@ def _wait_for_expected_index(
             }
             observed = {key: summary.get(key) for key in expected}
             if observed != expected:
+                failures = _index_failure_detail(state)
+                suffix = f"; failures: {failures}" if failures else ""
                 raise RuntimeError(
                     f"desktop app returned unexpected synthetic counts: {observed}"
+                    f"{suffix}"
                 )
             if not state["source"]["no_egress"]:
                 raise RuntimeError("desktop app did not preserve no-egress mode")
@@ -289,6 +285,30 @@ def _wait_for_expected_index(
     detail = _startup_detail(output)
     message = "desktop app did not complete its smoke index within 45 seconds"
     raise RuntimeError(f"{message}:\n{detail}" if detail else message)
+
+
+def _ready_url(output: BinaryIO) -> str | None:
+    match = re.search(
+        r"Smart Lab Index is ready at (http://127\.0\.0\.1:\d+/)",
+        _startup_detail(output),
+    )
+    return None if match is None else match.group(1)
+
+
+def _index_failure_detail(state: dict[str, object]) -> str:
+    details: list[str] = []
+    operation = state.get("operation")
+    if isinstance(operation, dict) and operation.get("error"):
+        details.append(f"operation={operation['error']}")
+    issues = state.get("issues")
+    if isinstance(issues, list):
+        for issue in issues[:8]:
+            if not isinstance(issue, dict) or issue.get("status") != "OPEN":
+                continue
+            evidence = issue.get("evidence")
+            error = evidence.get("error") if isinstance(evidence, dict) else None
+            details.append(f"{issue.get('code', 'ISSUE')}={error or 'open'}")
+    return "; ".join(details)[:2_000]
 
 
 def _startup_detail(output: BinaryIO) -> str:
@@ -372,6 +392,8 @@ def write_checksum(archive: Path) -> Path:
 
 
 def main() -> int:
+    import PyInstaller.__main__
+
     parser = argparse.ArgumentParser()
     parser.add_argument("--skip-smoke", action="store_true")
     args = parser.parse_args()

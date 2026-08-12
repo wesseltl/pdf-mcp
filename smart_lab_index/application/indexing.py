@@ -499,10 +499,13 @@ class IndexingService:
                 raise
             except Exception as exc:  # noqa: BLE001 - per-document parser isolation
                 stats["failed"] += 1
+                reason = " ".join(str(exc).split())[:350]
                 detail = (
                     f"{parser.manifest.module_id} failed for {source.external_id}: "
                     f"{type(exc).__name__}"
                 )
+                if reason:
+                    detail = f"{detail}: {reason}"
                 errors.append(detail)
                 self._operational_issue(
                     run_id=run_id,

@@ -6,6 +6,7 @@ import hashlib
 import os
 import tempfile
 import unittest
+from io import BytesIO
 from pathlib import Path
 from unittest.mock import call, patch
 
@@ -13,6 +14,34 @@ from scripts import build_smart_lab_desktop_app as desktop_build
 
 
 class SmartLabDesktopBuildTests(unittest.TestCase):
+    def test_ready_url_uses_the_app_assigned_loopback_port(self) -> None:
+        output = BytesIO(
+            b"Smart Lab Index is ready at http://127.0.0.1:49152/\n"
+            b"No-egress: on\n"
+        )
+
+        self.assertEqual(
+            desktop_build._ready_url(output),
+            "http://127.0.0.1:49152/",
+        )
+
+    def test_index_failure_detail_is_bounded_and_actionable(self) -> None:
+        state = {
+            "operation": {"error": None},
+            "issues": [
+                {
+                    "code": "PARSING_FAILURE",
+                    "status": "OPEN",
+                    "evidence": {"error": "parser worker exited with code 1"},
+                }
+            ],
+        }
+
+        self.assertEqual(
+            desktop_build._index_failure_detail(state),
+            "PARSING_FAILURE=parser worker exited with code 1",
+        )
+
     def test_checksum_manifest_matches_archive(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:
             archive = Path(temporary) / "smart-lab-index.zip"
