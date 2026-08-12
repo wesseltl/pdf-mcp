@@ -9,6 +9,7 @@ import os
 import platform
 import re
 import shutil
+import socket
 import subprocess
 import sys
 import tempfile
@@ -72,7 +73,7 @@ def executable_path() -> Path:
     if sys.platform == "darwin":
         return APP_DIST / f"{APP_NAME}.app" / "Contents" / "MacOS" / APP_NAME
     suffix = ".exe" if sys.platform == "win32" else ""
-    return APP_DIST / f"{APP_NAME}{suffix}"
+    return APP_DIST / APP_NAME / f"{APP_NAME}{suffix}"
 
 
 def signing_target() -> Path:
@@ -184,7 +185,15 @@ def _notarize_macos_app(target: Path, profile: str) -> None:
     subprocess.run(["xcrun", "stapler", "validate", str(target)], check=True)
 
 
+def available_port() -> int:
+    with socket.socket() as listener:
+        listener.bind(("127.0.0.1", 0))
+        return listener.getsockname()[1]
+
+
 def smoke_test(executable: Path) -> None:
+    port = available_port()
+    url = f"http://127.0.0.1:{port}/"
     sample = ROOT / "examples" / "smart_lab_index" / "sample_lab"
     with tempfile.TemporaryDirectory() as temporary, tempfile.TemporaryFile() as output:
         database = Path(temporary) / "index.db"
@@ -202,22 +211,19 @@ def smoke_test(executable: Path) -> None:
                 "--no-browser",
                 "--index-on-start",
                 "--port",
-                "0",
+                str(port),
             ],
             stdout=output,
             stderr=subprocess.STDOUT,
             env=environment,
         )
         try:
-            _wait_for_expected_index(process, output)
+            token = _wait_for_expected_index(process, output, url)
+            _request_shutdown(url, token)
+            process.wait(timeout=15)
         finally:
             if process.poll() is None:
-                process.terminate()
-                try:
-                    process.wait(timeout=5)
-                except subprocess.TimeoutExpired:
-                    process.kill()
-                    process.wait(timeout=5)
+                _terminate_process_tree(process)
 
 
 def _smoke_environment() -> dict[str, str]:
@@ -232,10 +238,10 @@ def _smoke_environment() -> dict[str, str]:
 def _wait_for_expected_index(
     process: subprocess.Popen[bytes],
     output: BinaryIO,
-) -> None:
-    deadline = time.monotonic() + 45
+    url: str,
+) -> str:
+    deadline = time.monotonic() + 90
     token: str | None = None
-    url: str | None = None
     while time.monotonic() < deadline:
         if process.poll() is not None:
             detail = _startup_detail(output)
@@ -244,11 +250,6 @@ def _wait_for_expected_index(
             )
             raise RuntimeError(f"{message}:\n{detail}" if detail else message)
         try:
-            if url is None:
-                url = _ready_url(output)
-                if url is None:
-                    time.sleep(0.2)
-                    continue
             if token is None:
                 with urllib.request.urlopen(url, timeout=1) as response:
                     page = response.read().decode("utf-8")
@@ -305,20 +306,46 @@ def _wait_for_expected_index(
                 raise RuntimeError(
                     "desktop app did not preserve the parser process boundary"
                 )
-            return
+            return token
         except OSError:
             time.sleep(0.4)
     detail = _startup_detail(output)
-    message = "desktop app did not complete its smoke index within 45 seconds"
+    message = "desktop app did not complete its smoke index within 90 seconds"
     raise RuntimeError(f"{message}:\n{detail}" if detail else message)
 
 
-def _ready_url(output: BinaryIO) -> str | None:
-    match = re.search(
-        r"Smart Lab Index is ready at (http://127\.0\.0\.1:\d+/)",
-        _startup_detail(output),
+def _request_shutdown(url: str, token: str) -> None:
+    request = urllib.request.Request(
+        f"{url}api/shutdown",
+        data=b"{}",
+        headers={
+            "Content-Type": "application/json",
+            "Origin": url.rstrip("/"),
+            "X-Smart-Lab-Session": token,
+        },
+        method="POST",
     )
-    return None if match is None else match.group(1)
+    with urllib.request.urlopen(request, timeout=5) as response:
+        result = json.load(response)
+    if result != {"ok": True}:
+        raise RuntimeError("desktop app did not confirm graceful shutdown")
+
+
+def _terminate_process_tree(process: subprocess.Popen[bytes]) -> None:
+    if sys.platform == "win32":
+        subprocess.run(
+            ["taskkill", "/PID", str(process.pid), "/T", "/F"],
+            check=False,
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL,
+        )
+    elif process.poll() is None:
+        process.terminate()
+    try:
+        process.wait(timeout=10)
+    except subprocess.TimeoutExpired:
+        process.kill()
+        process.wait(timeout=5)
 
 
 def _index_failure_detail(state: dict[str, object]) -> str:
@@ -353,8 +380,9 @@ def archive_app(signing_status: str) -> Path:
         shutil.copytree(app_bundle, staging / app_bundle.name)
         launch_instruction = f"Double-click {APP_NAME}.app."
     else:
+        app_directory = APP_DIST / APP_NAME
+        shutil.copytree(app_directory, staging, dirs_exist_ok=True)
         executable = executable_path()
-        shutil.copy2(executable, staging / executable.name)
         launch_instruction = f"Double-click {executable.name}."
 
     trust_note = {
@@ -426,12 +454,11 @@ def main() -> int:
 
     shutil.rmtree(BUILD_ROOT, ignore_errors=True)
     APP_DIST.mkdir(parents=True)
-    bundle_mode = "--onedir" if sys.platform == "darwin" else "--onefile"
     PyInstaller.__main__.run(
         [
             str(ROOT / "smart_lab_index" / "web_app.py"),
             f"--name={APP_NAME}",
-            bundle_mode,
+            "--onedir",
             "--windowed",
             "--noconfirm",
             "--clean",
