@@ -20,6 +20,11 @@ class SmartLabDesktopBuildTests(unittest.TestCase):
         )
         self.assertTrue(
             desktop_build._index_pending(
+                {"state": "STARTING", "completed_at": None}
+            )
+        )
+        self.assertTrue(
+            desktop_build._index_pending(
                 {"state": "INDEXING", "completed_at": None}
             )
         )

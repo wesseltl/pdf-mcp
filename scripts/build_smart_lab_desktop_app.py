@@ -406,7 +406,7 @@ def _wait_for_expected_index(
 
 def _index_pending(operation: dict[str, object]) -> bool:
     state = operation.get("state")
-    return state == "INDEXING" or (
+    return state in {"STARTING", "INDEXING"} or (
         state == "IDLE" and operation.get("completed_at") is None
     )
 
