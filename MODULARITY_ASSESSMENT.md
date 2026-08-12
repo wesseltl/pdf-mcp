@@ -4,7 +4,7 @@
 
 The repository is a **functionally separated but architecturally coupled single package**. Files are
 small enough to understand, and many functions are deterministic and tested. However, source files are
-not modules in the Smart Lab Index sense. There is no explicit contract, manifest, registry,
+not modules in the LabOverlay sense. There is no explicit contract, manifest, registry,
 configuration schema, lifecycle, health state, dependency declaration, or capability discovery.
 
 The correct starting point remains a modular monolith. Nothing in the current scale or deployment model
@@ -93,7 +93,7 @@ to database schemas.
 
 ### 1. There is no stable domain boundary
 
-**Severity: Critical for the Smart Lab Index transition.**
+**Severity: Critical for the LabOverlay transition.**
 
 Current outputs are untyped nested dictionaries tailored to table conversion. There are no entities,
 aliases, assertions, predicates, sources, documents, issues, index runs, review decisions, or audit
@@ -373,7 +373,7 @@ This sequence keeps existing user value available and avoids a big-bang rewrite.
 The existing document processor should be retained, but only as a set of ingestion and support
 capabilities. Its tested deterministic extraction and provenance mechanics are worth reusing. Its current
 orchestrators, dictionaries, direct imports, and converter UI are not a sufficient foundation for the
-Smart Lab Index Core.
+LabOverlay Core.
 
 The next implementation step should be narrowly scoped: define the neutral Core contracts and minimal
 built-in module registry, then place the existing PDF extractor behind the first parser adapter while

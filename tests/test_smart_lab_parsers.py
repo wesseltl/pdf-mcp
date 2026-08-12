@@ -1,4 +1,4 @@
-"""Contract tests for Smart Lab Index document parser modules."""
+"""Contract tests for LabOverlay document parser modules."""
 
 from __future__ import annotations
 

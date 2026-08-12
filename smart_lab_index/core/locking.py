@@ -1,4 +1,4 @@
-"""Cross-process ownership lease for one writable Smart Lab database."""
+"""Cross-process ownership lease for one writable LabOverlay database."""
 
 from __future__ import annotations
 
@@ -47,7 +47,7 @@ class DatabaseLease:
         except OSError as exc:
             stream.close()
             raise DatabaseBusyError(
-                f"another Smart Lab Index process owns this database: {database}"
+                f"another LabOverlay process owns this database: {database}"
             ) from exc
         self._stream = stream
         metadata = json.dumps(

@@ -1,4 +1,4 @@
-# Smart Lab Index Self-Service Architecture
+# LabOverlay Self-Service Architecture
 
 ## Objective
 
@@ -35,7 +35,7 @@ The target customer journey has five steps.
 4. The application pairs to the organization and asks the customer to connect one approved folder.
 5. The first scan starts automatically. Later scans are incremental and scheduled.
 
-Returning use must require only opening Smart Lab Index. The app remembers the approved folder and
+Returning use must require only opening LabOverlay. The app remembers the approved folder and
 its separate local database. An unavailable remembered network path returns to folder setup instead
 of scanning a different path.
 
@@ -131,7 +131,7 @@ The current ZIP artifacts are useful for pilots but are not the final low-touch 
 
 - Read-only source access.
 - Document content local by default.
-- No network credentials stored by Smart Lab Index.
+- No network credentials stored by LabOverlay.
 - No inbound internet port on the laboratory device.
 - Outbound control-plane traffic limited to enrollment, entitlement, release metadata, and bounded
   health when managed mode is enabled.

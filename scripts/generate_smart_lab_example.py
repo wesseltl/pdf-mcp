@@ -1,4 +1,4 @@
-"""Generate a small, entirely synthetic Smart Lab Index demonstration."""
+"""Generate a small, entirely synthetic LabOverlay demonstration."""
 
 from __future__ import annotations
 

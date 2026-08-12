@@ -108,7 +108,7 @@ class SmartLabOperationTests(unittest.TestCase):
             result = cli_main(["health", "--database", str(corrupt)])
 
         self.assertEqual(result, 2)
-        self.assertIn("smart-lab-index:", errors.getvalue())
+        self.assertIn("laboverlay:", errors.getvalue())
         self.assertNotIn("Traceback", errors.getvalue())
 
     def test_exclusive_startup_recovers_interrupted_runs(self) -> None:

@@ -95,7 +95,7 @@ jobs:
           if ([string]::IsNullOrWhiteSpace($env:CERTIFICATE_BASE64)) {
             exit 0
           }
-          $certificate = Join-Path $env:RUNNER_TEMP "smart-lab-index-codesign.pfx"
+          $certificate = Join-Path $env:RUNNER_TEMP "laboverlay-codesign.pfx"
           [IO.File]::WriteAllBytes($certificate, [Convert]::FromBase64String($env:CERTIFICATE_BASE64))
           "SMART_LAB_WINDOWS_CERTIFICATE_PATH=$certificate" | Out-File -FilePath $env:GITHUB_ENV -Append
 
@@ -113,8 +113,8 @@ jobs:
           if [[ -z "$CERTIFICATE_BASE64" || -z "$SIGNING_IDENTITY" ]]; then
             exit 0
           fi
-          certificate="$RUNNER_TEMP/smart-lab-index-codesign.p12"
-          keychain="$RUNNER_TEMP/smart-lab-index-signing.keychain-db"
+          certificate="$RUNNER_TEMP/laboverlay-codesign.p12"
+          keychain="$RUNNER_TEMP/laboverlay-signing.keychain-db"
           keychain_password="$(openssl rand -hex 24)"
           printf '%s' "$CERTIFICATE_BASE64" | base64 -D > "$certificate"
           security create-keychain -p "$keychain_password" "$keychain"
@@ -126,11 +126,11 @@ jobs:
           security default-keychain -s "$keychain"
           echo "SMART_LAB_MACOS_SIGNING_IDENTITY=$SIGNING_IDENTITY" >> "$GITHUB_ENV"
           if [[ -n "$NOTARY_APPLE_ID" && -n "$NOTARY_PASSWORD" && -n "$NOTARY_TEAM_ID" ]]; then
-            xcrun notarytool store-credentials smart-lab-index-notary \
+            xcrun notarytool store-credentials laboverlay-notary \
               --apple-id "$NOTARY_APPLE_ID" \
               --password "$NOTARY_PASSWORD" \
               --team-id "$NOTARY_TEAM_ID"
-            echo "SMART_LAB_MACOS_NOTARY_PROFILE=smart-lab-index-notary" >> "$GITHUB_ENV"
+            echo "SMART_LAB_MACOS_NOTARY_PROFILE=laboverlay-notary" >> "$GITHUB_ENV"
           fi
 
       - name: Build and smoke-test desktop apps
@@ -154,10 +154,10 @@ jobs:
           name: desktop-app-${{ runner.os }}-${{ runner.arch }}
           path: |
             dist/pdf-mcp-app-*.zip
-            dist/smart-lab-index-*.zip
-            dist/smart-lab-index-*.zip.sha256
-            dist/smart-lab-index-setup-*.exe
-            dist/smart-lab-index-setup-*.exe.sha256
+            dist/laboverlay-*.zip
+            dist/laboverlay-*.zip.sha256
+            dist/laboverlay-setup-*.exe
+            dist/laboverlay-setup-*.exe.sha256
 
   github-release:
     name: Publish GitHub release

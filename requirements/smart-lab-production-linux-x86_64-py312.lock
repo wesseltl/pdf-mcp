@@ -1,4 +1,4 @@
-# Hash-verified runtime wheels tested for Smart Lab Index 0.7.0.
+# Hash-verified runtime wheels tested for LabOverlay 0.7.0.
 # Target: CPython 3.12, Linux x86_64, glibc 2.34 or newer.
 # Regenerate and re-audit this file for every release or target change.
 --only-binary=:all:

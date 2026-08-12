@@ -1,8 +1,8 @@
-# Smart Lab Index First-Iteration Test Plan
+# LabOverlay First-Iteration Test Plan
 
 ## Purpose
 
-This plan defines the focused synthetic test strategy for the first modular Smart Lab Index
+This plan defines the focused synthetic test strategy for the first modular LabOverlay
 foundation. It covers the module registry, no-egress enforcement, filesystem discovery, parser
 contracts, assertion-based knowledge, SQLite durability, failure isolation, and preservation of the
 existing document-processing commands.
@@ -33,7 +33,7 @@ modules failed during import. The authoritative baseline must be captured after 
 
 ## Test Boundaries
 
-Use the existing `unittest` style. Add future Smart Lab tests as focused files such as:
+Use the existing `unittest` style. Add future LabOverlay tests as focused files such as:
 
 ```text
 tests/
@@ -61,7 +61,7 @@ wall-clock sleeps, or real laboratory data.
 
 ## Synthetic Vocabulary
 
-All new Smart Lab fixture entity values are limited to:
+All new LabOverlay fixture entity values are limited to:
 
 ```python
 LAB_ALPHA = "Lab Alpha"
@@ -74,7 +74,7 @@ ALEX_EXAMPLE = "Alex Example"
 
 Headers, predicates, file names, module IDs, and entity type names are schema vocabulary rather than
 fixture entities. Existing document-processor regression fixtures remain unchanged, but they must
-not be reused as Smart Lab domain evidence.
+not be reused as LabOverlay domain evidence.
 
 ## Generated Fixture Factories
 
@@ -308,7 +308,7 @@ module extraction:
 - `pdf-agent-mcp` still exposes the existing local extraction/profile tools, now delegating through
   compatible parser capabilities where practical.
 - `pdf-mcp-app` remains loopback-only, session-protected, and able to convert and download a result.
-- `pdf-agent-cloud-mcp` remains explicit opt-in, redacts secrets, and is blocked by Smart Lab
+- `pdf-agent-cloud-mcp` remains explicit opt-in, redacts secrets, and is blocked by LabOverlay
   no-egress mode before HTTP setup.
 - package/server metadata versions remain consistent.
 
@@ -400,7 +400,7 @@ evaluate-document-profile evaluations/simulated-customer/development.json
 evaluate-document-profile evaluations/simulated-customer/holdout.json
 ```
 
-The Smart Lab tests must run successfully with network access unavailable. CI should execute the
+The LabOverlay tests must run successfully with network access unavailable. CI should execute the
 full suite on Python 3.10, 3.11, and 3.12, preserving the current matrix.
 
 ## First-Iteration Exit Criteria

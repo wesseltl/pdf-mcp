@@ -1,4 +1,4 @@
-"""Tests for the Smart Lab Index Windows installer contract."""
+"""Tests for the LabOverlay Windows installer contract."""
 
 from __future__ import annotations
 
@@ -20,26 +20,26 @@ class SmartLabWindowsInstallerTests(unittest.TestCase):
         )
         self.assertIn("PrivilegesRequired=lowest", definition)
         self.assertIn(
-            "DefaultDirName={localappdata}\\Programs\\Smart Lab Index", definition
+            "DefaultDirName={localappdata}\\Programs\\LabOverlay", definition
         )
         self.assertIn("ArchitecturesAllowed=x64compatible", definition)
         self.assertIn("CloseApplications=yes", definition)
-        self.assertIn("UninstallDisplayIcon={app}\\smart-lab-index.exe", definition)
+        self.assertIn("UninstallDisplayIcon={app}\\laboverlay.exe", definition)
         self.assertNotIn("[UninstallDelete]", definition)
         self.assertNotIn(".smart-lab-index", definition)
 
     def test_installer_provides_start_menu_optional_desktop_and_launch(self) -> None:
         definition = installer_build.INNO_SCRIPT.read_text(encoding="utf-8")
 
-        self.assertIn('Name: "{group}\\Smart Lab Index"', definition)
+        self.assertIn('Name: "{group}\\LabOverlay"', definition)
         self.assertIn('Name: "desktopicon"', definition)
-        self.assertIn('Name: "{userdesktop}\\Smart Lab Index"', definition)
+        self.assertIn('Name: "{userdesktop}\\LabOverlay"', definition)
         self.assertIn("postinstall skipifsilent", definition)
 
     def test_installer_artifact_name_is_versioned_and_unambiguous(self) -> None:
         name = installer_build.installer_path().name
 
-        self.assertTrue(name.startswith("smart-lab-index-setup-v"))
+        self.assertTrue(name.startswith("laboverlay-setup-v"))
         self.assertTrue(name.endswith("-windows-x64.exe"))
 
     def test_configured_inno_compiler_is_used(self) -> None:

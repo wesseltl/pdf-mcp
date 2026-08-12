@@ -1,4 +1,4 @@
-# Smart Lab Index Controlled-Production Deployment
+# LabOverlay Controlled-Production Deployment
 
 This runbook targets one on-premises Linux host, one approved read-only filesystem scope, and a
 small trusted operator group. It does not claim regulatory validation, Windows/AD ACL enforcement,
@@ -43,13 +43,13 @@ index. The service account does not need package-install permissions.
 ```bash
 cd /approved-media
 sha256sum --ignore-missing -c python-distributions-SHA256SUMS
-sudo python3.12 -m venv /opt/smart-lab-index/venv
-sudo /opt/smart-lab-index/venv/bin/pip install --no-index \
+sudo python3.12 -m venv /opt/laboverlay/venv
+sudo /opt/laboverlay/venv/bin/pip install --no-index \
   --find-links /approved-media/wheelhouse --require-hashes \
   -r /approved-media/smart-lab-production-linux-x86_64-py312.lock
-sudo /opt/smart-lab-index/venv/bin/pip install --no-index --no-deps \
+sudo /opt/laboverlay/venv/bin/pip install --no-index --no-deps \
   /approved-media/pdf_agent_mcp-0.7.0-py3-none-any.whl
-/opt/smart-lab-index/venv/bin/pip check
+/opt/laboverlay/venv/bin/pip check
 ```
 
 ## Service account and paths
@@ -57,35 +57,35 @@ sudo /opt/smart-lab-index/venv/bin/pip install --no-index --no-deps \
 Example paths used by the supplied systemd units:
 
 ```bash
-sudo useradd --system --home /var/lib/smart-lab-index --shell /usr/sbin/nologin smart-lab-index
-sudo install -d -o smart-lab-index -g smart-lab-index -m 0700 /var/lib/smart-lab-index
-sudo install -d -o root -g smart-lab-index -m 0750 /etc/smart-lab-index
-sudo install -d -o root -g root -m 0755 /opt/smart-lab-index
+sudo useradd --system --home /var/lib/laboverlay --shell /usr/sbin/nologin laboverlay
+sudo install -d -o laboverlay -g laboverlay -m 0700 /var/lib/laboverlay
+sudo install -d -o root -g laboverlay -m 0750 /etc/laboverlay
+sudo install -d -o root -g root -m 0755 /opt/laboverlay
 ```
 
-Install the application in `/opt/smart-lab-index/venv`, then create the operator key as the service
+Install the application in `/opt/laboverlay/venv`, then create the operator key as the service
 account. The command prints the one-time browser password and stores the same value in a `0600` file.
 
 ```bash
-sudo -u smart-lab-index /opt/smart-lab-index/venv/bin/smart-lab-index init-operator \
-  --output /var/lib/smart-lab-index/operator.token
-sudo install -o smart-lab-index -g smart-lab-index -m 0600 \
-  /var/lib/smart-lab-index/operator.token /etc/smart-lab-index/operator.token
-sudo rm /var/lib/smart-lab-index/operator.token
+sudo -u laboverlay /opt/laboverlay/venv/bin/laboverlay init-operator \
+  --output /var/lib/laboverlay/operator.token
+sudo install -o laboverlay -g laboverlay -m 0600 \
+  /var/lib/laboverlay/operator.token /etc/laboverlay/operator.token
+sudo rm /var/lib/laboverlay/operator.token
 ```
 
 Copy and edit the environment and unit templates. If the source is not `/srv/lab-data`, also change
 the unit's `ConditionPathIsDirectory` and `ReadOnlyPaths` paths. Keep the source outside
-`/var/lib/smart-lab-index`. The service receives the operator key through systemd's read-only
+`/var/lib/laboverlay`. The service receives the operator key through systemd's read-only
 credential mount rather than opening the configuration copy directly.
 
 ```bash
-sudo install -o root -g smart-lab-index -m 0640 \
-  deploy/systemd/smart-lab-index.env.example /etc/smart-lab-index/smart-lab-index.env
-sudo install -o root -g root -m 0644 deploy/systemd/smart-lab-index*.service /etc/systemd/system/
-sudo install -o root -g root -m 0644 deploy/systemd/smart-lab-index-backup.timer /etc/systemd/system/
+sudo install -o root -g laboverlay -m 0640 \
+  deploy/systemd/laboverlay.env.example /etc/laboverlay/laboverlay.env
+sudo install -o root -g root -m 0644 deploy/systemd/laboverlay*.service /etc/systemd/system/
+sudo install -o root -g root -m 0644 deploy/systemd/laboverlay-backup.timer /etc/systemd/system/
 sudo systemctl daemon-reload
-sudo systemctl enable --now smart-lab-index.service smart-lab-index-backup.timer
+sudo systemctl enable --now laboverlay.service laboverlay-backup.timer
 ```
 
 The app performs one incremental run at startup and every configured interval. One malformed parser
@@ -99,8 +99,8 @@ The service listens only on `127.0.0.1`. Liveness and readiness reveal no indexe
 ```bash
 curl --fail http://127.0.0.1:8876/healthz
 curl --fail http://127.0.0.1:8876/readyz
-/opt/smart-lab-index/venv/bin/smart-lab-index health \
-  --database /var/lib/smart-lab-index/index.db
+/opt/laboverlay/venv/bin/laboverlay health \
+  --database /var/lib/laboverlay/index.db
 ```
 
 From an operator PC, use an SSH tunnel and open `http://127.0.0.1:8876/`. Enter username `operator`
@@ -118,21 +118,21 @@ plaintext and must be stored on an encrypted, access-controlled volume. Keep eac
 or inconsistent with the database.
 
 ```bash
-sudo -u smart-lab-index /opt/smart-lab-index/venv/bin/smart-lab-index backup \
-  --database /var/lib/smart-lab-index/index.db
-/opt/smart-lab-index/venv/bin/smart-lab-index verify-backup \
-  /var/lib/smart-lab-index/backups/index-YYYYMMDDTHHMMSSZ.db
+sudo -u laboverlay /opt/laboverlay/venv/bin/laboverlay backup \
+  --database /var/lib/laboverlay/index.db
+/opt/laboverlay/venv/bin/laboverlay verify-backup \
+  /var/lib/laboverlay/backups/index-YYYYMMDDTHHMMSSZ.db
 ```
 
 Restore is offline and fails while the running app owns the database. `--replace` first creates and
 verifies a pre-restore safety backup.
 
 ```bash
-sudo systemctl stop smart-lab-index.service
-sudo -u smart-lab-index /opt/smart-lab-index/venv/bin/smart-lab-index restore \
+sudo systemctl stop laboverlay.service
+sudo -u laboverlay /opt/laboverlay/venv/bin/laboverlay restore \
   /secure-backups/index-YYYYMMDDTHHMMSSZ.db \
-  --database /var/lib/smart-lab-index/index.db --replace
-sudo systemctl start smart-lab-index.service
+  --database /var/lib/laboverlay/index.db --replace
+sudo systemctl start laboverlay.service
 curl --fail http://127.0.0.1:8876/readyz
 ```
 

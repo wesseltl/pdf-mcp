@@ -1,1 +1,1 @@
-"""Static local operator interface for Smart Lab Index."""
+"""Static local operator interface for LabOverlay."""

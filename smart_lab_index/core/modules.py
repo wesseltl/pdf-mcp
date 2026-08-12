@@ -735,9 +735,9 @@ def _policy_block_reason(
     if not policy.no_egress:
         return ""
     if manifest.network_access not in {NetworkAccess.NONE, NetworkAccess.LOOPBACK}:
-        return "blocked by SMART_LAB_INDEX_NO_EGRESS"
+        return "blocked by LABOVERLAY_NO_EGRESS"
     if manifest.telemetry:
-        return "telemetry is blocked by SMART_LAB_INDEX_NO_EGRESS"
+        return "telemetry is blocked by LABOVERLAY_NO_EGRESS"
     if manifest.automatic_downloads:
-        return "automatic downloads are blocked by SMART_LAB_INDEX_NO_EGRESS"
+        return "automatic downloads are blocked by LABOVERLAY_NO_EGRESS"
     return ""

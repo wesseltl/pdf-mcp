@@ -10,7 +10,7 @@ from urllib.parse import urlparse
 ROOT = Path(__file__).resolve().parents[1]
 OFFER_PATHS = sorted((ROOT / "offers").glob("*.json"))
 BETA_PATH = ROOT / "beta" / "free-hosted-beta.json"
-SMART_LAB_BETA_PATH = ROOT / "beta" / "smart-lab-index-beta.json"
+LABOVERLAY_BETA_PATH = ROOT / "beta" / "laboverlay-beta.json"
 PUBLIC_FILES = (
     ROOT / "BETA_TERMS.md",
     ROOT / "COMMERCIAL_TERMS.md",
@@ -20,10 +20,10 @@ PUBLIC_FILES = (
     ROOT / "profile.schema.json",
     ROOT / "extraction-result.schema.json",
     BETA_PATH,
-    SMART_LAB_BETA_PATH,
+    LABOVERLAY_BETA_PATH,
     ROOT / "docs" / "index.html",
     ROOT / "docs" / "beta-terms.html",
-    ROOT / "docs" / "smart-lab-beta-terms.html",
+    ROOT / "docs" / "laboverlay-beta-terms.html",
     ROOT / "docs" / "terms.html",
     ROOT / "docs" / "privacy.html",
     ROOT / "docs" / "success.html",
@@ -31,8 +31,8 @@ PUBLIC_FILES = (
     ROOT / "docs" / "offers.js",
     ROOT / "docs" / "assets" / "hero-profile-checked-v2.jpg",
     ROOT / "docs" / "assets" / "hero-profile-checked-v2.webp",
-    ROOT / "docs" / "assets" / "smart-lab-index-workspace.png",
-    ROOT / "docs" / "assets" / "smart-lab-index-workspace-mobile.png",
+    ROOT / "docs" / "assets" / "laboverlay-workspace.png",
+    ROOT / "docs" / "assets" / "laboverlay-workspace-mobile.png",
     ROOT / "docs" / "examples" / "sample-invoice.pdf",
     ROOT / "docs" / "examples" / "sample-invoice-output.xlsx",
 )
@@ -244,15 +244,15 @@ def validate_beta_offer(path: Path, offer: dict) -> list[str]:
     return errors
 
 
-def validate_smart_lab_beta_offer(path: Path, offer: dict) -> list[str]:
+def validate_laboverlay_beta_offer(path: Path, offer: dict) -> list[str]:
     errors = []
     label = path.name
-    if offer.get("offer_id") != "smart-lab-index-request-beta":
-        errors.append(f"{label}: unexpected Smart Lab beta offer ID")
+    if offer.get("offer_id") != "laboverlay-request-beta":
+        errors.append(f"{label}: unexpected LabOverlay beta offer ID")
     if offer.get("offer_kind") != "local_software_beta":
         errors.append(f"{label}: local software beta offer kind is required")
     if offer.get("status") != "accepting_beta_requests":
-        errors.append(f"{label}: Smart Lab beta must remain request-only")
+        errors.append(f"{label}: LabOverlay beta must remain request-only")
 
     access = offer.get("access", {})
     if access.get("type") != "request_only" or access.get("billing") != "free_beta":
@@ -328,12 +328,12 @@ def validate_repository(
         else:
             notes.append("free hosted beta endpoint is published")
 
-    if SMART_LAB_BETA_PATH.is_file():
-        smart_lab_offer = load_offer(SMART_LAB_BETA_PATH)
+    if LABOVERLAY_BETA_PATH.is_file():
+        laboverlay_offer = load_offer(LABOVERLAY_BETA_PATH)
         errors.extend(
-            validate_smart_lab_beta_offer(SMART_LAB_BETA_PATH, smart_lab_offer)
+            validate_laboverlay_beta_offer(LABOVERLAY_BETA_PATH, laboverlay_offer)
         )
-        notes.append("Smart Lab Index beta is free and request-only")
+        notes.append("LabOverlay beta is free and request-only")
 
     live_offers = [offer for offer in offers if offer.get("checkout_url")]
     if live_offers:

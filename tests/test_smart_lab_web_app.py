@@ -1,4 +1,4 @@
-"""End-to-end tests for the local Smart Lab Index browser interface."""
+"""End-to-end tests for the local LabOverlay browser interface."""
 
 from __future__ import annotations
 
@@ -18,7 +18,12 @@ from smart_lab_index.modules.connectors.filesystem import (
     DEFAULT_MAX_FILES,
     DEFAULT_MAX_TOTAL_BYTES,
 )
-from smart_lab_index.web_app import _schedule_initial_index, create_server, main
+from smart_lab_index.web_app import (
+    DEFAULT_DATABASE,
+    _schedule_initial_index,
+    create_server,
+    main,
+)
 
 
 class SmartLabWebAppTests(unittest.TestCase):
@@ -713,7 +718,7 @@ class SmartLabWebAppMainTests(unittest.TestCase):
             [
                 call(
                     str(first_root),
-                    database="~/.smart-lab-index/index.db",
+                    database=DEFAULT_DATABASE,
                     source_id="explicit-source",
                     policy=RuntimePolicy(no_egress=False),
                     disabled_module_ids=[],
@@ -729,7 +734,7 @@ class SmartLabWebAppMainTests(unittest.TestCase):
                 ),
                 call(
                     second_root,
-                    database="~/.smart-lab-index/index.db",
+                    database=DEFAULT_DATABASE,
                     source_id=None,
                     policy=RuntimePolicy(no_egress=False),
                     disabled_module_ids=[],

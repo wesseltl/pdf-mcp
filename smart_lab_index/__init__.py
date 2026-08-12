@@ -1,4 +1,7 @@
-"""Smart Lab Index modular-monolith foundation."""
+"""LabOverlay modular-monolith foundation.
+
+The ``smart_lab_index`` import path remains stable for module compatibility.
+"""
 
 from __future__ import annotations
 

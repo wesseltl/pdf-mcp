@@ -42,7 +42,7 @@ class SmartLabCredentialTests(unittest.TestCase):
 
     @unittest.skipUnless(os.name == "posix", "POSIX systemd credential contract")
     def test_systemd_credential_contract_is_root_owned_and_tightly_scoped(self) -> None:
-        credential_directory = Path("/run/credentials/smart-lab-index.service")
+        credential_directory = Path("/run/credentials/laboverlay.service")
         target = credential_directory / "operator.token"
         directory = SimpleNamespace(
             st_mode=stat.S_IFDIR | 0o550,

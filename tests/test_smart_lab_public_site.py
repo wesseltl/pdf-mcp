@@ -1,4 +1,4 @@
-"""Checks for the Smart Lab Index public request-only beta page."""
+"""Checks for the LabOverlay public request-only beta page."""
 
 from __future__ import annotations
 
@@ -52,8 +52,8 @@ class SmartLabPublicSiteTests(unittest.TestCase):
         cls.parser = AssetCollector()
         cls.parser.feed(cls.html)
 
-    def test_homepage_leads_with_smart_lab_and_request_only_beta(self) -> None:
-        self.assertIn('<h1 id="hero-title">Smart Lab Index</h1>', self.html)
+    def test_homepage_leads_with_laboverlay_and_request_only_beta(self) -> None:
+        self.assertIn('<h1 id="hero-title">LabOverlay</h1>', self.html)
         self.assertIn("Find what your lab has", self.html)
         self.assertIn("Request beta access", self.html)
         self.assertIn("Agent-readable beta offer", self.html)
@@ -61,9 +61,9 @@ class SmartLabPublicSiteTests(unittest.TestCase):
         self.assertNotIn("Download the simple app", self.html)
         self.assertNotIn("buy.stripe.com", self.html)
 
-    def test_structured_data_describes_limited_free_smart_lab_beta(self) -> None:
+    def test_structured_data_describes_limited_free_laboverlay_beta(self) -> None:
         payload = json.loads("".join(self.parser.json_ld))
-        self.assertEqual(payload["name"], "Smart Lab Index")
+        self.assertEqual(payload["name"], "LabOverlay")
         self.assertEqual(payload["softwareVersion"], "0.7.0")
         self.assertEqual(payload["offers"]["price"], "0.00")
         self.assertEqual(
@@ -81,8 +81,8 @@ class SmartLabPublicSiteTests(unittest.TestCase):
 
     def test_workspace_images_have_stable_desktop_and_mobile_dimensions(self) -> None:
         expected = {
-            "smart-lab-index-workspace.png": (1600, 1000),
-            "smart-lab-index-workspace-mobile.png": (390, 1200),
+            "laboverlay-workspace.png": (1600, 1000),
+            "laboverlay-workspace-mobile.png": (390, 1200),
         }
         for name, dimensions in expected.items():
             with self.subTest(image=name):

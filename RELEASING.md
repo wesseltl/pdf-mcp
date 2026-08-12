@@ -48,11 +48,11 @@ will still publish successfully.
    python scripts/build_smart_lab_windows_installer.py
    ```
 
-   The Smart Lab build writes matching SHA-256 manifests. On Windows, the installer build performs
+   The LabOverlay build writes matching SHA-256 manifests. On Windows, the installer build performs
    a silent per-user install, exercises the installed app through the complete synthetic index, and
    uninstalls it before accepting the artifact. The installer has a stable application ID so a newer
    release upgrades the existing installation. It never removes the user's
-   `%USERPROFILE%\.smart-lab-index` data directory.
+   `%USERPROFILE%\.laboverlay` data directory.
 
    Windows and macOS builds are unsigned unless release credentials are configured. The same
    Windows Authenticode identity signs both the application executable and Setup executable. For
@@ -71,7 +71,7 @@ will still publish successfully.
 
    Set repository variable `DESKTOP_SIGNING_REQUIRED=true` only after the Windows and macOS
    credentials are installed. With that variable enabled, those platform builds fail closed rather
-   than publishing unsigned Smart Lab artifacts. macOS notarization runs when all three notary
+   than publishing unsigned LabOverlay artifacts. macOS notarization runs when all three notary
    credentials are present.
 
 4. Run the paid-beta metadata and launch checks:
@@ -89,9 +89,9 @@ will still publish successfully.
    git push origin "v$VERSION"
    ```
 
-The `Publish` workflow builds and smoke-tests the PDF converter and Smart Lab Index standalone apps
+The `Publish` workflow builds and smoke-tests the PDF converter and LabOverlay standalone apps
 on Windows, macOS, and Linux, then creates a GitHub release with those archives, the Windows Setup
-executable, and the Python distributions. The Smart Lab smoke test runs the compiled executable
+executable, and the Python distributions. The LabOverlay smoke test runs the compiled executable
 through the complete synthetic no-egress index; Windows additionally validates install and
 uninstall. When
 `PYPI_PUBLISH_ENABLED=true`, it also uploads the package to PyPI and, after that succeeds, publishes

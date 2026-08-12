@@ -21,6 +21,23 @@ DEFAULT_PARSER_MEMORY_BYTES = 1024 * 1024 * 1024
 DEFAULT_PARSER_OUTPUT_BYTES = 128 * 1024 * 1024
 
 
+def _aliased_value(
+    values: Mapping[str, str],
+    name: str,
+    legacy_name: str,
+) -> tuple[str | None, str]:
+    """Read a renamed setting without allowing contradictory policy values."""
+    current_present = name in values
+    legacy_present = legacy_name in values
+    if current_present and legacy_present and values[name] != values[legacy_name]:
+        raise ConfigurationError(f"{name} conflicts with legacy {legacy_name}")
+    if current_present:
+        return values[name], name
+    if legacy_present:
+        return values[legacy_name], legacy_name
+    return None, name
+
+
 def parse_boolean(value: str | None, *, name: str, default: bool = False) -> bool:
     """Parse a boolean without silently accepting misspelled security settings."""
     if value is None:
@@ -37,9 +54,14 @@ def parse_boolean(value: str | None, *, name: str, default: bool = False) -> boo
 
 def no_egress_enabled(environment: Mapping[str, str] | None = None) -> bool:
     values = os.environ if environment is None else environment
+    value, name = _aliased_value(
+        values,
+        "LABOVERLAY_NO_EGRESS",
+        "SMART_LAB_INDEX_NO_EGRESS",
+    )
     return parse_boolean(
-        values.get("SMART_LAB_INDEX_NO_EGRESS"),
-        name="SMART_LAB_INDEX_NO_EGRESS",
+        value,
+        name=name,
         default=False,
     )
 
@@ -113,32 +135,62 @@ class RuntimePolicy:
     @classmethod
     def from_env(cls, environment: Mapping[str, str] | None = None) -> RuntimePolicy:
         values = os.environ if environment is None else environment
+        production_value, production_name = _aliased_value(
+            values,
+            "LABOVERLAY_PRODUCTION",
+            "SMART_LAB_INDEX_PRODUCTION",
+        )
         production_mode = parse_boolean(
-            values.get("SMART_LAB_INDEX_PRODUCTION"),
-            name="SMART_LAB_INDEX_PRODUCTION",
+            production_value,
+            name=production_name,
             default=False,
+        )
+        isolation_value, isolation_name = _aliased_value(
+            values,
+            "LABOVERLAY_PARSER_ISOLATION",
+            "SMART_LAB_INDEX_PARSER_ISOLATION",
+        )
+        timeout_value, timeout_name = _aliased_value(
+            values,
+            "LABOVERLAY_PARSER_TIMEOUT_SECONDS",
+            "SMART_LAB_INDEX_PARSER_TIMEOUT_SECONDS",
+        )
+        cpu_value, cpu_name = _aliased_value(
+            values,
+            "LABOVERLAY_PARSER_CPU_SECONDS",
+            "SMART_LAB_INDEX_PARSER_CPU_SECONDS",
+        )
+        memory_value, memory_name = _aliased_value(
+            values,
+            "LABOVERLAY_PARSER_MEMORY_MB",
+            "SMART_LAB_INDEX_PARSER_MEMORY_MB",
+        )
+        output_value, output_name = _aliased_value(
+            values,
+            "LABOVERLAY_PARSER_OUTPUT_MB",
+            "SMART_LAB_INDEX_PARSER_OUTPUT_MB",
         )
         return cls(
             no_egress=no_egress_enabled(values) or production_mode,
             parser_isolation=parse_boolean(
-                values.get("SMART_LAB_INDEX_PARSER_ISOLATION"),
-                name="SMART_LAB_INDEX_PARSER_ISOLATION",
+                isolation_value,
+                name=isolation_name,
                 default=True,
             ),
             parser_timeout_seconds=_positive_float(
-                values.get("SMART_LAB_INDEX_PARSER_TIMEOUT_SECONDS"),
-                name="SMART_LAB_INDEX_PARSER_TIMEOUT_SECONDS",
+                timeout_value,
+                name=timeout_name,
                 default=DEFAULT_PARSER_TIMEOUT_SECONDS,
             ),
             parser_cpu_seconds=_positive_int(
-                values.get("SMART_LAB_INDEX_PARSER_CPU_SECONDS"),
-                name="SMART_LAB_INDEX_PARSER_CPU_SECONDS",
+                cpu_value,
+                name=cpu_name,
                 default=DEFAULT_PARSER_CPU_SECONDS,
             ),
             parser_memory_bytes=(
                 _positive_int(
-                    values.get("SMART_LAB_INDEX_PARSER_MEMORY_MB"),
-                    name="SMART_LAB_INDEX_PARSER_MEMORY_MB",
+                    memory_value,
+                    name=memory_name,
                     default=DEFAULT_PARSER_MEMORY_BYTES // (1024 * 1024),
                 )
                 * 1024
@@ -146,8 +198,8 @@ class RuntimePolicy:
             ),
             parser_output_bytes=(
                 _positive_int(
-                    values.get("SMART_LAB_INDEX_PARSER_OUTPUT_MB"),
-                    name="SMART_LAB_INDEX_PARSER_OUTPUT_MB",
+                    output_value,
+                    name=output_name,
                     default=DEFAULT_PARSER_OUTPUT_BYTES // (1024 * 1024),
                 )
                 * 1024

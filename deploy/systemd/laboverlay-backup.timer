@@ -1,11 +1,11 @@
 [Unit]
-Description=Daily verified Smart Lab Index backup
+Description=Daily verified LabOverlay backup
 
 [Timer]
 OnCalendar=*-*-* 02:15:00
 Persistent=true
 RandomizedDelaySec=15m
-Unit=smart-lab-index-backup.service
+Unit=laboverlay-backup.service
 
 [Install]
 WantedBy=timers.target

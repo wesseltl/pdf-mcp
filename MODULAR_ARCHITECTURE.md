@@ -1,14 +1,14 @@
-# Smart Lab Index Modular Architecture
+# LabOverlay Modular Architecture
 
 Status: Lead-approved and implemented for foundation version `0.1.0`
 
-Scope: first Smart Lab Index foundation iteration
+Scope: first LabOverlay foundation iteration
 
 Repository baseline: `pdf-agent-mcp` 0.4.0, Python 3.10+, no durable database
 
 ## 1. Decision Summary
 
-Build Smart Lab Index as one Python modular monolith with three clear layers:
+Build LabOverlay as one Python modular monolith with three clear layers:
 
 1. A small `smart_lab_index.core` package owns durable knowledge concepts, module contracts,
    orchestration policy, configuration policy, and repository interfaces.
@@ -65,7 +65,7 @@ be introduced cleanly without migrating an existing database.
 No customer-specific production behavior was found in the Python package. The `lab-coa-v1` template
 is a generic example. `evaluations/simulated-customer` is explicitly fictional and contains
 Northstar Water example data; it must remain test/evaluation material and must not become Core or
-domain-pack defaults. Seller and payment metadata also remain outside Smart Lab Index runtime logic.
+domain-pack defaults. Seller and payment metadata also remain outside LabOverlay runtime logic.
 
 ### Lead integration outcome
 
@@ -680,7 +680,7 @@ overrides:
 
 ```toml
 [core]
-database_path = "./smart-lab-index.sqlite3"
+database_path = "./laboverlay.sqlite3"
 no_egress = true
 
 [sources.lab_alpha]
@@ -716,13 +716,13 @@ Environment variables are for deployment policy and secret references, not an al
 configuration system. Reserve:
 
 ```text
-SMART_LAB_INDEX_CONFIG
-SMART_LAB_INDEX_DATABASE
-SMART_LAB_INDEX_NO_EGRESS
-SMART_LAB_INDEX_SECRET_<NAME>
+LABOVERLAY_CONFIG
+LABOVERLAY_DATABASE
+LABOVERLAY_NO_EGRESS
+LABOVERLAY_SECRET_<NAME>
 ```
 
-An invalid boolean environment value is a startup error. `SMART_LAB_INDEX_NO_EGRESS=true` overrides
+An invalid boolean environment value is a startup error. `LABOVERLAY_NO_EGRESS=true` overrides
 the file and cannot be turned off by a module. Secrets are resolved at initialization, redacted from
 logs, and never persisted in module configuration or index-run snapshots; snapshots store only secret
 names and a configuration hash.
@@ -750,7 +750,7 @@ spawning behavior, model storage, and that it performs no automatic model downlo
 than no-egress may later disable loopback too.
 
 The current `pdf_mcp.cloud_client` and hosted MCP bridge declare external network use and must not be
-registered in the default Smart Lab Index composition. During migration, their entry point must check
+registered in the default LabOverlay composition. During migration, their entry point must check
 the effective no-egress policy and fail before reading a document when no-egress is true.
 
 Built-in parsers require no network. Frontend assets must continue to be package-local, as they are in
@@ -949,7 +949,7 @@ require responsibility; Core must not assume every asset needs an owner.
 
 ## 20. UI Capability Model
 
-The first Smart Lab UI calls application query/command services; it does not query SQLite or module
+The first LabOverlay UI calls application query/command services; it does not query SQLite or module
 objects directly. Core views such as Overview, Entities, Assertions, Provenance, Sources, Issues,
 Review, Index Runs, and Modules are always available when their Core service is enabled.
 
@@ -1053,11 +1053,11 @@ Additional rules:
   registration, deterministic resolver stages, and narrowly defined issue rules.
 - Build the synthetic `sample_lab` conflict scenario entirely offline.
 
-### Step 6: Add Smart Lab query/UI adapters
+### Step 6: Add LabOverlay query/UI adapters
 
 - Add application queries for overview, entities, assertions/provenance, sources, issues, review,
   index runs, and modules.
-- Introduce a new Smart Lab browser entry point backed by these services. Keep the existing converter
+- Introduce a new LabOverlay browser entry point backed by these services. Keep the existing converter
   entry point until its document-export use case is available as an optional module/view.
 - Update MCP tools to call application services rather than concrete parsers where equivalent tools
   are retained.
@@ -1068,11 +1068,11 @@ Additional rules:
   an export module. Preserve its deterministic evidence and fingerprint behavior.
 - Reuse `output_safety.py` in `export.spreadsheet`.
 - Keep `cloud_client.py` as an explicitly enabled external-processing compatibility module or remove it
-  from Smart Lab packaging by product decision; never make it a fallback.
+  from LabOverlay packaging by product decision; never make it a fallback.
 
 ### Step 8: Product rename and compatibility retirement
 
-- Change distribution/entry-point branding only after the Smart Lab indexing path is usable.
+- Change distribution/entry-point branding only after the LabOverlay indexing path is usable.
 - Publish a deprecation window for `pdf-agent-mcp` commands and retain adapters for at least one
   release if users depend on them.
 - Do not combine a package rename, database introduction, and parser rewrite in one release.
@@ -1143,7 +1143,7 @@ These deferrals keep the Core small and make the first modular boundary testable
 9. **UI modules:** approve declarative built-in view contributions only; defer arbitrary runtime
    frontend plugins.
 10. **Hosted bridge:** decide whether the existing hosted extraction bridge remains a separately
-    packaged compatibility capability or is excluded from future Smart Lab Index distributions.
+    packaged compatibility capability or is excluded from future LabOverlay distributions.
 
 Approval of these decisions is sufficient to begin Step 1 without committing the product to
 microservices, a plugin marketplace, AI, or a particular laboratory/vendor implementation.

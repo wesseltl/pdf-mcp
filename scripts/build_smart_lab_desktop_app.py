@@ -1,4 +1,4 @@
-"""Build and smoke-test a standalone Smart Lab Index desktop archive."""
+"""Build and smoke-test a standalone LabOverlay desktop archive."""
 
 from __future__ import annotations
 
@@ -22,11 +22,11 @@ from typing import BinaryIO
 from smart_lab_index import __version__
 
 ROOT = Path(__file__).resolve().parents[1]
-BUILD_ROOT = ROOT / "build" / "smart-lab-desktop-app"
+BUILD_ROOT = ROOT / "build" / "laboverlay-desktop-app"
 APP_DIST = BUILD_ROOT / "dist"
 FINAL_DIST = ROOT / "dist"
-APP_NAME = "smart-lab-index"
-APP_DISPLAY_NAME = "Smart Lab Index"
+APP_NAME = "laboverlay"
+APP_DISPLAY_NAME = "LabOverlay"
 APP_PUBLISHER = "Wessel ter Laak"
 SIGNING_REQUIRED_ENV = "SMART_LAB_REQUIRE_SIGNING"
 _SMOKE_ENVIRONMENT = {
@@ -343,7 +343,7 @@ def _wait_for_expected_index(
             if token is None:
                 with urllib.request.urlopen(url, timeout=1) as response:
                     page = response.read().decode("utf-8")
-                if "<title>Smart Lab Index</title>" not in page:
+                if "<title>LabOverlay</title>" not in page:
                     raise RuntimeError("desktop app returned an unexpected page")
                 match = re.search(
                     r'name="smart-lab-session" content="([^"]+)"',
@@ -491,11 +491,11 @@ def archive_app(signing_status: str) -> Path:
         ),
     }[signing_status]
     (staging / "README.txt").write_text(
-        "Smart Lab Index local operator app\n"
-        "==================================\n\n"
+        "LabOverlay local operator app\n"
+        "=============================\n\n"
         f"{launch_instruction}\n"
         "The first time, connect a laboratory folder in the system dialog. The local browser "
-        "workspace opens and starts a read-only file sync. Smart Lab Index remembers that folder "
+        "workspace opens and starts a read-only file sync. LabOverlay remembers that folder "
         "and repeats incremental syncs automatically. Use Manage source to switch folders and "
         "Close application when finished.\n\n"
         "The desktop flow starts in no-egress mode and serves only bundled assets on loopback. "

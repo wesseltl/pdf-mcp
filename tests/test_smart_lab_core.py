@@ -1,4 +1,4 @@
-"""Focused tests for Smart Lab Index Core infrastructure."""
+"""Focused tests for LabOverlay Core infrastructure."""
 
 from __future__ import annotations
 
@@ -35,6 +35,7 @@ from smart_lab_index.core.modules import (
     NoEgressViolation,
     SmartLabModule,
 )
+from smart_lab_index.core.paths import default_state_directory
 from smart_lab_index.core.storage import KnowledgeStore, StorageError
 
 
@@ -223,16 +224,37 @@ class ModuleRegistryTests(unittest.TestCase):
 
     def test_invalid_no_egress_value_fails_closed(self):
         with self.assertRaises(ConfigurationError):
-            RuntimePolicy.from_env({"SMART_LAB_INDEX_NO_EGRESS": "tru"})
+            RuntimePolicy.from_env({"LABOVERLAY_NO_EGRESS": "tru"})
+
+    def test_legacy_policy_settings_remain_compatible_but_cannot_conflict(self):
+        policy = RuntimePolicy.from_env({"SMART_LAB_INDEX_NO_EGRESS": "true"})
+        self.assertTrue(policy.no_egress)
+
+        with self.assertRaisesRegex(ConfigurationError, "conflicts"):
+            RuntimePolicy.from_env({
+                "LABOVERLAY_NO_EGRESS": "true",
+                "SMART_LAB_INDEX_NO_EGRESS": "false",
+            })
 
     def test_non_finite_parser_timeout_fails_closed(self):
         for value in ("nan", "inf", "-inf"):
             with self.subTest(value=value), self.assertRaises(ConfigurationError):
                 RuntimePolicy.from_env({
-                    "SMART_LAB_INDEX_PARSER_TIMEOUT_SECONDS": value,
+                    "LABOVERLAY_PARSER_TIMEOUT_SECONDS": value,
                 })
         with self.assertRaises(ConfigurationError):
             RuntimePolicy(parser_timeout_seconds=float("nan"))
+
+    def test_default_state_directory_reuses_only_an_existing_legacy_install(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            home = Path(temporary)
+            self.assertEqual(default_state_directory(home), home / ".laboverlay")
+            legacy = home / ".smart-lab-index"
+            legacy.mkdir()
+            self.assertEqual(default_state_directory(home), legacy)
+            current = home / ".laboverlay"
+            current.mkdir()
+            self.assertEqual(default_state_directory(home), current)
 
     def test_snapshot_redacts_declared_and_conventionally_named_secrets(self):
         schema = {

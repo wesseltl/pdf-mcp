@@ -1,4 +1,4 @@
-"""Stable Core contracts for Smart Lab Index."""
+"""Stable Core contracts for LabOverlay."""
 
 from smart_lab_index.core.config import RuntimePolicy
 from smart_lab_index.core.events import Event, EventBus, EventType

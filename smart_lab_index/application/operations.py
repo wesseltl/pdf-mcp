@@ -123,7 +123,7 @@ def verify_backup(
         page_count = int(connection.execute("PRAGMA page_count").fetchone()[0])
         journal_mode = str(connection.execute("PRAGMA journal_mode").fetchone()[0])
     except sqlite3.Error as exc:
-        raise StorageError("backup is not a valid Smart Lab Index database") from exc
+        raise StorageError("backup is not a valid LabOverlay database") from exc
     finally:
         connection.close()
     schema_version = applied[-1] if applied else 0

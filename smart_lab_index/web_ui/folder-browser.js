@@ -184,7 +184,7 @@ async function cancelSelection() {
     ui.stopped = true;
     document.querySelector(".picker-shell").innerHTML = `
       <section class="closed-state">
-        <div class="closed-mark" aria-hidden="true">SL</div>
+        <div class="closed-mark" aria-hidden="true">LO</div>
         <h1>Folder selection cancelled</h1>
         <p>You can close this tab.</p>
       </section>`;

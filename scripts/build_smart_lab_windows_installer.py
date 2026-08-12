@@ -1,4 +1,4 @@
-"""Build, sign, and smoke-test the Smart Lab Index Windows installer."""
+"""Build, sign, and smoke-test the LabOverlay Windows installer."""
 
 from __future__ import annotations
 
@@ -19,7 +19,7 @@ else:
     import build_smart_lab_desktop_app as desktop_build
 
 ROOT = Path(__file__).resolve().parents[1]
-INNO_SCRIPT = ROOT / "installer" / "windows" / "smart-lab-index.iss"
+INNO_SCRIPT = ROOT / "installer" / "windows" / "laboverlay.iss"
 INSTALLER_ARCHITECTURE = "windows-x64"
 INSTALLER_BASE_NAME = (
     f"{desktop_build.APP_NAME}-setup-v{__version__}-{INSTALLER_ARCHITECTURE}"
@@ -143,7 +143,7 @@ def main() -> int:
     args = parser.parse_args()
 
     if sys.platform != "win32":
-        raise RuntimeError("the Smart Lab Index installer can only be built on Windows")
+        raise RuntimeError("the LabOverlay installer can only be built on Windows")
 
     installer = build_installer(find_inno_compiler())
     signing_status = desktop_build.sign_windows_file(installer)

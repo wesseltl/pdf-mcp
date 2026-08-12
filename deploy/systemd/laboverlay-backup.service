@@ -1,15 +1,15 @@
 [Unit]
-Description=Create and verify a Smart Lab Index backup
-ConditionPathExists=/var/lib/smart-lab-index/index.db
+Description=Create and verify a LabOverlay backup
+ConditionPathExists=/var/lib/laboverlay/index.db
 
 [Service]
 Type=oneshot
-User=smart-lab-index
-Group=smart-lab-index
+User=laboverlay
+Group=laboverlay
 UMask=0077
-StateDirectory=smart-lab-index
+StateDirectory=laboverlay
 StateDirectoryMode=0700
-ExecStart=/opt/smart-lab-index/venv/bin/smart-lab-index backup --database /var/lib/smart-lab-index/index.db
+ExecStart=/opt/laboverlay/venv/bin/laboverlay backup --database /var/lib/laboverlay/index.db
 NoNewPrivileges=true
 ProtectSystem=strict
 ProtectHome=true
@@ -28,6 +28,6 @@ RestrictNamespaces=true
 SystemCallArchitectures=native
 CapabilityBoundingSet=
 AmbientCapabilities=
-ReadWritePaths=/var/lib/smart-lab-index
+ReadWritePaths=/var/lib/laboverlay
 RestrictAddressFamilies=AF_UNIX
 IPAddressDeny=any

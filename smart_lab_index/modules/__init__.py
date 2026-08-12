@@ -1,1 +1,1 @@
-"""Built-in Smart Lab Index capability modules."""
+"""Built-in LabOverlay capability modules."""

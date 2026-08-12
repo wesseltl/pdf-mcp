@@ -1,4 +1,4 @@
-# Smart Lab Index synthetic example
+# LabOverlay synthetic example
 
 Generate the fixture from the repository root:
 

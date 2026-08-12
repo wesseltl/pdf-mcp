@@ -16,6 +16,7 @@ from smart_lab_index.core.domain import SourceDefinition
 from smart_lab_index.core.events import EventBus
 from smart_lab_index.core.locking import DatabaseLease
 from smart_lab_index.core.modules import ModuleRegistry
+from smart_lab_index.core.paths import default_database_path
 from smart_lab_index.core.storage import KnowledgeStore
 from smart_lab_index.modules.connectors.filesystem import (
     DEFAULT_MAX_FILES,
@@ -73,7 +74,7 @@ class SmartLabApplication:
 def build_application(
     root: str | Path,
     *,
-    database: str | Path = "~/.smart-lab-index/index.db",
+    database: str | Path | None = None,
     source_id: str | None = None,
     policy: RuntimePolicy | None = None,
     disabled_module_ids: Iterable[str] = (),
@@ -84,6 +85,7 @@ def build_application(
     acquire_database_lease: bool = True,
 ) -> SmartLabApplication:
     """Register built-ins explicitly; no dynamic imports or hidden plugin loading."""
+    database = database or default_database_path()
     _validate_state_path(root, database)
     database_lease: DatabaseLease | None = None
     events = EventBus()

@@ -15,7 +15,7 @@ No application code was changed as part of this audit.
 The repository is a small Python document-table extraction product, not yet a knowledge-indexing
 platform. It has useful deterministic PDF and DOCX extraction, cell-level evidence, profile-driven
 validation, export safety, local evaluation, MCP adapters, and a secure loopback browser shell. These
-are credible inputs to future Smart Lab Index parser, extraction, export, evaluation, and UI-adapter
+are credible inputs to future LabOverlay parser, extraction, export, evaluation, and UI-adapter
 modules.
 
 The current package has no durable database, entity model, assertions, source registry, index runs,
@@ -24,7 +24,7 @@ permission model. Format selection and orchestration use direct imports and suff
 largest concentration is `pdf_mcp/verified.py`, which combines parser selection, mapping, validation,
 transient issues, review decisions, provenance assembly, version fingerprints, and export.
 
-The safest strategy is preservation through adapters: define stable Smart Lab Index contracts, wrap
+The safest strategy is preservation through adapters: define stable LabOverlay contracts, wrap
 the tested extractors behind parser modules, and keep the existing public commands working while the
 new core is introduced incrementally.
 
@@ -187,7 +187,7 @@ documents, issues, index runs, audit events, review decisions, or resolved-value
 `evidence`, and `issues` returned by profile extraction are operation-scoped dictionaries described by
 [`extraction-result.schema.json:44`](extraction-result.schema.json#L44) and
 [`extraction-result.schema.json:89`](extraction-result.schema.json#L89). They should not be mistaken for
-the future durable Smart Lab Index domain model.
+the future durable LabOverlay domain model.
 
 ## Dependencies
 
@@ -298,7 +298,7 @@ Ruff, module-boundary tests, migration tests, or automatic hostile-document reso
 
 ## Safely reusable functionality
 
-| Functionality | Smart Lab Index destination | Reuse assessment |
+| Functionality | LabOverlay destination | Reuse assessment |
 | --- | --- | --- |
 | PDF text/table extraction and cell bounding boxes | `parser.pdf` | Reuse algorithms and tests behind a normalized parser adapter. Remove file-policy ownership and private shared helpers from the PDF implementation. |
 | DOCX paragraph/table extraction and merged-cell signal | `parser.docx` | Reuse behind the same normalized parser contract. Extend structural provenance before persistence. |
@@ -314,7 +314,7 @@ Ruff, module-boundary tests, migration tests, or automatic hostile-document reso
 
 ## Capabilities that do not exist yet
 
-The following Smart Lab Index foundations require new design rather than refactoring labels onto current
+The following LabOverlay foundations require new design rather than refactoring labels onto current
 code:
 
 - stable Core domain models and repositories;

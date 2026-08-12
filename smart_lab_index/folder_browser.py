@@ -269,7 +269,7 @@ def choose_source_folder_in_browser(
     server, state = create_folder_browser_server(initial_directory, port=port)
     actual_port = server.server_address[1]
     url = f"http://127.0.0.1:{actual_port}/"
-    print(f"Choose a Smart Lab Index source folder at {url}")
+    print(f"Choose a LabOverlay source folder at {url}")
     if open_browser:
         threading.Timer(0.25, lambda: webbrowser.open(url)).start()
     try:

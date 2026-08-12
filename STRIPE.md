@@ -59,5 +59,5 @@ unset STRIPE_SECRET_KEY
 
 Review the changed offer files and run the complete test suite before publishing them. Agents only
 use checkout when an offer has `status: available`; otherwise they use the purchase-request flow.
-The complete Smart Lab subscription boundary is specified in
+The complete LabOverlay subscription boundary is specified in
 [SELF_SERVICE_ARCHITECTURE.md](SELF_SERVICE_ARCHITECTURE.md).

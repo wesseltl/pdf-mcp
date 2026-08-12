@@ -1,4 +1,4 @@
-"""Tests for Smart Lab Index desktop release trust helpers."""
+"""Tests for LabOverlay desktop release trust helpers."""
 
 from __future__ import annotations
 
@@ -68,7 +68,7 @@ class SmartLabDesktopBuildTests(unittest.TestCase):
 
     def test_checksum_manifest_matches_archive(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:
-            archive = Path(temporary) / "smart-lab-index.zip"
+            archive = Path(temporary) / "laboverlay.zip"
             archive.write_bytes(b"tested desktop archive")
 
             checksum = desktop_build.write_checksum(archive)
@@ -89,7 +89,7 @@ class SmartLabDesktopBuildTests(unittest.TestCase):
     def test_windows_assets_include_product_metadata_and_icon_sizes(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:
             root = Path(temporary)
-            icon = desktop_build.write_windows_icon(root / "smart-lab-index.ico")
+            icon = desktop_build.write_windows_icon(root / "laboverlay.ico")
             version_info = desktop_build.write_windows_version_info(
                 root / "version.txt", "1.2.3"
             )
@@ -101,7 +101,7 @@ class SmartLabDesktopBuildTests(unittest.TestCase):
 
         self.assertEqual((reserved, image_type), (0, 1))
         self.assertGreaterEqual(image_count, 6)
-        self.assertIn("ProductName', u'Smart Lab Index", metadata)
+        self.assertIn("ProductName', u'LabOverlay", metadata)
         self.assertIn("filevers=(1, 2, 3, 0)", metadata)
 
     def test_unsigned_is_explicit_without_platform_credentials(self) -> None:
@@ -121,7 +121,7 @@ class SmartLabDesktopBuildTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as temporary:
             root = Path(temporary)
             certificate = root / "publisher.pfx"
-            executable = root / "smart-lab-index.exe"
+            executable = root / "laboverlay.exe"
             certificate.write_bytes(b"certificate fixture")
             executable.write_bytes(b"executable fixture")
             environment = {

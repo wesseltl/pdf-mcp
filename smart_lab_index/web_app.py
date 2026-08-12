@@ -1,4 +1,4 @@
-"""Loopback-only browser interface for Smart Lab Index."""
+"""Loopback-only browser interface for LabOverlay."""
 
 from __future__ import annotations
 
@@ -34,8 +34,13 @@ from smart_lab_index.application import (
     load_desktop_settings,
     save_desktop_settings,
 )
+from smart_lab_index.branding import APP_CLI_NAME, PRODUCT_NAME
 from smart_lab_index.core.config import RuntimePolicy
 from smart_lab_index.core.locking import DatabaseLease
+from smart_lab_index.core.paths import (
+    default_database_path,
+    default_workspace_directory,
+)
 from smart_lab_index.core.security import load_operator_token, validate_operator_token
 from smart_lab_index.core.storage import KnowledgeStore
 from smart_lab_index.folder_browser import choose_source_folder_in_browser
@@ -56,7 +61,7 @@ from smart_lab_index.modules.connectors.filesystem import (
 
 LOGGER = logging.getLogger(__name__)
 DEFAULT_PORT = 8876
-DEFAULT_DATABASE = "~/.smart-lab-index/index.db"
+DEFAULT_DATABASE = str(default_database_path())
 STATIC_ASSETS = {
     "/app.js": ("app.js", "text/javascript; charset=utf-8"),
     "/favicon.svg": ("favicon.svg", "image/svg+xml"),
@@ -145,7 +150,7 @@ class WebAppState:
         if self.index_interval_seconds is not None:
             self._scheduler_thread = threading.Thread(
                 target=self._schedule_indexes,
-                name="smart-lab-index-scheduler",
+                name="laboverlay-scheduler",
                 daemon=True,
             )
             self._scheduler_thread.start()
@@ -271,7 +276,7 @@ class WebAppState:
             self._cancel_event.clear()
             self._index_thread = threading.Thread(
                 target=self._run_index,
-                name="smart-lab-index-job",
+                name="laboverlay-job",
                 daemon=False,
             )
             self._index_thread.start()
@@ -297,7 +302,7 @@ class WebAppState:
                     result["startup_errors"] = dict(application.startup_errors)
                 modules = application.registry.snapshot()
         except Exception as exc:  # noqa: BLE001 - background jobs need a bounded failure state
-            LOGGER.error("Smart Lab indexing failed (%s)", type(exc).__name__)
+            LOGGER.error("LabOverlay indexing failed (%s)", type(exc).__name__)
             error = f"{type(exc).__name__}: indexing could not be completed"
         with self._lock:
             if modules is not None:
@@ -418,7 +423,7 @@ class SmartLabHandler(LoopbackHandler):
             try:
                 self._send_json(200, self.app_state.snapshot())
             except Exception as exc:  # noqa: BLE001 - return a bounded local API error
-                LOGGER.error("Smart Lab state read failed (%s)", type(exc).__name__)
+                LOGGER.error("LabOverlay state read failed (%s)", type(exc).__name__)
                 self._send_json(500, {"error": "The index state could not be read."})
             return
         if parsed.path == "/api/search":
@@ -435,7 +440,7 @@ class SmartLabHandler(LoopbackHandler):
             except (TypeError, ValueError):
                 self._send_json(400, {"error": "Enter at least two search characters."})
             except Exception as exc:  # noqa: BLE001 - bounded local API error
-                LOGGER.error("Smart Lab search failed (%s)", type(exc).__name__)
+                LOGGER.error("LabOverlay search failed (%s)", type(exc).__name__)
                 self._send_json(500, {"error": "Search could not be completed."})
             return
         if parsed.path == "/api/health":
@@ -447,7 +452,7 @@ class SmartLabHandler(LoopbackHandler):
             try:
                 self._send_json(200, self.app_state.operational_health())
             except Exception as exc:  # noqa: BLE001 - bounded local API error
-                LOGGER.error("Smart Lab health check failed (%s)", type(exc).__name__)
+                LOGGER.error("LabOverlay health check failed (%s)", type(exc).__name__)
                 self._send_json(503, {"error": "Health checks could not be completed."})
             return
         self._send_json(404, {"error": "Not found."})
@@ -523,7 +528,7 @@ class SmartLabHandler(LoopbackHandler):
 def create_server(
     root: str | Path,
     *,
-    database: str | Path = "~/.smart-lab-index/index.db",
+    database: str | Path | None = None,
     source_id: str | None = None,
     policy: RuntimePolicy | None = None,
     disabled_module_ids: Iterable[str] = (),
@@ -542,7 +547,7 @@ def create_server(
         raise ValueError("port must be between 0 and 65535")
     state = WebAppState(
         root,
-        database=database,
+        database=database or default_database_path(),
         source_id=source_id,
         policy=policy or RuntimePolicy.from_env(),
         disabled_module_ids=disabled_module_ids,
@@ -564,7 +569,7 @@ def create_server(
         server = bind_loopback_server(
             handler,
             port,
-            error_message="No available local port was found for Smart Lab Index.",
+            error_message=f"No available local port was found for {PRODUCT_NAME}.",
         )
     except Exception:
         state.close()
@@ -589,7 +594,7 @@ def _desktop_database(root: str | Path) -> Path:
     identity = hashlib.sha256(
         str(Path(root).expanduser().resolve()).encode("utf-8")
     ).hexdigest()[:20]
-    return Path.home() / ".smart-lab-index" / "workspaces" / f"{identity}.db"
+    return default_workspace_directory() / f"{identity}.db"
 
 
 def _schedule_initial_index(state: WebAppState) -> threading.Timer:
@@ -602,8 +607,8 @@ def _schedule_initial_index(state: WebAppState) -> threading.Timer:
 
 def main(argv: Sequence[str] | None = None) -> int:
     parser = argparse.ArgumentParser(
-        prog="smart-lab-index-app",
-        description="Open the local Smart Lab Index operator interface.",
+        prog=APP_CLI_NAME,
+        description=f"Open the local {PRODUCT_NAME} operator interface.",
     )
     parser.add_argument(
         "root",
@@ -653,7 +658,7 @@ def main(argv: Sequence[str] | None = None) -> int:
     environment_policy = RuntimePolicy.from_env()
     production_mode = args.production or environment_policy.production_mode
     if production_mode and args.root is None:
-        print("smart-lab-index-app: production mode requires an explicit source root")
+        print(f"{APP_CLI_NAME}: production mode requires an explicit source root")
         return 2
     try:
         operator_token = (
@@ -662,10 +667,10 @@ def main(argv: Sequence[str] | None = None) -> int:
             else load_operator_token(args.operator_token_file)
         )
     except ValueError as exc:
-        print(f"smart-lab-index-app: {exc}")
+        print(f"{APP_CLI_NAME}: {exc}")
         return 2
     if production_mode and operator_token is None:
-        print("smart-lab-index-app: production mode requires --operator-token-file")
+        print(f"{APP_CLI_NAME}: production mode requires --operator-token-file")
         return 2
     desktop_mode = args.root is None and not production_mode
     settings_path = (
@@ -677,7 +682,7 @@ def main(argv: Sequence[str] | None = None) -> int:
         try:
             forget_desktop_settings(settings_path)
         except DesktopSettingsError as exc:
-            print(f"smart-lab-index-app: {exc}")
+            print(f"{APP_CLI_NAME}: {exc}")
             return 2
 
     remembered: DesktopSettings | None = None
@@ -685,7 +690,7 @@ def main(argv: Sequence[str] | None = None) -> int:
         try:
             remembered = load_desktop_settings(settings_path)
         except DesktopSettingsError as exc:
-            print(f"smart-lab-index-app: {exc}")
+            print(f"{APP_CLI_NAME}: {exc}")
             return 2
 
     index_interval_minutes = args.index_interval_minutes
@@ -698,7 +703,7 @@ def main(argv: Sequence[str] | None = None) -> int:
     if index_interval_minutes is not None and (
         not math.isfinite(index_interval_minutes) or index_interval_minutes <= 0
     ):
-        print("smart-lab-index-app: --index-interval-minutes must be positive")
+        print(f"{APP_CLI_NAME}: --index-interval-minutes must be positive")
         return 2
 
     picker_supported = folder_picker_available()
@@ -727,7 +732,7 @@ def main(argv: Sequence[str] | None = None) -> int:
                 open_browser=not args.no_browser,
             )
         except (OSError, RuntimeError, ValueError, sqlite3.Error) as exc:
-            print(f"smart-lab-index-app: {exc}")
+            print(f"{APP_CLI_NAME}: {exc}")
             return 2
         browser_started = not args.no_browser
         if root is None:
@@ -743,7 +748,7 @@ def main(argv: Sequence[str] | None = None) -> int:
     if managed_database:
         database = remembered_database or _desktop_database(root)
     if not math.isfinite(args.max_total_gb) or args.max_total_gb <= 0:
-        print("smart-lab-index-app: --max-total-gb must be positive")
+        print(f"{APP_CLI_NAME}: --max-total-gb must be positive")
         return 2
     index_on_start = args.index_on_start or production_mode or desktop_mode
     recovery: tuple[str | Path, str | Path, str | None] | None = None
@@ -779,7 +784,7 @@ def main(argv: Sequence[str] | None = None) -> int:
                 recovery = None
                 index_on_start = False
                 continue
-            print(f"smart-lab-index-app: {exc}")
+            print(f"{APP_CLI_NAME}: {exc}")
             return 2
         if desktop_mode:
             try:
@@ -796,13 +801,13 @@ def main(argv: Sequence[str] | None = None) -> int:
                 )
             except (DesktopSettingsError, OSError) as exc:
                 server.server_close()
-                print(f"smart-lab-index-app: desktop setup could not be saved: {exc}")
+                print(f"{APP_CLI_NAME}: desktop setup could not be saved: {exc}")
                 return 2
         recovery = None
         actual_port = server.server_address[1]
         requested_port = actual_port
         url = f"http://127.0.0.1:{actual_port}/"
-        print(f"Smart Lab Index is ready at {url}")
+        print(f"{PRODUCT_NAME} is ready at {url}")
         print(f"Source: {state.root}")
         print(f"Database: {Path(state.database).expanduser()}")
         print(f"No-egress: {'on' if state.policy.no_egress else 'off'}")
@@ -826,7 +831,7 @@ def main(argv: Sequence[str] | None = None) -> int:
             server.serve_forever(poll_interval=0.25)
         except KeyboardInterrupt:
             interrupted = True
-            print("\nStopping Smart Lab Index.")
+            print(f"\nStopping {PRODUCT_NAME}.")
         finally:
             if initial_index_timer is not None:
                 initial_index_timer.cancel()

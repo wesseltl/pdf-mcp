@@ -1,6 +1,6 @@
 <!-- mcp-name: io.github.wesseltl/pdf-mcp -->
 
-# Smart Lab Index
+# LabOverlay
 
 ![CI](https://github.com/wesseltl/pdf-mcp/actions/workflows/ci.yml/badge.svg)
 ![Python](https://img.shields.io/badge/python-3.10%2B-blue)
@@ -8,17 +8,17 @@
 ![License](https://img.shields.io/badge/license-MIT-green)
 
 **Build a local, evidence-backed index above the laboratory files and systems you already use.**
-Smart Lab Index discovers supported files, connects names and relationships, preserves why every
+LabOverlay discovers supported files, connects names and relationships, preserves why every
 fact is believed, and reports contradictions without editing the source.
 
 The modular product includes a local operator GUI and deterministic CLI. It works without AI, cloud
 services, telemetry, or network access. Start with the four-file synthetic example in
-[SMART_LAB_INDEX.md](SMART_LAB_INDEX.md).
+[LABOVERLAY.md](LABOVERLAY.md).
 
 ```bash
 python -m venv .venv
 .venv/bin/python -m pip install -e .
-.venv/bin/smart-lab-index-app
+.venv/bin/laboverlay-app
 ```
 
 Choose a laboratory folder once in the system dialog or bundled folder navigator. The browser opens
@@ -40,12 +40,15 @@ authentication, scheduled runs, disposable resource-limited parser processes, he
 exclusive database ownership, manifested backup/restore commands, and a hash-verified Linux runtime
 lock. Organization-specific validation and source-access approval remain required.
 
-The release workflow creates standalone `smart-lab-index` applications and SHA-256 manifests for
+The release workflow creates standalone `laboverlay` applications and SHA-256 manifests for
 Windows, macOS, and Linux. Windows users receive a standard per-user Setup executable as well as a
-portable ZIP. Setup needs no administrator rights, adds Smart Lab Index to the Start Menu, supports
-in-place upgrades and uninstall, and leaves indexes and settings in `%USERPROFILE%\.smart-lab-index`
+portable ZIP. Setup needs no administrator rights, adds LabOverlay to the Start Menu, supports
+in-place upgrades and uninstall, and leaves indexes and settings in `%USERPROFILE%\.laboverlay`
 untouched. Python is not required. Windows signing and macOS signing/notarization activate when
 publisher credentials are configured for the release workflow.
+
+Existing installations that only contain `%USERPROFILE%\.smart-lab-index` continue using that
+state directory automatically. The legacy `smart-lab-index` command aliases also remain available.
 
 ## Document ingestion compatibility
 
@@ -65,7 +68,7 @@ Need a profile and measured baseline for real documents? See the
 Agents can use the structured offer at
 [`offers/document-to-excel-pilot.json`](https://raw.githubusercontent.com/wesseltl/pdf-mcp/main/offers/document-to-excel-pilot.json).
 
-Website: [Smart Lab Index request-only beta and compatible document tools](https://wesseltl.github.io/pdf-mcp/).
+Website: [LabOverlay request-only beta and compatible document tools](https://wesseltl.github.io/pdf-mcp/).
 
 > **Current limitation:** PDF extraction supports born-digital documents. Scanned or image-only PDFs
 > require OCR, which is not included. An `accepted` decision means the configured checks passed; it

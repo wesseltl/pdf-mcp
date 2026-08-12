@@ -25,9 +25,9 @@ def load_beta_offer():
         return json.load(f)
 
 
-def load_smart_lab_beta_offer():
+def load_laboverlay_beta_offer():
     with open(
-        os.path.join(ROOT, "beta", "smart-lab-index-beta.json"),
+        os.path.join(ROOT, "beta", "laboverlay-beta.json"),
         encoding="utf-8",
     ) as f:
         return json.load(f)
@@ -38,7 +38,7 @@ class TestOfferMetadata(unittest.TestCase):
     def setUpClass(cls):
         cls.offers = load_offers()
         cls.beta_offer = load_beta_offer()
-        cls.smart_lab_beta_offer = load_smart_lab_beta_offer()
+        cls.laboverlay_beta_offer = load_laboverlay_beta_offer()
 
     def test_offer_ids_and_prices_are_stable(self):
         self.assertEqual(
@@ -190,8 +190,10 @@ class TestOfferMetadata(unittest.TestCase):
             "BETA_TERMS.md",
             "PRIVACY.md",
             "beta/free-hosted-beta.json",
+            "beta/laboverlay-beta.json",
             "beta/smart-lab-index-beta.json",
             "docs/beta-terms.html",
+            "docs/laboverlay-beta-terms.html",
             "docs/smart-lab-beta-terms.html",
             "docs/terms.html",
             "docs/privacy.html",
@@ -202,9 +204,9 @@ class TestOfferMetadata(unittest.TestCase):
             with self.subTest(path=relative_path):
                 self.assertTrue(os.path.isfile(os.path.join(ROOT, relative_path)))
 
-    def test_smart_lab_beta_is_local_free_and_request_only(self):
-        beta = self.smart_lab_beta_offer
-        self.assertEqual(beta["offer_id"], "smart-lab-index-request-beta")
+    def test_laboverlay_beta_is_local_free_and_request_only(self):
+        beta = self.laboverlay_beta_offer
+        self.assertEqual(beta["offer_id"], "laboverlay-request-beta")
         self.assertEqual(beta["offer_kind"], "local_software_beta")
         self.assertEqual(beta["status"], "accepting_beta_requests")
         self.assertEqual(beta["access"]["type"], "request_only")

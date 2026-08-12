@@ -1,4 +1,4 @@
-"""Stable identity normalization owned by Smart Lab Core."""
+"""Stable identity normalization owned by LabOverlay Core."""
 
 from __future__ import annotations
 

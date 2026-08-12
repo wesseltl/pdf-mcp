@@ -1,4 +1,4 @@
-"""Universal, provenance-first domain contracts owned by Smart Lab Core."""
+"""Universal, provenance-first domain contracts owned by LabOverlay Core."""
 
 from __future__ import annotations
 

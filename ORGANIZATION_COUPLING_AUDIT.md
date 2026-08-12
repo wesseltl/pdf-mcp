@@ -30,7 +30,7 @@ The repository does contain:
 5. hardcoded assumptions about the current product's PDF/DOCX conversion use case.
 
 The fictional data is acceptable as test data. The laboratory profile belongs in an optional document
-intelligence or `domain.general_lab` module, not in Smart Lab Index Core. Product/operator metadata
+intelligence or `domain.general_lab` module, not in LabOverlay Core. Product/operator metadata
 belongs in distribution and commercial configuration, not runtime domain logic.
 
 ## Data and fixture audit
@@ -59,7 +59,7 @@ Tracked DOCX fixture metadata names `pdf-mcp synthetic fixture generator`; track
 is anonymous with synthetic titles. No real organization metadata was found.
 
 The fictional pack is safe to retain as legacy parser/profile regression coverage. It should not become
-the canonical Smart Lab Index demonstration because it tests analytical-result rows rather than the
+the canonical LabOverlay demonstration because it tests analytical-result rows rather than the
 entity/assertion conflict scenario in the product vision.
 
 ### Private-data controls
@@ -98,19 +98,19 @@ navigation ([`pdf_mcp/web_app.py:30`](pdf_mcp/web_app.py#L30),
 [`pdf_mcp/web_ui/index.html:23`](pdf_mcp/web_ui/index.html#L23),
 [`pdf_mcp/web_ui/index.html:53`](pdf_mcp/web_ui/index.html#L53)). These are product-scope assumptions,
 not organization assumptions. They should become capabilities contributed by document ingestion and
-export modules rather than Smart Lab Index Core navigation.
+export modules rather than LabOverlay Core navigation.
 
 ## Product and repository coupling
 
 The following hardcoded identifiers are expected in the current product but must be isolated during a
-Smart Lab Index transition:
+LabOverlay transition:
 
 | Coupling | Evidence | Recommended destination |
 | --- | --- | --- |
 | Distribution name `pdf-agent-mcp` and six `pdf-*` commands | [`pyproject.toml:5`](pyproject.toml#L5), [`pyproject.toml:31`](pyproject.toml#L31) | Legacy compatibility package and command aliases during migration. |
 | Package description and keywords centered on PDF, DOCX, MCP, and agents | [`pyproject.toml:7`](pyproject.toml#L7), [`pyproject.toml:13`](pyproject.toml#L13) | Distribution metadata, eventually replaced for the new product package. |
 | MCP server names `pdf-extractor` and `pdf-cloud-extractor` | [`pdf_mcp/server.py:24`](pdf_mcp/server.py#L24), [`pdf_mcp/cloud_server.py:14`](pdf_mcp/cloud_server.py#L14) | Optional legacy MCP adapter configuration. |
-| Environment prefix `PDF_MCP_*` | [`pdf_mcp/extractor.py:15`](pdf_mcp/extractor.py#L15), [`pdf_mcp/cloud_client.py:35`](pdf_mcp/cloud_client.py#L35) | Compatibility configuration adapter; new Core settings should use one Smart Lab Index schema. |
+| Environment prefix `PDF_MCP_*` | [`pdf_mcp/extractor.py:15`](pdf_mcp/extractor.py#L15), [`pdf_mcp/cloud_client.py:35`](pdf_mcp/cloud_client.py#L35) | Compatibility configuration adapter; new Core settings should use one LabOverlay schema. |
 | Hardcoded extraction-result schema URL under the owner's repository | [`pdf_mcp/verified.py:550`](pdf_mcp/verified.py#L550) | Versioned schema registry/configuration, not extraction logic. |
 | Registry identity and repository URL | [`server.json:2`](server.json#L2) | Release metadata only. |
 | GitHub help and source links in the local UI | [`pdf_mcp/web_ui/index.html:17`](pdf_mcp/web_ui/index.html#L17), [`pdf_mcp/web_ui/index.html:138`](pdf_mcp/web_ui/index.html#L138) | Branding/help configuration, removable in no-egress mode. |
@@ -137,7 +137,7 @@ results. It is tightly bound to launch validation and website behavior, however.
 requirements ([`scripts/validate_launch.py:57`](scripts/validate_launch.py#L57),
 [`scripts/validate_launch.py:122`](scripts/validate_launch.py#L122)).
 
-These commercial assets should remain outside Smart Lab Index Core. If retained in the same repository,
+These commercial assets should remain outside LabOverlay Core. If retained in the same repository,
 place them under an explicitly separate distribution/commerce boundary and do not load them during
 local indexing.
 

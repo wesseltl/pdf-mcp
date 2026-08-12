@@ -46,8 +46,8 @@ class TestStripeConnector(unittest.TestCase):
 
     def test_recurring_plan_requires_and_preserves_entitlement_fulfillment(self):
         offer = {
-            "offer_id": "smart-lab-index",
-            "name": "Smart Lab Index",
+            "offer_id": "laboverlay",
+            "name": "LabOverlay",
             "summary": "Local-first laboratory knowledge index.",
             "price": {
                 "amount": "149.00",
@@ -75,8 +75,8 @@ class TestStripeConnector(unittest.TestCase):
 
     def test_recurring_plan_fails_without_automatic_fulfillment_contract(self):
         offer = {
-            "offer_id": "smart-lab-index",
-            "name": "Smart Lab Index",
+            "offer_id": "laboverlay",
+            "name": "LabOverlay",
             "summary": "Local-first laboratory knowledge index.",
             "price": {
                 "amount": "149.00",

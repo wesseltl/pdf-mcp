@@ -107,7 +107,7 @@ class LoopbackHandler(BaseHTTPRequestHandler):
             401,
             {"error": "Operator authentication is required."},
             headers={
-                "WWW-Authenticate": 'Basic realm="Smart Lab Index", charset="UTF-8"'
+                "WWW-Authenticate": 'Basic realm="LabOverlay", charset="UTF-8"'
             },
         )
 

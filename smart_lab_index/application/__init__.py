@@ -1,4 +1,4 @@
-"""Application services that compose Smart Lab Core and enabled modules."""
+"""Application services that compose LabOverlay Core and enabled modules."""
 
 from smart_lab_index.application.bootstrap import SmartLabApplication, build_application
 from smart_lab_index.application.desktop_settings import (

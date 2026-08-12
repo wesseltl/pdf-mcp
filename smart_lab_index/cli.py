@@ -1,4 +1,4 @@
-"""Local command-line interface for deterministic Smart Lab indexing."""
+"""Local command-line interface for deterministic LabOverlay indexing."""
 
 from __future__ import annotations
 
@@ -18,8 +18,13 @@ from smart_lab_index.application import (
     verify_backup,
     verify_backup_manifest,
 )
+from smart_lab_index.branding import CLI_NAME
 from smart_lab_index.core.config import RuntimePolicy
 from smart_lab_index.core.domain import IndexRunStatus
+from smart_lab_index.core.paths import (
+    default_database_path,
+    default_operator_token_path,
+)
 from smart_lab_index.core.security import OPERATOR_USERNAME, create_operator_token
 from smart_lab_index.core.storage import KnowledgeStore
 from smart_lab_index.modules.connectors.filesystem import (
@@ -29,15 +34,16 @@ from smart_lab_index.modules.connectors.filesystem import (
 
 
 def _parser() -> argparse.ArgumentParser:
+    default_database = str(default_database_path())
     parser = argparse.ArgumentParser(
-        prog="smart-lab-index",
+        prog=CLI_NAME,
         description="Build a local, provenance-first index above laboratory files.",
     )
     commands = parser.add_subparsers(dest="command", required=True)
 
     index = commands.add_parser("index", help="incrementally index a local folder")
     index.add_argument("root", help="read-only folder to scan recursively")
-    index.add_argument("--database", default="~/.smart-lab-index/index.db")
+    index.add_argument("--database", default=default_database)
     index.add_argument("--source-id")
     index.add_argument("--disable", action="append", default=[], metavar="MODULE_ID")
     index.add_argument("--enable", action="append", default=[], metavar="MODULE_ID")
@@ -72,13 +78,13 @@ def _parser() -> argparse.ArgumentParser:
     )
 
     status = commands.add_parser("status", help="show index counts and the latest run")
-    status.add_argument("--database", default="~/.smart-lab-index/index.db")
+    status.add_argument("--database", default=default_database)
 
     health = commands.add_parser("health", help="verify database integrity and schema")
-    health.add_argument("--database", default="~/.smart-lab-index/index.db")
+    health.add_argument("--database", default=default_database)
 
     inspect = commands.add_parser("inspect", help="show indexed knowledge as JSON")
-    inspect.add_argument("--database", default="~/.smart-lab-index/index.db")
+    inspect.add_argument("--database", default=default_database)
 
     modules = commands.add_parser("modules", help="show built-in module health and security")
     modules.add_argument("root", help="folder used to validate the filesystem connector")
@@ -93,12 +99,12 @@ def _parser() -> argparse.ArgumentParser:
     )
     operator.add_argument(
         "--output",
-        default="~/.smart-lab-index/operator.token",
+        default=str(default_operator_token_path()),
     )
     operator.add_argument("--force", action="store_true")
 
     backup = commands.add_parser("backup", help="create and verify a consistent backup")
-    backup.add_argument("--database", default="~/.smart-lab-index/index.db")
+    backup.add_argument("--database", default=default_database)
     backup.add_argument("--output")
 
     verify = commands.add_parser("verify-backup", help="verify a backup and its checksum")
@@ -112,7 +118,7 @@ def _parser() -> argparse.ArgumentParser:
 
     restore = commands.add_parser("restore", help="restore a verified backup while offline")
     restore.add_argument("backup")
-    restore.add_argument("--database", default="~/.smart-lab-index/index.db")
+    restore.add_argument("--database", default=default_database)
     restore.add_argument("--replace", action="store_true")
     return parser
 
@@ -183,7 +189,7 @@ def main(argv: list[str] | None = None) -> int:
             ))
             return 0
     except (OSError, RuntimeError, ValueError, sqlite3.Error) as exc:
-        print(f"smart-lab-index: {exc}", file=sys.stderr)
+        print(f"{CLI_NAME}: {exc}", file=sys.stderr)
         return 2
     return 2
 

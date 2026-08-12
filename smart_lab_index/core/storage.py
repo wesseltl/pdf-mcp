@@ -1,4 +1,4 @@
-"""Core-owned durable SQLite storage for the Smart Lab knowledge index."""
+"""Core-owned durable SQLite storage for the LabOverlay knowledge index."""
 
 from __future__ import annotations
 
@@ -50,7 +50,7 @@ def _id() -> str:
 class KnowledgeStore:
     """Single durable repository boundary owned by Core, not individual modules."""
 
-    def __init__(self, database: str | Path = "smart-lab-index.db") -> None:
+    def __init__(self, database: str | Path = "laboverlay.db") -> None:
         if str(database) == ":memory:":
             self.database = ":memory:"
         else:
@@ -139,7 +139,7 @@ class KnowledgeStore:
             for row in self.connection.execute("SELECT version FROM schema_migrations")
         }
         if any(version > SCHEMA_VERSION for version in applied):
-            raise StorageError("database schema is newer than this Smart Lab Core")
+            raise StorageError("database schema is newer than this LabOverlay Core")
         if 1 not in applied:
             self._apply_v1()
         if 2 not in applied:

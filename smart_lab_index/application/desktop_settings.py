@@ -12,6 +12,8 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
+from smart_lab_index.core.paths import default_desktop_settings_file
+
 SETTINGS_SCHEMA_VERSION = 1
 DEFAULT_DESKTOP_INDEX_INTERVAL_MINUTES = 15.0
 MAX_SETTINGS_BYTES = 64 * 1024
@@ -54,7 +56,7 @@ class DesktopSettings:
 
 
 def default_desktop_settings_path() -> Path:
-    return Path.home() / ".smart-lab-index" / "desktop-settings.json"
+    return default_desktop_settings_file()
 
 
 def load_desktop_settings(path: str | Path | None = None) -> DesktopSettings | None:

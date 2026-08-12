@@ -499,7 +499,7 @@ async function stopApplication() {
   if (ui.requestBusy || ui.stopped) {
     return;
   }
-  const confirmed = window.confirm("Close Smart Lab Index on this computer?");
+  const confirmed = window.confirm("Close LabOverlay on this computer?");
   if (!confirmed) {
     return;
   }
@@ -512,7 +512,7 @@ async function stopApplication() {
     ui.stopped = true;
     clearPoll();
     renderStopped();
-    announce("Smart Lab Index closed");
+    announce("LabOverlay closed");
   } catch (error) {
     ui.actionError = error instanceof Error ? error.message : "Unable to stop the application.";
     renderApplication();
@@ -1286,8 +1286,8 @@ function openTrustCenter() {
       Network: noEgress
         ? "External connections are blocked."
         : "External connections are allowed; review enabled modules before using sensitive data.",
-      "Source safety": "Source files are read only and are never modified by Smart Lab Index.",
-      Permissions: "Basic file permissions are observed. Access is not enforced by Smart Lab Index.",
+      "Source safety": "Source files are read only and are never modified by LabOverlay.",
+      Permissions: "Basic file permissions are observed. Access is not enforced by LabOverlay.",
       "System health": healthLabel,
       "Parser isolation": parserLabel,
       Automation: schedule,
@@ -1569,7 +1569,7 @@ function renderDecisionPanel(openIssues, latestRun) {
   panel.append(
     node("span", "panel-eyebrow", "Review queue"),
     statusBadge(issue.severity),
-    node("h2", "", observations.length > 1 ? "Which location should Smart Lab Index use?" : issueLabel(issue.code)),
+    node("h2", "", observations.length > 1 ? "Which location should LabOverlay use?" : issueLabel(issue.code)),
     node("p", "decision-subject", scalarText(issue.entity_name || evidence.subject_name, "Indexed item")),
     node(
       "p",
@@ -1953,7 +1953,7 @@ function issueTable(rows, caption) {
 function openIssueDetails(issue) {
   const observations = asArray(asObject(issue.evidence).observed_locations);
   openDetails(
-    observations.length > 1 ? "Which location should Smart Lab Index use?" : issueLabel(issue.code),
+    observations.length > 1 ? "Which location should LabOverlay use?" : issueLabel(issue.code),
     scalarText(issue.entity_name, "Review source evidence"),
     issue,
     ["severity", "status", "entity_name", "evidence", "reviews"],

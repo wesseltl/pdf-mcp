@@ -1,4 +1,4 @@
-# Smart Lab Index Security / No-Egress Baseline Review
+# LabOverlay Security / No-Egress Baseline Review
 
 ## Audit metadata
 
@@ -14,9 +14,10 @@ The remainder of this document preserves the pre-implementation baseline at comm
 The current foundation branch has since implemented the first-party application-policy controls and
 addressed the critical connector/provenance findings identified during integration:
 
-- Core now strictly parses `SMART_LAB_INDEX_NO_EGRESS`, and the built-in module registry blocks
+- Core now strictly parses `LABOVERLAY_NO_EGRESS` (with `SMART_LAB_INDEX_NO_EGRESS` retained as a
+  legacy alias), and the built-in module registry blocks
   configured-endpoint/internet modules before start while allowing explicit loopback modules.
-- Every current Smart Lab Index built-in exposes versioned capabilities plus network, file,
+- Every current LabOverlay built-in exposes versioned capabilities plus network, file,
   credential, dependency, configuration, lifecycle, health, telemetry, automatic-download,
   subprocess, and source-write metadata.
 - The retained hosted extraction bridge refuses in no-egress mode before cloud configuration is read
@@ -29,28 +30,28 @@ addressed the critical connector/provenance findings identified during integrati
   failures use bounded generic details, and configuration snapshots redact secret-like fields.
 - Source generations and transactional extractor processing preserve the last successful assertions
   when a changed source fails. Modules receive narrow read-only repository facades.
-- Smart Lab Index `0.2.0` adds a loopback-only operator GUI with a random browser-session token,
+- LabOverlay `0.2.0` adds a loopback-only operator GUI with a random browser-session token,
   same-origin checks on mutations, no-store responses, a restrictive CSP, bundled assets, bounded
   request bodies, and no external links or runtime asset requests. SQLite connections remain local
   to the request or background index thread.
-- Smart Lab Index `0.3.0` adds local folder selection and source switching. Dialog adapters execute
+- LabOverlay `0.3.0` adds local folder selection and source switching. Dialog adapters execute
   fixed platform commands without a shell, forward only required desktop environment variables,
   validate the selected directory, and do not inspect source contents. Picker-created workspaces are
   isolated by a root-derived hash. The standalone executable smoke test verifies a complete
   synthetic no-egress index through the packaged GUI.
-- Smart Lab Index `0.4.0` adds a bundled folder-navigator fallback for systems without a native
+- LabOverlay `0.4.0` adds a bundled folder-navigator fallback for systems without a native
   dialog helper. The navigator serves only on loopback, requires a random session token before
   listing directory names, validates selected paths without reading file contents, and enforces the
   exact loopback origin and port for mutations. Runtime assets remain bundled. Release-only signing
   hooks may contact configured timestamp and Apple notarization services during artifact creation;
   they are not included in or called by the runtime application. Every desktop archive receives a
   SHA-256 manifest.
-- Smart Lab Index `0.5.0` removes implicit indexing after folder selection, adds metadata-only source
+- LabOverlay `0.5.0` removes implicit indexing after folder selection, adds metadata-only source
   preflight with file-count/aggregate-byte/per-file/exclusion limits, exposes progress and cooperative
   cancellation, and never infers deletions from cancelled scans. The filesystem connector records
   POSIX ownership/mode/effective-process access but explicitly does not claim rich ACL capture or
   enforcement.
-- Smart Lab Index `0.7.0` executes each selected parser in a disposable spawned process. Inputs are
+- LabOverlay `0.7.0` executes each selected parser in a disposable spawned process. Inputs are
   checksum-verified bytes and outputs are bounded normalized JSON. Parent timeout/cancellation plus
   worker CPU, address-space, file-size, network, subprocess, file-write, and serialized-output limits
   prevent one malformed document from taking down the indexer on the supported production target.
@@ -69,7 +70,7 @@ addressed the critical connector/provenance findings identified during integrati
 - Bounded local search, extraction-coverage reporting, calibration rules, and auditable conflict
   review operate only against the local SQLite store and add no external runtime dependency.
 
-Accordingly, `NE-001` through `NE-004` are remediated for the explicitly registered Smart Lab Index
+Accordingly, `NE-001` through `NE-004` are remediated for the explicitly registered LabOverlay
 runtime path, and the connector now enforces the first source-root boundary. The retained legacy
 browser/export commands remain compatibility surfaces with their separately documented behavior.
 The remaining findings include hash-pinned build tools and inputs for additional release targets, an
@@ -79,7 +80,7 @@ loopback-only policy, filesystem restrictions, a dedicated account, and service 
 application policy is not a sandbox for malicious plugins.
 
 Post-implementation validation on 2026-08-11 passed all 204 repository tests, including 98 focused
-Smart Lab tests, real-HTTP GUI tests, parser-isolation adversarial tests, backup/restore tests, and
+LabOverlay tests, real-HTTP GUI tests, parser-isolation adversarial tests, backup/restore tests, and
 picker/restart-loop tests. A complete built-in no-egress indexing run was executed with socket
 connection calls intercepted and made zero attempts. Authenticated desktop and 390-pixel browser
 automation completed a controlled-production run without console/page errors or horizontal overflow.
@@ -89,11 +90,11 @@ process can contain malicious code or enforce access to a confidential shared la
 
 This review covers every current executable path declared in `pyproject.toml:31-37`, their shared
 runtime components, the static website, operational scripts, build/release automation, and every
-module category proposed for Smart Lab Index. It distinguishes observed repository facts from
+module category proposed for LabOverlay. It distinguishes observed repository facts from
 requirements for the planned product.
 
 This is not a penetration test of an operating-system image or the unavailable hosted backend. The
-Smart Lab runtime has a target-specific lock, but build dependencies, optional compatibility extras,
+LabOverlay runtime has a target-specific lock, but build dependencies, optional compatibility extras,
 and other OS/Python targets are not all hash-locked or vendored, and no SBOM is supplied. The hosted
 service implementation called by `pdf_mcp/cloud_client.py` is also not present and cannot be audited.
 
@@ -116,7 +117,7 @@ to `true` currently changes nothing. In particular, it does not stop the cloud M
 reading and uploading a document.
 
 **Verdict:** The repository has a useful local-first starting point, but it does **not** currently
-meet the fail-closed Smart Lab Index no-egress requirement. No-egress must not be advertised as an
+meet the fail-closed LabOverlay no-egress requirement. No-egress must not be advertised as an
 enforced product mode until blockers `NE-001` and `NE-002` and all first-iteration requirements below
 are implemented and tested.
 
@@ -127,7 +128,7 @@ The following labels are used throughout:
 - **CURRENT FACT**: directly evidenced by the reviewed repository.
 - **ASSURANCE GAP**: behavior is not implemented, not testable from this repository, or delegated to
   an unpinned dependency or external system.
-- **REQUIREMENT**: required change for the first Smart Lab Index foundation; it is not current
+- **REQUIREMENT**: required change for the first LabOverlay foundation; it is not current
   behavior.
 - **FUTURE RECOMMENDATION**: useful hardening after the first iteration, not an MVP prerequisite.
 
@@ -138,7 +139,7 @@ The following labels are used throughout:
 | `NE-001` | Critical | `SMART_LAB_INDEX_NO_EGRESS` has no implementation. `pdf_mcp/cloud_client.py:34-58`, `87-104`, and `146-157` construct external clients without consulting a global policy. | Parse policy once at startup, reject invalid values, block incompatible modules before initialization, and enforce it again at every outbound call boundary. A blocked call must occur before file open, DNS, socket creation, or credential access. |
 | `NE-002` | Critical | There is no Core security policy, module manifest security declaration, module registry enforcement, or centralized network boundary. Future modules could make hidden network calls or auto-download models. | Make resource declarations mandatory and schema-validated. Registry enable/start must fail closed for incompatible modules. Route built-in network and inference access through policy-enforcing Core interfaces. |
 | `NE-003` | High | The package exposes the explicit cloud bridge as a normal console entry point (`pyproject.toml:34`). It uploads the complete selected file as multipart content (`pdf_mcp/cloud_client.py:87-104`). Existing tests prove that behavior (`tests/test_cloud_client.py:90-100`). | Mark the module `network=external`, `no_egress_compatible=false`; in no-egress mode report `BLOCKED_BY_POLICY` and refuse before reading a path. Never fall back to it from a local module. |
-| `NE-004` | High | Agent-facing local MCP tools can read supported files and write exports anywhere allowed by the process unless the optional `PDF_MCP_ALLOWED_DIR` is set (`pdf_mcp/extractor.py:13-36`, `pdf_mcp/server.py:27-149`). | Require explicit source roots and separate state/export/temp roots in Smart Lab Index. Use read-only connector handles and Core-owned write repositories. Optional unrestricted host access is not an acceptable indexing default. |
+| `NE-004` | High | Agent-facing local MCP tools can read supported files and write exports anywhere allowed by the process unless the optional `PDF_MCP_ALLOWED_DIR` is set (`pdf_mcp/extractor.py:13-36`, `pdf_mcp/server.py:27-149`). | Require explicit source roots and separate state/export/temp roots in LabOverlay. Use read-only connector handles and Core-owned write repositories. Optional unrestricted host access is not an acceptable indexing default. |
 | `NE-005` | High | Local CLI/MCP parsers have no common byte/page/expanded-archive/CPU/memory/time limits or parser process isolation. The browser path limits upload bytes, PDF pages, and output bytes (`pdf_mcp/web_app.py:23-29`, `227-256`), but DOCX is only checked for a ZIP prefix (`pdf_mcp/web_app.py:118-123`). | Add bounded parser execution and per-record failure isolation before recursively indexing untrusted trees. A malformed or compressed-bomb document must create a parser-failure issue without stopping the run. |
 | `NE-006` | High | Offline installation/build reproducibility is absent. Runtime/build dependencies use open-ended minimum versions, CI installs from package indexes, and GitHub Actions use mutable major-version tags (`pyproject.toml:14-21`, `.github/workflows/ci.yml:23-33`, `.github/workflows/publish.yml:18-28`). | Produce a pinned, hash-verified offline bundle or wheelhouse/SBOM for no-egress deployments. Pin release actions by commit digest and verify downloaded publisher artifacts. Runtime must never invoke package installation. |
 | `NE-007` | Medium | Logging has no shared redaction policy. Browser debug request logs can include the filename carried in the conversion query, exception traces are logged, and the manual inspector prints paths and extracted rows (`pdf_mcp/web_app.py:166-167`, `211-212`, `221-223`; `tests/manual/inspect_document.py:19-43`). | Define structured redaction rules. Never log source text, table cells, secrets, query-string filenames, or full customer paths by default. Test with canary content and credentials. |
@@ -216,7 +217,7 @@ external backend.
 
 - **CURRENT FACT:** PDF/DOCX parsers open sources for reading. No current parser edits the source.
 - **CURRENT FACT:** Exporters intentionally create directories and overwrite an explicit destination
-  (`pdf_mcp/exporter.py:167-177`; `pdf_mcp/verified.py:683-698`). Smart Lab Index must not place these
+  (`pdf_mcp/exporter.py:167-177`; `pdf_mcp/verified.py:683-698`). LabOverlay must not place these
   outputs inside indexed source roots by default.
 - **CURRENT FACT:** `PDF_MCP_ALLOWED_DIR` protects both reads and writes through one boundary, is
   optional, and is captured when `pdf_mcp.extractor` is imported (`pdf_mcp/extractor.py:13-36`). It is
@@ -236,7 +237,7 @@ external backend.
 - **ASSURANCE GAP:** Abrupt termination cleanup, startup scavenging, secure deletion, disk encryption,
   swap/core-dump exposure, and Windows ACLs are not controlled by this code. Secure deletion cannot be
   promised reliably on modern filesystems; minimize retention and rely on encrypted storage.
-- **REQUIREMENT:** Smart Lab Index must use separate configured roots for immutable sources, durable
+- **REQUIREMENT:** LabOverlay must use separate configured roots for immutable sources, durable
   Core state, exports, and application temp. Temp filenames should be opaque; directories/files should
   be owner-only where supported; content must not be written to logs.
 
@@ -310,7 +311,7 @@ its manifest if import-time code can perform I/O; manifests must be data-only.
 
 ## Fail-closed no-egress contract
 
-The following behavior is required for the first Smart Lab Index iteration.
+The following behavior is required for the first LabOverlay iteration.
 
 1. **Single immutable policy.** Core parses `SMART_LAB_INDEX_NO_EGRESS` before module discovery or
    configuration-secret resolution. Missing means normal mode. Explicit true/false values are
@@ -346,7 +347,7 @@ The following behavior is required for the first Smart Lab Index iteration.
     versions. A blocked module is visible. No external action is reported as local, and no unaudited
     hosted retention claim is inherited by Core.
 
-For a strong guarantee, pair application enforcement with outbound firewall denial for the Smart Lab
+For a strong guarantee, pair application enforcement with outbound firewall denial for the LabOverlay
 Index process/user. Python module boundaries prevent accidental egress; they do not contain malicious
 in-process code.
 
@@ -361,7 +362,7 @@ These are release gates for the modular foundation.
 - [ ] `SLI-SEC-04`: Mark the existing cloud bridge/external provider capability as blocked and make it
   refuse before path resolution/file open when no-egress is true.
 - [ ] `SLI-SEC-05`: Keep local browser/API binding on loopback, bundle all assets, and remove automatic
-  remote loads from any Smart Lab Index UI.
+  remote loads from any LabOverlay UI.
 - [ ] `SLI-SEC-06`: Implement separate configured source, state, export, model, and private temp roots;
   source roots are read-only-first.
 - [ ] `SLI-SEC-07`: Put every parser behind the normalized parser contract with byte, expanded-size,
@@ -411,7 +412,7 @@ These are release gates for the modular foundation.
 Existing tests provide partial coverage only: local browser session/origin/CSP behavior
 (`tests/test_web_app.py:79-113`, `212-219`), cloud HTTPS/generic filename/key non-disclosure
 (`tests/test_cloud_client.py:71-121`), and spreadsheet formula defense
-(`tests/test_exporter.py:57-59`, `122-136`). There are currently no tests for the Smart Lab Index
+(`tests/test_exporter.py:57-59`, `122-136`). There are currently no tests for the LabOverlay
 environment variable, global socket denial, module security metadata, source immutability, parser
 resource exhaustion, log redaction, stale temp cleanup, offline model behavior, or packaged no-egress
 operation.
@@ -423,7 +424,7 @@ first-party implementation is deterministic, source-read-only, model-free, and c
 outbound client. The local browser app also provides a solid bundled, loopback-only UI baseline.
 
 Those properties are currently conventions attached to specific paths, not a Core-enforced security
-contract. Smart Lab Index should first implement one immutable security policy, one validated module
+contract. LabOverlay should first implement one immutable security policy, one validated module
 security manifest, one registry enforcement point, separated filesystem roots, bounded parsers, and
 the no-egress tests above. External/cloud modules must remain visible but blocked, with no fallback.
 Only after those controls pass against packaged artifacts should the product claim fail-closed

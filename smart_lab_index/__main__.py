@@ -1,4 +1,4 @@
-"""Run Smart Lab Index with ``python -m smart_lab_index``."""
+"""Legacy entry point for LabOverlay via ``python -m smart_lab_index``."""
 
 import multiprocessing
 

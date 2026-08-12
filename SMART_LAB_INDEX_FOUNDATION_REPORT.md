@@ -1,4 +1,4 @@
-# Smart Lab Index Foundation Report
+# LabOverlay Foundation Report
 
 Date: 2026-08-11
 
@@ -6,7 +6,7 @@ Branch: `agent/smart-lab-index-foundation`
 
 Foundation/Core API version: `0.1.0`
 
-Post-foundation updates add the local capability-aware operator GUI in Smart Lab Index `0.2.0` and
+Post-foundation updates add the local capability-aware operator GUI in LabOverlay `0.2.0` and
 native folder selection, source switching, isolated picker workspaces, and standalone desktop
 packaging in `0.3.0`. Version `0.4.0` adds a zero-dependency browser folder navigator, exact-origin
 enforcement, checksummed archives, certificate-driven platform signing/notarization hooks, and a
@@ -32,7 +32,7 @@ calling concrete document implementations. `pdf_mcp.verified` combined loading, 
 validation, evidence, review decisions, and result assembly in one document-workflow pipeline.
 
 The document product was retained as a compatibility layer. Stripe administration, the public site,
-CI/release automation, and the optional hosted bridge remain outside the Smart Lab Index runtime.
+CI/release automation, and the optional hosted bridge remain outside the LabOverlay runtime.
 
 Detailed audit artifacts:
 
@@ -174,13 +174,13 @@ Fifteen modules are installed. Fourteen are enabled and healthy in the synthetic
 ## Reused Functionality
 
 The existing `pdf_mcp` package remains operational. Its table assessment logic now delegates to the
-shared parser-module helper, removing one duplicated implementation. The Smart Lab PDF and DOCX
+shared parser-module helper, removing one duplicated implementation. The LabOverlay PDF and DOCX
 modules preserve the proven `pdfplumber` and `python-docx` parsing approach while converting output
 to normalized, provenance-rich Core contracts. Existing PDF/DOCX extraction, export, profile,
 evaluation, MCP, and browser workflows continue to pass their tests.
 
 No existing document feature was deleted. It is now the compatibility/document-ingestion layer, not
-the Smart Lab Index Core.
+the LabOverlay Core.
 
 ## Organization Independence
 
@@ -243,12 +243,12 @@ and warnings. This is not yet a mature production migration history.
 Validation completed on 2026-08-11:
 
 - Full repository suite: 204 tests passed in 51.016 seconds.
-- Focused Smart Lab suite: 98 tests passed in 40.560 seconds.
-- Ruff: all changed Smart Lab code, tests, and release scripts passed targeted checks.
+- Focused LabOverlay suite: 98 tests passed in 40.560 seconds.
+- Ruff: all changed LabOverlay code, tests, and release scripts passed targeted checks.
 - Existing sample, simulated development, and simulated holdout evaluation gates passed with 1.0
   field precision/recall/F1, exact-record rate, and decision accuracy.
 - Wheel and source distribution built successfully; `twine check` passed for both.
-- The Smart Lab Index `0.6.0` Linux standalone executable completed its packaged synthetic no-egress
+- The LabOverlay `0.6.0` Linux standalone executable completed its packaged synthetic no-egress
   smoke test through spawned parser workers with 4 sources, 4 documents, 4 entities, 3 assertions,
   and 1 open issue. The archive SHA-256 manifest verified.
 - The `0.6.0` controlled-production GUI completed authenticated desktop and 390-pixel mobile browser
@@ -334,7 +334,7 @@ smart-lab-index status
 - SQLite content is owner-restricted but plaintext. Use encrypted storage and a dedicated OS account
   for controlled evaluation.
 - The distribution still has the compatibility identity `pdf-agent-mcp` `0.6.0`; select and validate
-  a distinct Smart Lab Index release identity before publishing this branch.
+  a distinct LabOverlay release identity before publishing this branch.
 - The hash-verified production dependency lock covers CPython 3.12 on Linux x86_64. Other targets
   still require their own generated lock and audit, and the release does not yet include an SBOM.
 - Dynamic third-party installation is intentionally absent. Built-in module boundaries are ready;
