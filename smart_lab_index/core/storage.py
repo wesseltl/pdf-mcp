@@ -1567,6 +1567,91 @@ class KnowledgeStore:
             "issues_by_status": issue_counts,
         }
 
+    def understanding_summary(self) -> dict[str, int]:
+        """Summarize how much parsed content produced structured knowledge."""
+        row = self.connection.execute(
+            """
+            WITH ranked_documents AS (
+                SELECT documents.document_id, documents.source_record_id,
+                       documents.content_json,
+                       ROW_NUMBER() OVER (
+                           PARTITION BY documents.source_record_id,
+                                        documents.source_generation
+                           ORDER BY documents.created_at DESC,
+                                    documents.document_id DESC
+                       ) AS document_rank
+                FROM documents
+                JOIN source_records
+                  ON source_records.source_record_id=documents.source_record_id
+                 AND source_records.source_generation=documents.source_generation
+                 AND source_records.checksum=documents.source_checksum
+                WHERE source_records.deleted_at IS NULL
+            ),
+            current_documents AS (
+                SELECT document_id, source_record_id, content_json
+                FROM ranked_documents WHERE document_rank=1
+            ),
+            ranked_processing AS (
+                SELECT document_processing.*,
+                       ROW_NUMBER() OVER (
+                           PARTITION BY document_processing.document_id,
+                                        document_processing.module_id
+                           ORDER BY document_processing.completed_at DESC,
+                                    document_processing.rowid DESC
+                       ) AS processing_rank
+                FROM document_processing
+                JOIN current_documents
+                  ON current_documents.document_id=document_processing.document_id
+            ),
+            document_totals AS (
+                SELECT current_documents.document_id,
+                       COALESCE(SUM(ranked_processing.entity_count), 0)
+                           AS entity_count,
+                       COALESCE(SUM(ranked_processing.assertion_count), 0)
+                           AS assertion_count,
+                       MAX(
+                           CASE
+                               WHEN ranked_processing.warnings_json IS NOT NULL
+                                AND ranked_processing.warnings_json != '[]'
+                               THEN 1 ELSE 0
+                           END
+                       ) AS extraction_warning,
+                       CASE
+                           WHEN instr(
+                               current_documents.content_json,
+                               '"warnings":[]'
+                           ) = 0
+                           THEN 1 ELSE 0
+                       END AS parser_warning
+                FROM current_documents
+                LEFT JOIN ranked_processing
+                  ON ranked_processing.document_id=current_documents.document_id
+                 AND ranked_processing.processing_rank=1
+                GROUP BY current_documents.document_id
+            )
+            SELECT COUNT(*) AS documents_read,
+                   COALESCE(SUM(
+                       CASE WHEN entity_count + assertion_count > 0 THEN 1 ELSE 0 END
+                   ), 0) AS documents_with_structured_data,
+                   COALESCE(SUM(
+                       CASE WHEN entity_count + assertion_count = 0 THEN 1 ELSE 0 END
+                   ), 0) AS documents_without_structured_data,
+                   COALESCE(SUM(
+                       CASE WHEN entity_count > 0 THEN 1 ELSE 0 END
+                   ), 0) AS documents_with_entities,
+                   COALESCE(SUM(
+                       CASE WHEN assertion_count > 0 THEN 1 ELSE 0 END
+                   ), 0) AS documents_with_facts,
+                   COALESCE(SUM(
+                       CASE WHEN extraction_warning=1 OR parser_warning=1 THEN 1 ELSE 0 END
+                   ), 0) AS documents_with_warnings,
+                   COALESCE(SUM(entity_count), 0) AS extracted_entity_observations,
+                   COALESCE(SUM(assertion_count), 0) AS extracted_fact_observations
+            FROM document_totals
+            """
+        ).fetchone()
+        return {key: int(row[key] or 0) for key in row.keys()}
+
     def search(self, query: str, *, limit: int = 50) -> list[dict[str, Any]]:
         query = " ".join(query.split())
         if len(query) < 2:
@@ -1770,8 +1855,21 @@ class KnowledgeStore:
             "SELECT * FROM index_runs ORDER BY started_at DESC LIMIT 1"
         ).fetchone()
         projections = self.projection_counts()
+        active_sources = count("source_records", "WHERE deleted_at IS NULL")
+        understanding = self.understanding_summary()
+        understanding["files_without_document"] = max(
+            active_sources - understanding["documents_read"],
+            0,
+        )
+        latest_stats = {} if latest is None else _load_json(latest["stats_json"], {})
+        understanding["unsupported_files"] = int(
+            latest_stats.get("unsupported_files", 0)
+        )
+        understanding["observed_files"] = int(
+            latest_stats.get("observed_files", active_sources)
+        )
         return {
-            "sources": count("source_records", "WHERE deleted_at IS NULL"),
+            "sources": active_sources,
             "documents": projections["documents"],
             "historical_documents": count("documents"),
             "entities": count("entities"),
@@ -1779,12 +1877,13 @@ class KnowledgeStore:
                 "assertions", "WHERE status NOT IN ('REJECTED', 'SUPERSEDED')"
             ),
             "open_issues": count("issues", "WHERE status='OPEN'"),
+            "understanding": understanding,
             "latest_run": None if latest is None else {
                 "index_run_id": latest["index_run_id"],
                 "source_id": latest["source_id"],
                 "source_configuration_hash": latest["source_configuration_hash"],
                 "status": latest["status"],
-                "stats": _load_json(latest["stats_json"], {}),
+                "stats": latest_stats,
                 "started_at": latest["started_at"],
                 "completed_at": latest["completed_at"],
                 "error": latest["error"],

@@ -237,6 +237,10 @@ plus a focused review action for the highest-priority open finding. Evidence row
 showing source path, structural locator, confidence, module, and issue evidence. Search is server-side
 and bounded, so it covers the whole SQLite index even when large list views return only their first
 500 rows.
+Overview separately reports files found, readable documents, documents that produced structured
+data, documents with no recognized structured facts, parser warnings, and unsupported formats. A
+completed sync is never presented as proof that every fact was understood. The Documents view can
+filter these coverage outcomes without exposing internal IDs in its normal operator view.
 Conflict review keeps all original assertions. It marks selected evidence confirmed and alternatives
 rejected, records a review decision and audit event, and reopens when materially new assertion evidence
 appears.
@@ -265,8 +269,9 @@ contents.
 
 ## Current limitations
 
-- Standalone artifacts are ZIP applications rather than native OS installers. Builds are unsigned
-  unless publisher signing credentials are configured; every archive includes a SHA-256 manifest.
+- Windows releases include a per-user Setup executable and portable ZIP. macOS and Linux remain ZIP
+  applications. Builds are unsigned unless publisher signing credentials are configured; every
+  artifact includes a SHA-256 manifest.
 - Only a filesystem connector and one general laboratory domain pack are implemented.
 - Deterministic rules recognize common equipment, room, people, responsibility, serial/model/status,
   calibration, and maintenance headers plus a narrow `located_in` text form. They are not general

@@ -208,6 +208,10 @@ class IndexingService:
             )
             stats["planned_files"] = int(batch.metadata.get("planned_files", 0))
             stats["planned_bytes"] = int(batch.metadata.get("planned_bytes", 0))
+            stats["observed_files"] = int(batch.metadata.get("observed_files", 0))
+            stats["unsupported_files"] = int(
+                batch.metadata.get("unsupported_files", 0)
+            )
             seen_ids = {item.record.external_id for item in batch.sources}
             failed_ids = {failure.external_id for failure in batch.failures}
 
@@ -976,6 +980,8 @@ def _empty_stats() -> dict[str, int]:
         "hook_failures": 0,
         "planned_files": 0,
         "planned_bytes": 0,
+        "observed_files": 0,
+        "unsupported_files": 0,
         "processed_files": 0,
     }
 

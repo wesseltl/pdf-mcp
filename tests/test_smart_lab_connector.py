@@ -47,6 +47,8 @@ class FilesystemConnectorTests(unittest.TestCase):
         self.assertTrue(batch.complete)
         self.assertFalse(batch.failures)
         self.assertEqual(set(sources), {"note.txt", "nested/assets.csv"})
+        self.assertEqual(batch.metadata["observed_files"], 3)
+        self.assertEqual(batch.metadata["unsupported_files"], 1)
         self.assertTrue(all(item.change is DiscoveryChange.NEW for item in sources.values()))
         self.assertEqual(opened_modes, ["rb", "rb"])
         self.assertEqual(note.read_bytes(), original_contents[note])

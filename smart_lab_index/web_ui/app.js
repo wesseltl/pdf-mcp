@@ -68,6 +68,7 @@ const ui = {
   actionError: "",
   activeViewId: null,
   changingSource: false,
+  documentFilter: "all",
   fetching: false,
   filterByView: new Map(),
   health: null,
@@ -638,7 +639,7 @@ function displayViewLabel(view) {
     return "Overview";
   }
   if (category === "sources") {
-    return "Sources";
+    return "Files";
   }
   if (category === "modules") {
     return "System health";
@@ -1132,7 +1133,7 @@ function renderSearch(view) {
     columns: [
       { label: "Type", value: (row) => statusBadge(row.kind) },
       { key: "title", label: "Result", className: "primary-cell" },
-      { key: "subtitle", label: "Context" },
+      { label: "Context", value: searchResultContext },
       { key: "snippet", label: "Match", className: "cell-muted" },
       { key: "source_path", label: "Source", className: "cell-mono" },
     ],
@@ -1140,6 +1141,27 @@ function renderSearch(view) {
     rowLabel: (row) => `Open search result for ${scalarText(row.title, "record")}`,
     onOpen: openSearchResult,
   }));
+}
+
+function searchResultContext(row) {
+  if (String(row.kind || "").toLocaleLowerCase() === "entity") {
+    const parts = String(row.subtitle || "")
+      .split("|")
+      .map((part) => part.trim())
+      .filter(Boolean);
+    if (parts.length) {
+      parts[0] = entityTypeName(parts[0]);
+    }
+    return parts.map(humanize).join(" · ");
+  }
+  if (String(row.kind || "").toLocaleLowerCase() === "issue") {
+    return String(row.subtitle || "")
+      .split("|")
+      .map((part) => humanize(part.trim()))
+      .filter(Boolean)
+      .join(" · ");
+  }
+  return scalarText(row.subtitle);
 }
 
 function openSearchResult(result) {
@@ -1229,46 +1251,141 @@ function renderOverview(view) {
 
 function renderWorkspaceSummary(summary, openIssues, latestRun) {
   const section = node("section", "overview-summary");
-  const status = node("div", `overview-status${openIssues.length ? " needs-review" : " is-current"}`);
-  const marker = node("span", "overview-status-marker", openIssues.length ? "!" : "✓");
+  const understanding = asObject(summary.understanding);
+  const assessment = workspaceAssessment(summary, understanding, openIssues, latestRun);
+  const status = node("div", `overview-status ${assessment.tone}`);
+  const marker = node("span", "overview-status-marker", assessment.symbol);
   marker.setAttribute("aria-hidden", "true");
   const copy = node("div", "overview-status-copy");
   copy.append(
-    node(
-      "strong",
-      "",
-      openIssues.length
-        ? "Workspace needs attention"
-        : "Workspace is up to date",
-    ),
-    node(
-      "span",
-      "",
-      latestRun.completed_at
-        ? `${openIssues.length ? `${formatNumber(openIssues.length)} review item${openIssues.length === 1 ? "" : "s"} · ` : ""}Latest sync ${formatDate(latestRun.completed_at)}`
-        : "No completed sync recorded",
-    ),
+    node("strong", "", assessment.title),
+    node("span", "", assessment.detail),
   );
   status.append(marker, copy);
-  if (openIssues.length) {
+  if (assessment.action === "documents") {
+    status.append(commandButton(
+      "Review coverage",
+      "→",
+      () => openDocuments("unstructured"),
+      "button button-secondary",
+    ));
+  } else if (assessment.action === "review") {
     status.append(commandButton("Open review queue", "→", openReviewQueue, "button button-secondary"));
-  } else {
+  } else if (assessment.action === "search") {
     status.append(commandButton("Search workspace", "⌕", focusSearch, "button button-secondary"));
   }
 
   const metrics = node("dl", "overview-metrics");
   [
-    ["Source files", summary.sources],
-    ["Documents read", summary.documents],
-    ["Lab items", summary.entities],
-    ["Connections", summary.active_assertions],
+    ["Files found", understanding.observed_files || summary.sources],
+    ["Files read", summary.documents],
+    ["Lab items recognized", summary.entities],
+    ["Structured facts", summary.active_assertions],
   ].forEach(([label, value]) => {
     const metric = node("div", "overview-metric");
     metric.append(node("dt", "", label), node("dd", "", formatNumber(value)));
     metrics.append(metric);
   });
-  section.append(status, metrics);
+  section.append(status, renderUnderstandingCoverage(understanding), metrics);
   return section;
+}
+
+function workspaceAssessment(summary, understanding, openIssues, latestRun) {
+  const documents = Number(understanding.documents_read ?? summary.documents ?? 0);
+  const structured = Number(understanding.documents_with_structured_data || 0);
+  const unstructured = Number(understanding.documents_without_structured_data || 0);
+  const unread = Number(understanding.files_without_document || 0);
+  const unsupported = Number(understanding.unsupported_files || 0);
+  const warnings = Number(understanding.documents_with_warnings || 0);
+  const runStatus = String(latestRun.status || "").toUpperCase();
+  const latest = latestRun.completed_at ? `Latest sync ${formatDate(latestRun.completed_at)}` : "No completed sync recorded";
+
+  if (operationIsActive()) {
+    return {
+      action: null,
+      detail: progressDetail(asObject(ui.state?.operation)),
+      symbol: "↻",
+      title: "Reading and organizing the selected files",
+      tone: "is-scanning",
+    };
+  }
+  if (["FAILED", "COMPLETED_WITH_ERRORS"].includes(runStatus) || unread > 0) {
+    const problems = unread || Number(asObject(latestRun.stats).failed || 0);
+    return {
+      action: "documents",
+      detail: `${formatNumber(problems)} file problem${problems === 1 ? "" : "s"} reported · ${latest}`,
+      symbol: "!",
+      title: "Some files could not be fully processed",
+      tone: "has-gaps",
+    };
+  }
+  if (documents > 0 && structured === 0) {
+    return {
+      action: "documents",
+      detail: `${formatNumber(documents)} readable document${documents === 1 ? "" : "s"}, but no structured lab facts · ${latest}`,
+      symbol: "!",
+      title: "Files were indexed, but the lab data was not recognized",
+      tone: "has-gaps",
+    };
+  }
+  if (unstructured > 0 || unsupported > 0 || warnings > 0) {
+    return {
+      action: "documents",
+      detail: `${formatNumber(structured)} of ${formatNumber(documents)} readable documents produced structured data · ${latest}`,
+      symbol: "!",
+      title: "Some of the selected data still needs coverage",
+      tone: "has-gaps",
+    };
+  }
+  if (openIssues.length) {
+    return {
+      action: "review",
+      detail: `${formatNumber(openIssues.length)} evidence conflict${openIssues.length === 1 ? "" : "s"} · ${latest}`,
+      symbol: "!",
+      title: "Recognized data needs review",
+      tone: "needs-review",
+    };
+  }
+  return {
+    action: "search",
+    detail: documents
+      ? `${formatNumber(structured)} of ${formatNumber(documents)} readable documents produced structured data · ${latest}`
+      : latest,
+    symbol: "✓",
+    title: "Structured lab data is available",
+    tone: "is-current",
+  };
+}
+
+function renderUnderstandingCoverage(understanding) {
+  const documents = Number(understanding.documents_read || 0);
+  const structured = Number(understanding.documents_with_structured_data || 0);
+  const percent = documents > 0 ? Math.round((structured / documents) * 100) : 0;
+  const wrapper = node("div", "understanding-coverage");
+  const heading = node("div", "understanding-heading");
+  heading.append(
+    node("strong", "", "Structured data coverage"),
+    node("span", "", documents ? `${formatNumber(structured)} of ${formatNumber(documents)} readable documents` : "No readable documents"),
+  );
+  const meter = node("progress", "coverage-meter");
+  meter.setAttribute("aria-label", "Documents producing structured data");
+  meter.max = 100;
+  meter.value = percent;
+  meter.textContent = `${percent}%`;
+
+  const breakdown = node("dl", "coverage-breakdown");
+  [
+    ["Structured data", structured, "recognized"],
+    ["No structured facts", understanding.documents_without_structured_data, "unrecognized"],
+    ["Read warnings", understanding.documents_with_warnings, "warning"],
+    ["Unsupported files", understanding.unsupported_files, "unsupported"],
+  ].forEach(([label, value, tone]) => {
+    const item = node("div", `coverage-item is-${tone}`);
+    item.append(node("dt", "", label), node("dd", "", formatNumber(value)));
+    breakdown.append(item);
+  });
+  wrapper.append(heading, meter, breakdown);
+  return wrapper;
 }
 
 function focusSearch() {
@@ -1278,6 +1395,15 @@ function focusSearch() {
   }
   chooseView(String(search.view_id));
   elements.filter.focus();
+}
+
+function openDocuments(filter = "all") {
+  const documents = currentViews().find((view) => viewCategory(view) === "documents");
+  if (!documents) {
+    return;
+  }
+  ui.documentFilter = filter;
+  chooseView(String(documents.view_id));
 }
 
 function openReviewQueue() {
@@ -1414,7 +1540,7 @@ function entityLane(entity) {
   return "center";
 }
 
-function entityTypeLabel(entity) {
+function entityTypeName(value) {
   const labels = {
     ASSET: "Equipment",
     DOCUMENT: "Document",
@@ -1424,7 +1550,11 @@ function entityTypeLabel(entity) {
     PERSON: "Person",
     PROCESS: "Process",
   };
-  return labels[String(entity.entity_type || "").toUpperCase()] || humanize(entity.entity_type) || "Item";
+  return labels[String(value || "").toUpperCase()] || humanize(value) || "Item";
+}
+
+function entityTypeLabel(entity) {
+  return entityTypeName(entity.entity_type);
 }
 
 function graphPositions(entities) {
@@ -1540,7 +1670,7 @@ function renderKnowledgeSvg(graph, openIssues) {
     }
     const open = () => openDetails(
       fullName,
-      [entity.entity_type, entity.subtype].filter(Boolean).map(humanize).join(" · "),
+      [entityTypeName(entity.entity_type), humanize(entity.subtype)].filter(Boolean).join(" · "),
       entity,
     );
     group.addEventListener("click", open);
@@ -1596,8 +1726,8 @@ function renderDecisionPanel(openIssues, latestRun) {
     panel.append(
       node("span", "panel-eyebrow", "Review queue"),
       node("div", "decision-clear-mark", "✓"),
-      node("h2", "", "Review queue is clear"),
-      node("p", "decision-copy", "No open review items were reported by the latest completed sync."),
+      node("h2", "", "No conflicts found"),
+      node("p", "decision-copy", "No conflicts were detected in the structured facts recognized so far."),
     );
     if (latestRun.completed_at) {
       panel.append(node("p", "decision-meta", `Checked ${formatDate(latestRun.completed_at)}`));
@@ -1783,7 +1913,7 @@ function renderEntities(view) {
     rowLabel: (row) => `Open ${scalarText(row.canonical_name, "entity")} details`,
     onOpen: (row) => openDetails(
       scalarText(row.canonical_name, "Entity"),
-      [row.entity_type, row.subtype].filter(Boolean).map(humanize).join(" · "),
+      [entityTypeName(row.entity_type), humanize(row.subtype)].filter(Boolean).join(" · "),
       row,
     ),
   });
@@ -1846,7 +1976,7 @@ function entityFirstObserved(entity) {
 
 function typePair(primary, secondary) {
   const wrapper = node("span", "inline-pair");
-  wrapper.append(node("span", "", humanize(primary)));
+  wrapper.append(node("span", "", entityTypeName(primary)));
   if (secondary) {
     wrapper.append(node("span", "inline-secondary", humanize(secondary)));
   }
@@ -1915,9 +2045,10 @@ function sourcePair(path, id) {
 
 function renderDocuments(view) {
   const allRows = asArray(ui.state.documents);
-  const rows = filteredRows(allRows);
+  const outcomeRows = allRows.filter((row) => documentMatchesFilter(row, ui.documentFilter));
+  const rows = filteredRows(outcomeRows);
   setViewCount(view.count ?? allRows.length, rows.length);
-  if (!rows.length) {
+  if (!allRows.length) {
     elements.viewRoot.replaceChildren(
       emptyState(
         currentFilter() ? "No matching documents" : "No documents found",
@@ -1928,41 +2059,115 @@ function renderDocuments(view) {
     return;
   }
 
-  elements.viewRoot.replaceChildren(createTable({
+  const container = node("div", "document-workspace");
+  container.append(renderDocumentFilters(allRows));
+  if (!rows.length) {
+    container.append(emptyState(
+      currentFilter() ? "No documents match these filters" : "No documents in this category",
+      currentFilter() ? "Change the text or coverage filter to see other files." : "Choose another coverage filter.",
+      "⌕",
+    ));
+    elements.viewRoot.replaceChildren(container);
+    return;
+  }
+
+  container.append(createTable({
     caption: scalarText(view.label, "Documents"),
     columns: [
       { key: "source_path", label: "Document", className: "primary-cell" },
       { label: "Type", value: (row) => contentTypeLabel(row.content_type) },
-      { label: "Information found", value: extractionCoverage },
-      { label: "Warnings", value: extractionWarnings },
+      { label: "Result", value: documentOutcome },
+      { label: "Evidence found", value: extractionCoverage },
+      { label: "Notes", value: extractionWarnings },
       { label: "Last scanned", value: (row) => formatDate(row.created_at) },
     ],
     rows,
     rowLabel: (row) => `Open document details for ${scalarText(row.source_path, "document")}`,
     onOpen: (row) => openDetails(
       scalarText(row.source_path, "Document"),
-      scalarText(row.content_type, "Document record"),
+      contentTypeLabel(row.content_type),
       row,
     ),
   }));
+  elements.viewRoot.replaceChildren(container);
+}
+
+function documentHasStructuredData(row) {
+  return Number(row.extracted_entity_count || 0) + Number(row.extracted_assertion_count || 0) > 0;
+}
+
+function documentWarningCount(row) {
+  return asArray(row.parser_warnings).length + asArray(row.processing).reduce(
+    (total, item) => total + asArray(item.warnings).length,
+    0,
+  );
+}
+
+function documentMatchesFilter(row, filter) {
+  if (filter === "structured") {
+    return documentHasStructuredData(row);
+  }
+  if (filter === "unstructured") {
+    return !documentHasStructuredData(row);
+  }
+  if (filter === "warnings") {
+    return documentWarningCount(row) > 0;
+  }
+  return true;
+}
+
+function renderDocumentFilters(rows) {
+  const values = [
+    ["all", "All", rows.length],
+    ["structured", "Structured data", rows.filter(documentHasStructuredData).length],
+    ["unstructured", "No structured facts", rows.filter((row) => !documentHasStructuredData(row)).length],
+    ["warnings", "Read warnings", rows.filter((row) => documentWarningCount(row) > 0).length],
+  ];
+  const toolbar = node("div", "document-filter-bar");
+  const control = node("div", "segmented-control");
+  control.setAttribute("role", "group");
+  control.setAttribute("aria-label", "Filter documents by processing result");
+  values.forEach(([value, label, count]) => {
+    const button = node("button", "segment-button");
+    button.type = "button";
+    button.setAttribute("aria-pressed", String(ui.documentFilter === value));
+    button.append(
+      node("span", "", label),
+      node("span", "segment-count", formatNumber(count)),
+    );
+    button.addEventListener("click", () => {
+      ui.documentFilter = value;
+      renderDocuments(activeView());
+    });
+    control.append(button);
+  });
+  toolbar.append(
+    node("strong", "document-filter-label", "Coverage"),
+    control,
+  );
+  return toolbar;
+}
+
+function documentOutcome(row) {
+  return node(
+    "span",
+    `status-badge ${documentHasStructuredData(row) ? "status-success" : "status-warning"}`,
+    documentHasStructuredData(row) ? "Structured data found" : "No structured facts",
+  );
 }
 
 function extractionCoverage(row) {
   const entities = Number(row.extracted_entity_count || 0);
   const assertions = Number(row.extracted_assertion_count || 0);
-  return `${formatNumber(entities)} items · ${formatNumber(assertions)} connections`;
+  return `${formatNumber(entities)} item${entities === 1 ? "" : "s"} · ${formatNumber(assertions)} fact${assertions === 1 ? "" : "s"}`;
 }
 
 function extractionWarnings(row) {
-  const parserWarnings = asArray(row.parser_warnings);
-  const extractionWarnings = asArray(row.processing).flatMap(
-    (item) => asArray(item.warnings),
-  );
-  const count = parserWarnings.length + extractionWarnings.length;
+  const count = documentWarningCount(row);
   return node(
     "span",
     `status-badge ${count ? "status-warning" : "status-success"}`,
-    count ? `${count} warning${count === 1 ? "" : "s"}` : "Clear",
+    count ? `${count} warning${count === 1 ? "" : "s"}` : "None reported",
   );
 }
 
@@ -2264,7 +2469,7 @@ function renderModules(view) {
     rowLabel: (row) => `Open module details for ${scalarText(row.module_id, "module")}`,
     onOpen: (row) => openDetails(
       scalarText(row.name, scalarText(row.module_id, "Module")),
-      `${scalarText(row.module_id)} · v${scalarText(row.version)}`,
+      `Version ${scalarText(row.version)}`,
       row,
       ["module_id", "module_type", "version", "enabled", "health_state", "health_message", "dependencies", "capabilities", "description"],
     ),
@@ -2337,7 +2542,7 @@ function createTable({ caption, columns, rows, onOpen, rowLabel }) {
   const head = document.createElement("thead");
   const headRow = document.createElement("tr");
   columns.forEach((column) => {
-    const heading = node("th", "", column.label);
+    const heading = node("th", column.className || "", column.label);
     heading.scope = "col";
     headRow.append(heading);
   });
@@ -2461,10 +2666,70 @@ function defaultDetailKeys(record) {
   return preferred.filter((key) => key in asObject(record));
 }
 
+function detailLabel(key) {
+  const labels = {
+    canonical_name: "Name",
+    code: "Finding",
+    content_type: "File type",
+    created_at: "Recorded",
+    entity_type: "Category",
+    extracted_assertion_count: "Facts found",
+    extracted_entity_count: "Item observations",
+    health_message: "Details",
+    health_state: "System status",
+    identifier: "Identifier",
+    literal: "Value",
+    modified_at: "Modified",
+    object_name: "Related item",
+    parser_warnings: "Reading notes",
+    path: "File",
+    permission_metadata: "File access",
+    predicate: "Relationship",
+    severity: "Priority",
+    source_path: "Evidence file",
+    started_at: "Started",
+    completed_at: "Completed",
+    subject_name: "Subject",
+    subtype: "Type",
+  };
+  return labels[key] || humanize(key);
+}
+
+function renderDetailField(key, value) {
+  if (key === "entity_type") {
+    return node("p", "detail-value", entityTypeName(value));
+  }
+  if (key === "subtype") {
+    return node("p", "detail-value", humanize(value) || "—");
+  }
+  if (key === "predicate") {
+    return node("p", "detail-value", formatPredicate(value));
+  }
+  if (key === "code") {
+    return node("p", "detail-value", issueLabel(value));
+  }
+  if (key === "content_type") {
+    return node("p", "detail-value", contentTypeLabel(value));
+  }
+  if (["severity", "status", "health_state"].includes(key)) {
+    return statusBadge(value);
+  }
+  if (["size_bytes"].includes(key)) {
+    return node("p", "detail-value", formatBytes(value));
+  }
+  if (["created_at", "modified_at", "started_at", "completed_at"].includes(key)) {
+    return node("p", "detail-value", formatDate(value));
+  }
+  if (["extracted_entity_count", "extracted_assertion_count"].includes(key)) {
+    return node("p", "detail-value", formatNumber(value));
+  }
+  return renderDetailValue(value);
+}
+
 function detailGroup(key, value) {
   const group = node("section", "detail-group");
-  group.append(node("span", "detail-label", humanize(key)));
-  group.append(renderDetailValue(value));
+  group.append(node("span", "detail-label", detailLabel(key)));
+  group.append(renderDetailField(key, value));
   return group;
 }
 

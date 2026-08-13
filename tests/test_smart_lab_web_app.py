@@ -114,7 +114,10 @@ class SmartLabWebAppTests(unittest.TestCase):
         self.assertNotIn(b"https://", combined)
         self.assertNotIn(b"http://", combined)
         self.assertIn(b"knowledge map", combined)
+        self.assertIn(b"structured data coverage", combined)
+        self.assertIn(b"no structured facts", combined)
         self.assertIn(b"technical details", combined)
+        self.assertNotIn(b"workspace is up to date", combined)
 
     def test_state_requires_session_and_is_capability_driven(self) -> None:
         status, _headers, content = self.request("GET", "/api/state")
@@ -348,6 +351,11 @@ class SmartLabWebAppTests(unittest.TestCase):
         self.assertEqual(payload["summary"]["entities"], 4)
         self.assertEqual(payload["summary"]["active_assertions"], 3)
         self.assertEqual(payload["summary"]["open_issues"], 1)
+        understanding = payload["summary"]["understanding"]
+        self.assertEqual(understanding["documents_with_structured_data"], 4)
+        self.assertEqual(understanding["documents_without_structured_data"], 0)
+        self.assertEqual(understanding["files_without_document"], 0)
+        self.assertEqual(understanding["unsupported_files"], 0)
         self.assertEqual(
             {entity["canonical_name"] for entity in payload["entities"]},
             {"Alex Example", "Freezer-001", "Room A-101", "Room A-102"},
@@ -384,6 +392,33 @@ class SmartLabWebAppTests(unittest.TestCase):
         self.assertEqual(rerun["unchanged"], 4)
         self.assertEqual(rerun["parsed"], 0)
         self.assertEqual(rerun["assertions"], 0)
+
+    def test_state_reports_files_that_were_read_but_not_structured(self) -> None:
+        root = Path(self.state.root)
+        (root / "general-notes.txt").write_text(
+            "This document contains searchable prose but no structured lab facts.",
+            encoding="utf-8",
+        )
+        (root / "diagram.png").write_bytes(b"synthetic unsupported image")
+
+        status, _headers, _content = self.request(
+            "POST",
+            "/api/index",
+            body=b"",
+            headers=self.api_headers(),
+        )
+        self.assertEqual(status, 202)
+        self.assertTrue(self.state.wait_for_index(timeout=10))
+
+        payload = self.state_payload()
+        understanding = payload["summary"]["understanding"]
+        self.assertEqual(payload["summary"]["sources"], 5)
+        self.assertEqual(payload["summary"]["documents"], 5)
+        self.assertEqual(understanding["observed_files"], 6)
+        self.assertEqual(understanding["unsupported_files"], 1)
+        self.assertEqual(understanding["documents_with_structured_data"], 4)
+        self.assertEqual(understanding["documents_without_structured_data"], 1)
+        self.assertEqual(understanding["files_without_document"], 0)
 
     def test_search_and_issue_review_are_local_authenticated_and_durable(self) -> None:
         status, _headers, _content = self.request(

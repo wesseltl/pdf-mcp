@@ -161,6 +161,8 @@ class FilesystemConnector(ConnectorModule):
         failures: list[DiscoveryFailure] = []
         complete = True
         candidates: list[_Candidate] = []
+        observed_files = 0
+        unsupported_files = 0
         planned_files = 0
         planned_bytes = 0
         scanned_directories = 0
@@ -229,10 +231,12 @@ class FilesystemConnector(ConnectorModule):
                 if not _include_name(filename, settings):
                     continue
                 path = directory_path / filename
-                if path.suffix.lower() not in settings.include_extensions:
-                    continue
                 external_id = _relative_or_dot(path, settings.root)
                 if _excluded(external_id, filename, settings.exclude_patterns):
+                    continue
+                observed_files += 1
+                if path.suffix.lower() not in settings.include_extensions:
+                    unsupported_files += 1
                     continue
                 try:
                     if path.is_symlink():
@@ -249,6 +253,8 @@ class FilesystemConnector(ConnectorModule):
                             planned_files,
                             planned_bytes,
                             "file count",
+                            observed_files=observed_files,
+                            unsupported_files=unsupported_files,
                         )
                     if planned_bytes > settings.max_total_bytes:
                         return _scope_limit_batch(
@@ -256,6 +262,8 @@ class FilesystemConnector(ConnectorModule):
                             planned_files,
                             planned_bytes,
                             "total size",
+                            observed_files=observed_files,
+                            unsupported_files=unsupported_files,
                         )
                     if stat.st_size > settings.max_file_bytes:
                         raise OSError(
@@ -368,9 +376,11 @@ class FilesystemConnector(ConnectorModule):
             failures=tuple(failures),
             complete=complete,
             metadata={
+                "observed_files": observed_files,
                 "planned_files": planned_files,
                 "planned_bytes": planned_bytes,
                 "scanned_directories": scanned_directories,
+                "unsupported_files": unsupported_files,
                 "blocked": False,
             },
         )
@@ -576,6 +586,9 @@ def _scope_limit_batch(
     planned_files: int,
     planned_bytes: int,
     exceeded: str,
+    *,
+    observed_files: int,
+    unsupported_files: int,
 ) -> DiscoveryBatch:
     message = (
         f"source preflight stopped: {exceeded} exceeds configured scope "
@@ -586,8 +599,10 @@ def _scope_limit_batch(
         failures=(DiscoveryFailure(".", str(settings.root), message),),
         complete=False,
         metadata={
+            "observed_files": observed_files,
             "planned_files": planned_files,
             "planned_bytes": planned_bytes,
+            "unsupported_files": unsupported_files,
             "blocked": True,
         },
     )
