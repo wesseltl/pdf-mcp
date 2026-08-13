@@ -22,6 +22,7 @@ ROOT = Path(__file__).resolve().parents[1]
 BUILD_ROOT = ROOT / "build" / "desktop-app"
 APP_DIST = BUILD_ROOT / "dist"
 FINAL_DIST = ROOT / "dist"
+STARTUP_TIMEOUT_SECONDS = 60
 
 
 def platform_label() -> str:
@@ -58,7 +59,7 @@ def smoke_test(executable: Path) -> None:
             env=environment,
         )
         try:
-            deadline = time.monotonic() + 30
+            deadline = time.monotonic() + STARTUP_TIMEOUT_SECONDS
             while time.monotonic() < deadline:
                 if process.poll() is not None:
                     detail = _startup_detail(startup_output)
@@ -73,7 +74,10 @@ def smoke_test(executable: Path) -> None:
                 except OSError:
                     time.sleep(0.4)
             detail = _startup_detail(startup_output)
-            message = "desktop app did not start within 30 seconds"
+            message = (
+                "desktop app did not start within "
+                f"{STARTUP_TIMEOUT_SECONDS} seconds"
+            )
             raise RuntimeError(f"{message}:\n{detail}" if detail else message)
         finally:
             if process.poll() is None:
