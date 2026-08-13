@@ -1,0 +1,83 @@
+{
+  "schema_version": "1.0",
+  "offer_id": "laboverlay-request-beta",
+  "offer_kind": "local_software_beta",
+  "product": "LabOverlay",
+  "version": "0.7.0",
+  "status": "accepting_beta_requests",
+  "access": {
+    "type": "request_only",
+    "billing": "free_beta",
+    "availability": "limited"
+  },
+  "summary": "Request access to a local-first laboratory knowledge indexing beta that preserves source evidence and surfaces conflicting records without modifying source files.",
+  "intended_for": [
+    "laboratory operations teams",
+    "research teams",
+    "quality teams",
+    "facility and equipment teams"
+  ],
+  "current_capabilities": [
+    "read-only recursive filesystem discovery",
+    "PDF, DOCX, XLSX, CSV, and TXT parsing",
+    "equipment, location, person, document, and responsibility indexing",
+    "assertion-level provenance",
+    "conflicting location detection",
+    "local search across entities, assertions, documents, issues, and sources",
+    "auditable issue confirmation and dismissal",
+    "bounded source preflight with progress and cancellation",
+    "one-time graphical folder setup with remembered private workspace settings",
+    "automatic first scan and scheduled incremental scans",
+    "plain-language desktop and mobile browser workspace",
+    "interactive entity and relationship map with source-linked review actions",
+    "overdue calibration date detection",
+    "incremental re-indexing",
+    "scheduled incremental indexing",
+    "process-isolated parser resource controls",
+    "operator-authenticated controlled-production mode",
+    "verified local backup and offline restore",
+    "local no-egress operation without telemetry"
+  ],
+  "current_limits": [
+    "filesystem sources only",
+    "no OCR",
+    "no multi-user access enforcement",
+    "POSIX owner/group metadata only; no Windows or SharePoint ACL enforcement",
+    "no source write-back",
+    "not a malware-analysis sandbox or validated regulated system",
+    "desktop artifacts are unsigned until publisher credentials are configured"
+  ],
+  "application_rules": {
+    "attach_files_to_request": false,
+    "send_document_contents_by_email": false,
+    "accepted_initial_data": "synthetic, non-sensitive, or explicitly approved internal sample data",
+    "invitation_guaranteed": false,
+    "production_sla": false
+  },
+  "runtime_privacy": {
+    "source_access": "read_only",
+    "document_uploads": false,
+    "telemetry": false,
+    "analytics": false,
+    "runtime_external_assets": false,
+    "no_egress_mode": true,
+    "production_operator_authentication": "shared local operator credential over loopback or an SSH tunnel",
+    "local_index_storage": "owner-restricted SQLite; content is not application-encrypted"
+  },
+  "access_methods": [
+    {
+      "type": "email_beta_request",
+      "url": "mailto:wesseltl@gmail.com?subject=LabOverlay%20Beta%20Request",
+      "description": "Send a short use-case description without attaching files or confidential information."
+    }
+  ],
+  "agent_instructions": {
+    "requires_user_confirmation": true,
+    "do_not_attach_documents_to_email": true,
+    "recommended_action": "Explain the local beta scope and limitations, ask the user for approval, then prepare an access request containing only organization type, laboratory type, operating system, approximate test-file count and formats, and the problem to evaluate. Never attach source files or include document contents.",
+    "email_body_template": "Hi Wessel,\n\nI want to request LabOverlay beta access.\n\nOrganization or project:\nLaboratory type:\nOperating system:\nApproximate number and types of test files:\nMain problem to evaluate:\n\nI will not attach documents to this request."
+  },
+  "terms_url": "https://wesseltl.github.io/pdf-mcp/laboverlay-beta-terms.html",
+  "privacy_url": "https://wesseltl.github.io/pdf-mcp/privacy.html",
+  "human_readable_url": "https://wesseltl.github.io/pdf-mcp/#beta"
+}

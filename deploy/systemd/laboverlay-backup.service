@@ -1,0 +1,33 @@
+[Unit]
+Description=Create and verify a LabOverlay backup
+ConditionPathExists=/var/lib/laboverlay/index.db
+
+[Service]
+Type=oneshot
+User=laboverlay
+Group=laboverlay
+UMask=0077
+StateDirectory=laboverlay
+StateDirectoryMode=0700
+ExecStart=/opt/laboverlay/venv/bin/laboverlay backup --database /var/lib/laboverlay/index.db
+NoNewPrivileges=true
+ProtectSystem=strict
+ProtectHome=true
+ProtectHostname=true
+PrivateTmp=true
+PrivateDevices=true
+ProtectProc=invisible
+ProcSubset=pid
+ProtectKernelTunables=true
+ProtectKernelModules=true
+ProtectKernelLogs=true
+ProtectControlGroups=true
+RestrictSUIDSGID=true
+LockPersonality=true
+RestrictNamespaces=true
+SystemCallArchitectures=native
+CapabilityBoundingSet=
+AmbientCapabilities=
+ReadWritePaths=/var/lib/laboverlay
+RestrictAddressFamilies=AF_UNIX
+IPAddressDeny=any

@@ -1,14 +1,60 @@
 <!-- mcp-name: io.github.wesseltl/pdf-mcp -->
 
-# pdf-mcp
+# LabOverlay
 
 ![CI](https://github.com/wesseltl/pdf-mcp/actions/workflows/ci.yml/badge.svg)
 ![Python](https://img.shields.io/badge/python-3.10%2B-blue)
 ![MCP](https://img.shields.io/badge/MCP-server-6E56CF)
 ![License](https://img.shields.io/badge/license-MIT-green)
 
-**Turn tables in PDF and Word documents into Excel, CSV, or JSON.** Use the simple browser app with
-no agent setup, or connect the same deterministic extraction tools to an AI agent through
+**Build a local, evidence-backed index above the laboratory files and systems you already use.**
+LabOverlay discovers supported files, connects names and relationships, preserves why every
+fact is believed, and reports contradictions without editing the source.
+
+The modular product includes a local operator GUI and deterministic CLI. It works without AI, cloud
+services, telemetry, or network access. Start with the four-file synthetic example in
+[LABOVERLAY.md](LABOVERLAY.md).
+
+```bash
+python -m venv .venv
+.venv/bin/python -m pip install -e .
+.venv/bin/laboverlay-app
+```
+
+Choose a laboratory folder once in the system dialog or bundled folder navigator. The browser opens
+the Overview workspace and starts the first read-only sync automatically. The app remembers that
+approved folder, reopens it without setup, and repeats incremental syncs every 15 minutes. Search,
+Equipment, Locations, People, Responsibilities, Documents, Sources, and the Review queue remain
+local. **Manage source** switches workspaces without a terminal. The app binds only to loopback and
+serves bundled assets. Overview turns indexed entities and assertions into a connected knowledge map
+and brings the most important evidence-backed decision to the top of the workspace.
+
+The target subscription architecture keeps billing and device enrollment in a hosted control plane
+while documents and extracted knowledge stay in the laboratory. See
+[SELF_SERVICE_ARCHITECTURE.md](SELF_SERVICE_ARCHITECTURE.md) for implemented behavior and remaining
+self-service launch gates.
+
+For a dedicated, single-tenant Linux deployment, see
+[PRODUCTION_DEPLOYMENT.md](PRODUCTION_DEPLOYMENT.md). Controlled-production mode adds operator
+authentication, scheduled runs, disposable resource-limited parser processes, health probes,
+exclusive database ownership, manifested backup/restore commands, and a hash-verified Linux runtime
+lock. Organization-specific validation and source-access approval remain required.
+
+The release workflow creates standalone `laboverlay` applications and SHA-256 manifests for
+Windows, macOS, and Linux. Windows users receive a standard per-user Setup executable as well as a
+portable ZIP. Setup needs no administrator rights, adds LabOverlay to the Start Menu, supports
+in-place upgrades and uninstall, and leaves indexes and settings in `%USERPROFILE%\.laboverlay`
+untouched. Python is not required. Windows signing and macOS signing/notarization activate when
+publisher credentials are configured for the release workflow.
+
+Existing installations that only contain `%USERPROFILE%\.smart-lab-index` continue using that
+state directory automatically. The legacy `smart-lab-index` command aliases also remain available.
+
+## Document ingestion compatibility
+
+The existing `pdf-mcp` browser app and MCP tools remain available as document-ingestion capabilities.
+They turn tables in PDF and Word documents into Excel, CSV, or JSON. The browser app needs no agent
+setup, while the same deterministic tools can be connected to an AI agent through
 [MCP](https://modelcontextprotocol.io).
 
 The browser app is for direct table conversion. It previews the extracted rows, highlights basic
@@ -22,7 +68,7 @@ Need a profile and measured baseline for real documents? See the
 Agents can use the structured offer at
 [`offers/document-to-excel-pilot.json`](https://raw.githubusercontent.com/wesseltl/pdf-mcp/main/offers/document-to-excel-pilot.json).
 
-Website: [simple conversion, local tools, and the free hosted agent beta](https://wesseltl.github.io/pdf-mcp/).
+Website: [LabOverlay request-only beta and compatible document tools](https://wesseltl.github.io/pdf-mcp/).
 
 > **Current limitation:** PDF extraction supports born-digital documents. Scanned or image-only PDFs
 > require OCR, which is not included. An `accepted` decision means the configured checks passed; it

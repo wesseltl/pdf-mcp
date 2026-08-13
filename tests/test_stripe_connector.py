@@ -1,4 +1,5 @@
 """Tests for Stripe Payment Link offer plumbing without calling Stripe."""
+
 import importlib.util
 import json
 import os
@@ -6,7 +7,6 @@ import tempfile
 import unittest
 from pathlib import Path
 from unittest import mock
-
 
 ROOT = Path(__file__).resolve().parents[1]
 SCRIPT = ROOT / "scripts" / "create_stripe_payment_links.py"
@@ -44,6 +44,50 @@ class TestStripeConnector(unittest.TestCase):
         self.assertEqual(plan["payment_link"]["billing_address_collection"], "required")
         self.assertTrue(plan["payment_link"]["tax_id_collection"]["enabled"])
 
+    def test_recurring_plan_requires_and_preserves_entitlement_fulfillment(self):
+        offer = {
+            "offer_id": "laboverlay",
+            "name": "LabOverlay",
+            "summary": "Local-first laboratory knowledge index.",
+            "price": {
+                "amount": "149.00",
+                "currency": "EUR",
+                "billing": "monthly",
+            },
+            "fulfillment": {
+                "mode": "webhook_entitlement",
+                "entitlement_id": "smart_lab_index_core",
+                "success_url": (
+                    "https://app.smartlabindex.example/setup"
+                    "?session_id={CHECKOUT_SESSION_ID}"
+                ),
+            },
+            "source_repository": "https://github.com/wesseltl/pdf-mcp",
+        }
+
+        plan = stripe_connector.build_creation_plan(offer)
+
+        self.assertEqual(plan["price"]["recurring"], {"interval": "month"})
+        self.assertIn(
+            "{CHECKOUT_SESSION_ID}",
+            plan["payment_link"]["after_completion"]["redirect"]["url"],
+        )
+
+    def test_recurring_plan_fails_without_automatic_fulfillment_contract(self):
+        offer = {
+            "offer_id": "laboverlay",
+            "name": "LabOverlay",
+            "summary": "Local-first laboratory knowledge index.",
+            "price": {
+                "amount": "149.00",
+                "currency": "EUR",
+                "billing": "monthly",
+            },
+            "source_repository": "https://github.com/wesseltl/pdf-mcp",
+        }
+        with self.assertRaisesRegex(ValueError, "webhook_entitlement"):
+            stripe_connector.build_creation_plan(offer)
+
     def test_upsert_stripe_method(self):
         offer = {
             "checkout_url": None,
@@ -77,18 +121,19 @@ class TestStripeConnector(unittest.TestCase):
         self.assertIsNone(unchanged["checkout_url"])
 
     def test_stripe_call_requires_explicit_expected_mode(self):
-        with mock.patch("sys.argv", ["create_stripe_payment_links.py", "--live"]):
-            with self.assertRaises(SystemExit) as raised:
-                stripe_connector.main()
+        with (
+            mock.patch("sys.argv", ["create_stripe_payment_links.py", "--live"]),
+            self.assertRaises(SystemExit) as raised,
+        ):
+            stripe_connector.main()
         self.assertIn("--expected-mode", str(raised.exception))
 
     def test_live_mode_requires_write(self):
         with mock.patch(
             "sys.argv",
             ["create_stripe_payment_links.py", "--live", "--expected-mode", "live"],
-        ):
-            with self.assertRaises(SystemExit) as raised:
-                stripe_connector.main()
+        ), self.assertRaises(SystemExit) as raised:
+            stripe_connector.main()
         self.assertIn("--write", str(raised.exception))
 
     def test_test_mode_rejects_write(self):
@@ -101,9 +146,8 @@ class TestStripeConnector(unittest.TestCase):
                 "--expected-mode",
                 "test",
             ],
-        ):
-            with self.assertRaises(SystemExit) as raised:
-                stripe_connector.main()
+        ), self.assertRaises(SystemExit) as raised:
+            stripe_connector.main()
         self.assertIn("Test checkout", str(raised.exception))
 
     def test_mode_mismatch_stops_before_stripe_import(self):
@@ -114,9 +158,11 @@ class TestStripeConnector(unittest.TestCase):
             "price": {"amount": "19.00", "currency": "EUR"},
             "source_repository": "https://github.com/wesseltl/pdf-mcp",
         }
-        with mock.patch.dict(os.environ, {"STRIPE_SECRET_KEY": "sk_test_example"}):
-            with self.assertRaises(SystemExit) as raised:
-                stripe_connector.create_payment_link(offer, expected_mode="live")
+        with (
+            mock.patch.dict(os.environ, {"STRIPE_SECRET_KEY": "sk_test_example"}),
+            self.assertRaises(SystemExit) as raised,
+        ):
+            stripe_connector.create_payment_link(offer, expected_mode="live")
         self.assertIn("test mode", str(raised.exception))
 
     def test_live_mode_requires_complete_seller_identity(self):
@@ -128,9 +174,11 @@ class TestStripeConnector(unittest.TestCase):
             "source_repository": "https://github.com/wesseltl/pdf-mcp",
             "seller": {"name": "Wessel ter Laak"},
         }
-        with mock.patch.dict(os.environ, {"STRIPE_SECRET_KEY": "sk_live_example"}):
-            with self.assertRaises(SystemExit) as raised:
-                stripe_connector.create_payment_link(offer, expected_mode="live")
+        with (
+            mock.patch.dict(os.environ, {"STRIPE_SECRET_KEY": "sk_live_example"}),
+            self.assertRaises(SystemExit) as raised,
+        ):
+            stripe_connector.create_payment_link(offer, expected_mode="live")
         self.assertIn("business_registration_number", str(raised.exception))
 
     def test_live_result_marks_offer_available(self):
